@@ -76,3 +76,34 @@ export async function fetchAvatarObjectUrl(downloadUrl: string): Promise<string 
   const blob = await response.blob();
   return URL.createObjectURL(blob);
 }
+
+/**
+ * Descarga el avatar (proxy autenticado) y lo devuelve como **data URL** (QL-44). A
+ * diferencia de un `blob:` URL —vivo solo durante la sesión de la página—, un data URL se
+ * puede persistir en `localStorage` y sobrevive a recargas y al cierre de sesión, así que
+ * sirve para cachear la foto de la "última cuenta" y mostrarla en el login sin token.
+ *
+ * Best-effort: devuelve `null` (sin lanzar) si no hay avatar, falla la red o el token ya no
+ * es válido, para no romper el flujo de login que lo invoca.
+ */
+export async function fetchAvatarDataUrl(downloadUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${BASE_URL}${downloadUrl}`, {
+      method: 'GET',
+      headers: authHeader(),
+    });
+
+    if (!response.ok) return null;
+
+    const blob = await response.blob();
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () =>
+        resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}

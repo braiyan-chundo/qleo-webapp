@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { QleoLoader } from '@/shared/components/QleoLoader';
@@ -22,6 +22,7 @@ export function SessionGate() {
   const token = useAuthStore((s) => s.accessToken);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const location = useLocation();
 
   const { isLoading, isError, error, refetch } = useProfile();
 
@@ -34,7 +35,8 @@ export function SessionGate() {
   }, [is401, logout]);
 
   if (!token) {
-    return <Navigate to="/login" replace />;
+    // Guardamos la ubicación actual para volver aquí tras el login (QL-49).
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   // El perfil aún no ha resuelto y no tenemos usuario rehidratado todavía.

@@ -75,6 +75,12 @@
   --error-container: #ffdad6;
   --on-error-container: #93000a;
 
+  /* Warning (advertencia — par tonal ámbar M3) */
+  --warning: #855400;
+  --on-warning: #ffffff;
+  --warning-container: #ffddad;
+  --on-warning-container: #2a1800;
+
   /* Fixed (M3 fixed accent set) */
   --primary-fixed: #dbe1ff;
   --primary-fixed-dim: #b4c5ff;
@@ -217,6 +223,12 @@
   --error-container: rgba(255, 77, 109, 0.16);
   --on-error-container: #ffb3c0;
 
+  /* Warning — ámbar neón tenue */
+  --warning: #ffc247;
+  --on-warning: #0a0a12;
+  --warning-container: rgba(255, 194, 71, 0.16);
+  --on-warning-container: #ffdf9e;
+
   /* Fixed set (versiones neón tenues para acentos) */
   --primary-fixed: rgba(255, 45, 120, 0.24);
   --primary-fixed-dim: rgba(255, 45, 120, 0.4);
@@ -347,6 +359,11 @@
   --color-on-error: var(--on-error);
   --color-error-container: var(--error-container);
   --color-on-error-container: var(--on-error-container);
+
+  --color-warning: var(--warning);
+  --color-on-warning: var(--on-warning);
+  --color-warning-container: var(--warning-container);
+  --color-on-warning-container: var(--on-warning-container);
 
   /* ---- Paleta de etiquetas (bg-palette-blue-dot, text-palette-blue-on-surface, …) ---- */
   --color-palette-blue-dot: var(--palette-blue-dot);

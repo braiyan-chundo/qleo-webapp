@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/shared/components/AppSidebar';
 import { BottomNav } from '@/shared/components/BottomNav';
+import { PushNotificationBanner } from '@/features/push/components/PushNotificationBanner';
 import { ThemeToggle } from '@/shared/components/ThemeToggle';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { GlobalSearch } from '@/features/search/components/GlobalSearch';
@@ -128,8 +129,11 @@ export function AppLayout() {
             </div>
           </header>
 
+          {/* Banner de notificaciones desactivadas (QL-46): tope del área autenticada. */}
+          <PushNotificationBanner />
+
           {/* Main Content Area */}
-          <main className="flex-1 overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+          <main className="flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
             <Outlet />
           </main>
 

@@ -11,44 +11,59 @@ import { UsersAdminPage } from '@/features/users/pages/UsersAdminPage';
 import { AuditLogPage } from '@/features/audit/pages/AuditLogPage';
 import { HolidaysAdminPage } from '@/features/work-calendar/pages/HolidaysAdminPage';
 import { SessionGate } from '@/shared/components/SessionGate';
+import { PublicOnlyRoute } from '@/shared/components/PublicOnlyRoute';
 import { AdminRoute } from '@/shared/components/AdminRoute';
 import { AuthLayout } from '@/shared/layouts/AuthLayout';
 import { AppLayout } from '@/shared/layouts/AppLayout';
+import { ErrorBoundary } from '@/shared/components/ErrorBoundary';
+import { NotFoundPage } from '@/shared/components/NotFoundPage';
+import { useThemeColorMeta } from '@/shared/hooks/use-theme-color-meta';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 
 function App() {
+  // Sincroniza la barra del SO con el tema activo (QL-47).
+  useThemeColorMeta();
+
   return (
     <TooltipProvider>
       <Toaster richColors position="top-right" />
       <BrowserRouter>
-        <Routes>
-          <Route element={<AuthLayout />}>
-            <Route path="/login" element={<LoginPage />} />
-          </Route>
-
-          <Route element={<SessionGate />}>
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/projects/:id" element={<ProjectDetailPage />} />
-              <Route
-                path="/projects/:id/tasks/:taskId"
-                element={<TaskDetailPage />}
-              />
-              <Route path="/tasks" element={<MyTasksPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-
-              {/* Área de administración (solo ADMIN) */}
-              <Route element={<AdminRoute />}>
-                <Route path="/admin" element={<UsersAdminPage />} />
-                <Route path="/audit" element={<AuditLogPage />} />
-                <Route path="/calendar" element={<HolidaysAdminPage />} />
+        <ErrorBoundary>
+          <Routes>
+            {/* Rutas públicas: con sesión activa redirigen a la ruta previa o al inicio (QL-49). */}
+            <Route element={<PublicOnlyRoute />}>
+              <Route element={<AuthLayout />}>
+                <Route path="/login" element={<LoginPage />} />
               </Route>
             </Route>
-          </Route>
-        </Routes>
+
+            <Route element={<SessionGate />}>
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/projects" element={<ProjectsPage />} />
+                <Route path="/projects/:id" element={<ProjectDetailPage />} />
+                <Route
+                  path="/projects/:id/tasks/:taskId"
+                  element={<TaskDetailPage />}
+                />
+                <Route path="/tasks" element={<MyTasksPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+
+                {/* Área de administración (solo ADMIN) */}
+                <Route element={<AdminRoute />}>
+                  <Route path="/admin" element={<UsersAdminPage />} />
+                  <Route path="/audit" element={<AuditLogPage />} />
+                  <Route path="/calendar" element={<HolidaysAdminPage />} />
+                </Route>
+              </Route>
+            </Route>
+
+            {/* Ruta comodín: 404 de marca (QL-50). */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </ErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>
   );

@@ -1,7 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { authService, type LoginDto, type RegisterDto } from '../services/auth.service';
+import { rememberAccount } from '../lib/last-account';
 import { useAuthStore } from '@/store/auth.store';
+import { getFromPath } from '@/shared/lib/router-state';
 
 /**
  * Hooks de datos del feature Auth. Encapsulan TanStack Query para que las páginas
@@ -14,30 +16,42 @@ export const authKeys = {
   profile: ['auth', 'me'] as const,
 };
 
-/** Inicia sesión y guarda las credenciales; navega al inicio al terminar. */
+/**
+ * Inicia sesión, guarda credenciales y navega a la ruta previa (`state.from`, colocada por
+ * `SessionGate`) o al inicio (QL-49). Además cachea la "última cuenta" para el login (QL-44),
+ * best-effort: no bloquea ni condiciona la navegación.
+ */
 export function useLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
   const setCredentials = useAuthStore((s) => s.setCredentials);
 
   return useMutation({
     mutationFn: (dto: LoginDto) => authService.login(dto),
     onSuccess: (res) => {
       setCredentials(res.accessToken, res.user);
-      navigate('/');
+      // QL-44: recuerda la cuenta (incl. avatar) sin bloquear el redirect.
+      void rememberAccount(res.user);
+      navigate(getFromPath(location.state) ?? '/', { replace: true });
     },
   });
 }
 
-/** Registra un usuario (rol MEMBER), guarda credenciales y navega al inicio. */
+/**
+ * Registra un usuario (rol MEMBER), guarda credenciales y navega a la ruta previa o al inicio.
+ * También cachea la última cuenta (QL-44) de forma best-effort.
+ */
 export function useRegister() {
   const navigate = useNavigate();
+  const location = useLocation();
   const setCredentials = useAuthStore((s) => s.setCredentials);
 
   return useMutation({
     mutationFn: (dto: RegisterDto) => authService.register(dto),
     onSuccess: (res) => {
       setCredentials(res.accessToken, res.user);
-      navigate('/');
+      void rememberAccount(res.user);
+      navigate(getFromPath(location.state) ?? '/', { replace: true });
     },
   });
 }

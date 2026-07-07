@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useLogin, useRegister } from '../hooks/use-auth';
+import { LastAccountCard } from '../components/LastAccountCard';
+import { clearLastAccount, getLastAccount } from '../lib/last-account';
 
 import { Mail, Lock, EyeOff, Eye, User, Briefcase } from 'lucide-react';
 import { QleoLogo } from '@/shared/components/QleoLogo';
@@ -36,6 +38,8 @@ const registerSchema = z.object({
 export const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+  // QL-44: última cuenta recordada (localStorage). Se lee una vez al montar.
+  const [rememberedAccount, setRememberedAccount] = useState(() => getLastAccount());
 
   const loginMutation = useLogin();
   const registerMutation = useRegister();
@@ -57,6 +61,21 @@ export const LoginPage = () => {
 
   const onLogin = (data: z.infer<typeof loginSchema>) => {
     loginMutation.mutate(data);
+  };
+
+  // QL-44: al elegir la cuenta recordada, precarga el email y enfoca la contraseña.
+  const handleSelectRememberedAccount = () => {
+    if (!rememberedAccount) return;
+    loginForm.setValue('email', rememberedAccount.email);
+    loginForm.setFocus('password');
+  };
+
+  // "Usar otra cuenta": olvida la cuenta recordada y muestra el formulario limpio.
+  const handleUseAnotherAccount = () => {
+    clearLastAccount();
+    setRememberedAccount(null);
+    loginForm.setValue('email', '');
+    loginForm.setFocus('email');
   };
 
   const onRegister = (data: z.infer<typeof registerSchema>) => {
@@ -115,6 +134,28 @@ export const LoginPage = () => {
         {/* Form Section */}
         {!AUTH_FEATURES.register || activeTab === 'login' ? (
           <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-5">
+            {/* Última cuenta recordada (QL-44): tarjeta "¿Esta es tu cuenta?" + "Usar otra cuenta". */}
+            {rememberedAccount && (
+              <div className="space-y-2.5">
+                <p className="ml-1 text-xs font-medium text-on-surface-variant">
+                  ¿Esta es tu cuenta?
+                </p>
+                <LastAccountCard
+                  account={rememberedAccount}
+                  onSelect={handleSelectRememberedAccount}
+                />
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={handleUseAnotherAccount}
+                    className="text-xs font-medium text-primary transition-colors hover:underline underline-offset-2"
+                  >
+                    Usar otra cuenta
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Email Input */}
             <div className="space-y-1.5">
               <Label className="block text-xs font-medium text-on-surface ml-1" htmlFor="email">Correo electrónico</Label>

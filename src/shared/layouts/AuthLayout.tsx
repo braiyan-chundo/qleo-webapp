@@ -1,8 +1,14 @@
 import { Outlet } from 'react-router-dom';
+import { ThemeToggle } from '@/shared/components/ThemeToggle';
 
 export const AuthLayout = () => {
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-background">
+      {/* Cambio de tema (QL-43): accesible sobre el card, en la esquina superior. */}
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle />
+      </div>
+
       {/* Background Image Layer */}
       <div
         className="absolute inset-0 bg-cover bg-center z-0 scale-105 transform transition-transform duration-[20s] hover:scale-110"
