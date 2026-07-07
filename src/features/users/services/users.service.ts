@@ -1,0 +1,105 @@
+import { api } from '@/core/api/fetch-client';
+import type { Paginated } from '@/shared/types/paginated';
+
+/** DTO de respuesta del backend para un usuario (§3.2). Sin `passwordHash`. */
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string;
+  role: 'ADMIN' | 'MEMBER';
+  status: 'ACTIVE' | 'INACTIVE';
+  avatarUrl?: string;
+  /** QL-32: proxy privado del avatar subido, o `null` si no hay. */
+  avatarDownloadUrl?: string | null;
+  jobTitle?: string;
+  createdAt: string;
+}
+
+/** Entrada del directorio de usuarios (§3.2, `GET /users/directory`). Solo ACTIVOS. */
+export interface UserDirectoryEntry {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  /** QL-32: proxy privado del avatar subido, o `null` si no hay. */
+  avatarDownloadUrl?: string | null;
+  jobTitle?: string;
+}
+
+/** DTO de creación de usuario (§3.2, `POST /users`). Solo `ADMIN`. */
+export interface CreateUserDto {
+  name: string;
+  email: string;
+  password: string;
+  role?: 'ADMIN' | 'MEMBER';
+  jobTitle?: string;
+}
+
+/** DTO de actualización de usuario (§3.2, `PATCH /users/:id`). Todos opcionales. */
+export interface UpdateUserDto {
+  name?: string;
+  email?: string;
+  password?: string;
+  role?: 'ADMIN' | 'MEMBER';
+  jobTitle?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+}
+
+/** Filtros de listado de usuarios (§3.2). Solo `ADMIN` puede consultarlo. */
+export interface UserListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: 'ADMIN' | 'MEMBER';
+  status?: 'ACTIVE' | 'INACTIVE';
+}
+
+function buildQuery(params: UserListParams): string {
+  const search = new URLSearchParams();
+  if (params.page != null) search.set('page', String(params.page));
+  if (params.limit != null) search.set('limit', String(params.limit));
+  if (params.search) search.set('search', params.search);
+  if (params.role) search.set('role', params.role);
+  if (params.status) search.set('status', params.status);
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
+}
+
+export const usersService = {
+  /** Listado completo con paginación. **Solo ADMIN** (pantalla de administración). */
+  list: (params: UserListParams = {}) => {
+    return api.get<Paginated<UserSummary>>(`/users${buildQuery(params)}`);
+  },
+
+  /** Crea un usuario fijando el rol de plataforma. **Solo ADMIN**. 409 si el email existe. */
+  create: (dto: CreateUserDto) => {
+    return api.post<UserSummary>('/users', dto);
+  },
+
+  /** Obtiene un usuario por id. **Solo ADMIN**. */
+  getById: (id: string) => {
+    return api.get<UserSummary>(`/users/${id}`);
+  },
+
+  /** Actualiza datos, rol, contraseña o estado. **Solo ADMIN**. */
+  update: (id: string, dto: UpdateUserDto) => {
+    return api.patch<UserSummary>(`/users/${id}`, dto);
+  },
+
+  /** Desactiva (soft delete → `status: INACTIVE`). **Solo ADMIN**. */
+  remove: (id: string) => {
+    return api.delete<UserSummary>(`/users/${id}`);
+  },
+
+  /**
+   * Directorio de usuarios activos para pickers (§3.2). Accesible a **cualquier
+   * autenticado**. Devuelve un array simple (sin envoltorio de paginación),
+   * ordenado por `name` asc. `limit` def. 10, máx. 50.
+   */
+  directory: (search?: string, limit = 10) => {
+    const qs = new URLSearchParams();
+    if (search?.trim()) qs.set('search', search.trim());
+    qs.set('limit', String(limit));
+    return api.get<UserDirectoryEntry[]>(`/users/directory?${qs.toString()}`);
+  },
+};

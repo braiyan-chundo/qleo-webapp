@@ -1,0 +1,347 @@
+import { useEffect } from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from '@/components/ui/native-select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+import { useStages } from '@/features/stages/hooks/use-stages';
+import { useColumns } from '@/features/columns/hooks/use-columns';
+
+import { DatePicker } from '@/components/ui/date-picker';
+
+import { useCreateTask, useUpdateTask } from '../hooks/use-tasks';
+import { taskFormSchema, type TaskFormValues } from '../schemas/task.schema';
+import type { Task } from '../services/tasks.service';
+import {
+  dateInputToDate,
+  dateInputToIso,
+  dateToDateInput,
+  isoToDateInput,
+} from '../lib/deadline';
+
+interface TaskFormDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  projectId: string;
+  /** Si se pasa, el diálogo funciona en modo edición (solo CREATOR). */
+  task?: Task;
+  /** Al crear desde "+ Añadir tarea" de una columna, presetea esa columna. */
+  presetColumnId?: string;
+}
+
+const emptyValues: TaskFormValues = {
+  title: '',
+  description: '',
+  stageId: '',
+  columnId: '',
+  label: '',
+  startDate: '',
+};
+
+/** Crear/editar una tarea (QL-07). Selectores de etapa (obligatorio) y columna (opcional). */
+export function TaskFormDialog({
+  open,
+  onOpenChange,
+  projectId,
+  task,
+  presetColumnId,
+}: TaskFormDialogProps) {
+  const isEdit = !!task;
+
+  const { data: stages, isLoading: stagesLoading } = useStages(
+    open ? projectId : undefined,
+  );
+  const { data: columns, isLoading: columnsLoading } = useColumns(
+    open ? projectId : undefined,
+  );
+  const defaultColumn = columns?.find((c) => c.isDefault);
+
+  const createTask = useCreateTask(projectId);
+  const updateTask = useUpdateTask(projectId);
+  const isPending = createTask.isPending || updateTask.isPending;
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<TaskFormValues>({
+    resolver: zodResolver(taskFormSchema),
+    defaultValues: emptyValues,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    if (task) {
+      reset({
+        title: task.title,
+        description: task.description ?? '',
+        stageId: task.stageId,
+        columnId: task.columnId,
+        label: task.label ?? '',
+        startDate: isoToDateInput(task.startDate),
+      });
+    } else {
+      reset({
+        ...emptyValues,
+        stageId: stages?.[0]?.id ?? '',
+        columnId: presetColumnId ?? '',
+      });
+    }
+  }, [open, task, stages, presetColumnId, reset]);
+
+  const onSubmit = (values: TaskFormValues) => {
+    const description = values.description?.trim() || undefined;
+    const label = values.label?.trim() || undefined;
+    const startDate = dateInputToIso(values.startDate ?? '');
+
+    if (isEdit && task) {
+      updateTask.mutate(
+        {
+          id: task.id,
+          data: {
+            title: values.title.trim(),
+            description,
+            stageId: values.stageId,
+            columnId: values.columnId || undefined,
+            // `null` limpia la etiqueta/fecha si el usuario las borró.
+            label: label ?? null,
+            startDate,
+          },
+        },
+        {
+          onSuccess: () => {
+            toast.success('Tarea actualizada');
+            onOpenChange(false);
+          },
+          onError: (err) => {
+            toast.error(
+              err instanceof Error ? err.message : 'No se pudo actualizar la tarea',
+            );
+          },
+        },
+      );
+    } else {
+      createTask.mutate(
+        {
+          projectId,
+          stageId: values.stageId,
+          title: values.title.trim(),
+          description,
+          columnId: values.columnId || undefined,
+          label,
+          startDate,
+        },
+        {
+          onSuccess: () => {
+            toast.success('Tarea creada');
+            onOpenChange(false);
+          },
+          onError: (err) => {
+            toast.error(
+              err instanceof Error ? err.message : 'No se pudo crear la tarea',
+            );
+          },
+        },
+      );
+    }
+  };
+
+  const noStages = !stagesLoading && (!stages || stages.length === 0);
+  const noColumns = !columnsLoading && (!columns || columns.length === 0);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Editar tarea' : 'Nueva tarea'}</DialogTitle>
+          <DialogDescription>
+            Cada tarea pertenece a una etapa y a una columna de estado. El título es
+            obligatorio.
+          </DialogDescription>
+        </DialogHeader>
+
+        {(noStages || noColumns) && (
+          <div className="rounded-lg border border-error/20 bg-error-container px-4 py-3 text-sm font-medium text-on-error-container">
+            {noColumns
+              ? 'El proyecto no tiene columnas. Crea al menos una columna de estado antes de añadir tareas.'
+              : 'El proyecto no tiene etapas. Crea al menos una etapa antes de añadir tareas.'}
+          </div>
+        )}
+
+        <form
+          id="task-form"
+          onSubmit={handleSubmit(onSubmit)}
+          className="grid gap-4"
+        >
+          <div className="grid gap-1.5">
+            <Label htmlFor="title" className="text-on-surface">
+              Título <span className="text-error">*</span>
+            </Label>
+            <Input
+              id="title"
+              placeholder="Reservar hotel en Cancún"
+              className="h-10"
+              {...register('title')}
+            />
+            {errors.title && (
+              <span className="text-xs font-medium text-error">
+                {errors.title.message}
+              </span>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="stageId" className="text-on-surface">
+                Etapa <span className="text-error">*</span>
+              </Label>
+              <Controller
+                control={control}
+                name="stageId"
+                render={({ field }) => (
+                  <NativeSelect
+                    id="stageId"
+                    className="w-full [&>select]:h-10"
+                    disabled={stagesLoading || noStages}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  >
+                    <NativeSelectOption value="" disabled>
+                      {stagesLoading ? 'Cargando…' : 'Selecciona una etapa'}
+                    </NativeSelectOption>
+                    {stages?.map((stage) => (
+                      <NativeSelectOption key={stage.id} value={stage.id}>
+                        {stage.name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                )}
+              />
+              {errors.stageId && (
+                <span className="text-xs font-medium text-error">
+                  {errors.stageId.message}
+                </span>
+              )}
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="columnId" className="text-on-surface">
+                Columna
+              </Label>
+              <Controller
+                control={control}
+                name="columnId"
+                render={({ field }) => (
+                  <NativeSelect
+                    id="columnId"
+                    className="w-full [&>select]:h-10"
+                    disabled={columnsLoading || noColumns}
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  >
+                    <NativeSelectOption value="">
+                      {defaultColumn
+                        ? `Por defecto (${defaultColumn.name})`
+                        : 'Columna por defecto'}
+                    </NativeSelectOption>
+                    {columns?.map((column) => (
+                      <NativeSelectOption key={column.id} value={column.id}>
+                        {column.name}
+                        {column.isDefault ? ' (por defecto)' : ''}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                )}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="label" className="text-on-surface">
+                Etiqueta
+              </Label>
+              <Input
+                id="label"
+                placeholder="VUELOS"
+                className="h-10"
+                {...register('label')}
+              />
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="startDate" className="text-on-surface">
+                Fecha de inicio
+              </Label>
+              <Controller
+                control={control}
+                name="startDate"
+                render={({ field }) => (
+                  <DatePicker
+                    id="startDate"
+                    className="w-full"
+                    value={dateInputToDate(field.value ?? '')}
+                    onChange={(date) => field.onChange(dateToDateInput(date))}
+                    placeholder="Sin fecha"
+                  />
+                )}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="description" className="text-on-surface">
+              Descripción
+            </Label>
+            <Textarea
+              id="description"
+              rows={3}
+              placeholder="Detalles, alcance o notas de la tarea…"
+              {...register('description')}
+            />
+          </div>
+        </form>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="task-form"
+            disabled={isPending || noStages || noColumns}
+          >
+            {isPending && <Loader2 className="animate-spin" />}
+            {isEdit ? 'Guardar cambios' : 'Crear tarea'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

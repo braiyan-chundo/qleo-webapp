@@ -1,0 +1,612 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/sora";
+@import "@fontsource-variable/space-grotesk";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================================
+   QLEO — SISTEMA DE DISEÑO DUAL
+   Tema claro  = "Qleo Design System" (Material 3 Sapphire)
+   Tema oscuro = "Neon Tokyo" (cyberpunk)
+   ---------------------------------------------------------------------------
+   Estructura:
+   1) :root           → tokens Material 3 del TEMA CLARO (hex exactos)
+   2) .dark           → tokens M3 derivados del TEMA OSCURO Neon Tokyo
+   3) @theme inline   → expone TODOS los tokens M3 como utilidades Tailwind
+                        (bg-surface, text-on-surface-variant, …) Y mapea los
+                        tokens estándar de shadcn sobre la paleta M3.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1) TEMA CLARO — Material 3 Sapphire
+   -------------------------------------------------------------------------- */
+:root {
+  /* Superficies y fondos */
+  --surface: #f8f9ff;
+  --surface-dim: #cbdbf5;
+  --surface-bright: #f8f9ff;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #eff4ff;
+  --surface-container: #e5eeff;
+  --surface-container-high: #dce9ff;
+  --surface-container-highest: #d3e4fe;
+  --background: #f8f9ff;
+  --on-background: #0b1c30;
+  --surface-variant: #d3e4fe;
+
+  /* Texto sobre superficies */
+  --on-surface: #0b1c30;
+  --on-surface-variant: #424656;
+
+  /* Inversos */
+  --inverse-surface: #213145;
+  --inverse-on-surface: #eaf1ff;
+  --inverse-primary: #b4c5ff;
+
+  /* Bordes y tinte */
+  --outline: #737687;
+  --outline-variant: #c3c6d8;
+  --surface-tint: #0052dd;
+
+  /* Primario */
+  --primary: #004ccd;
+  --on-primary: #ffffff;
+  --primary-container: #0f62fe;
+  --on-primary-container: #f3f3ff;
+
+  /* Secundario */
+  --secondary: #006c49;
+  --on-secondary: #ffffff;
+  --secondary-container: #6cf8bb;
+  --on-secondary-container: #00714d;
+
+  /* Terciario */
+  --tertiary: #7b4d00;
+  --on-tertiary: #ffffff;
+  --tertiary-container: #9c6300;
+  --on-tertiary-container: #fff2e7;
+
+  /* Error */
+  --error: #ba1a1a;
+  --on-error: #ffffff;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+
+  /* Fixed (M3 fixed accent set) */
+  --primary-fixed: #dbe1ff;
+  --primary-fixed-dim: #b4c5ff;
+  --on-primary-fixed: #00174c;
+  --on-primary-fixed-variant: #003da9;
+  --secondary-fixed: #6ffbbe;
+  --secondary-fixed-dim: #4edea3;
+  --on-secondary-fixed: #002113;
+  --on-secondary-fixed-variant: #005236;
+  --tertiary-fixed: #ffddb8;
+  --tertiary-fixed-dim: #ffb95f;
+  --on-tertiary-fixed: #2a1700;
+  --on-tertiary-fixed-variant: #653e00;
+
+  /* Radios (M3 / Apple) */
+  --radius: 0.5rem;
+
+  /* ---- Paleta de etiquetas del tablero (columnas/categorías) ----
+     `-dot` = punto sólido saturado; `-surface`/`-on-surface` = pill suave legible.
+     Tema claro (M3): tonos accesibles sobre superficies claras. */
+  --palette-blue-dot: #0f62fe;
+  --palette-blue-surface: #dbe4ff;
+  --palette-blue-on-surface: #002d9c;
+  --palette-orange-dot: #b45309;
+  --palette-orange-surface: #ffe9cf;
+  --palette-orange-on-surface: #7a3d00;
+  --palette-green-dot: #087f5b;
+  --palette-green-surface: #cff5e6;
+  --palette-green-on-surface: #045c42;
+  --palette-purple-dot: #7048e8;
+  --palette-purple-surface: #e7ddff;
+  --palette-purple-on-surface: #45298f;
+  --palette-red-dot: #d32f2f;
+  --palette-red-surface: #ffdad6;
+  --palette-red-on-surface: #93000a;
+  --palette-pink-dot: #d6336c;
+  --palette-pink-surface: #ffdbe7;
+  --palette-pink-on-surface: #8f1046;
+  --palette-gray-dot: #64748b;
+  --palette-gray-surface: #e2e5ee;
+  --palette-gray-on-surface: #3b4252;
+
+  /* Sombras de elevación (M3 suaves, solo modo claro) */
+  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --elevation-2: 0 4px 12px -2px rgba(11, 28, 48, 0.08), 0 2px 6px -2px rgba(11, 28, 48, 0.05);
+  --elevation-3: 0 12px 32px -8px rgba(11, 28, 48, 0.12), 0 4px 12px -4px rgba(11, 28, 48, 0.08);
+
+  /* Glass (claro): blanco translúcido */
+  --glass-bg: rgba(248, 249, 255, 0.8);
+  --glass-border: rgba(195, 198, 216, 0.4);
+
+  /* ------ Tokens shadcn (mapeados sobre la paleta M3 clara) ------ */
+  --foreground: var(--on-surface);
+  --card: var(--surface-container-lowest);
+  --card-foreground: var(--on-surface);
+  --popover: var(--surface-container-low);
+  --popover-foreground: var(--on-surface);
+  --primary-foreground: var(--on-primary);
+  --secondary-foreground: var(--on-secondary-container);
+  --muted: var(--surface-container);
+  --muted-foreground: var(--on-surface-variant);
+  --accent: var(--primary-container);
+  --accent-foreground: var(--on-primary-container);
+  --destructive: var(--error);
+  --border: var(--outline-variant);
+  --input: var(--outline-variant);
+  --ring: var(--primary);
+  --chart-1: var(--primary);
+  --chart-2: var(--secondary);
+  --chart-3: var(--tertiary);
+  --chart-4: var(--primary-container);
+  --chart-5: var(--inverse-primary);
+  /* QL-39: fondo del sidebar diferenciado del general también en claro (antes `surface`,
+     igual que el fondo de la app). `surface-container` le da la sensación de "importancia"
+     que ya tenía en oscuro. */
+  --sidebar: var(--surface-container);
+  --sidebar-foreground: var(--on-surface);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-accent: var(--surface-container-low);
+  --sidebar-accent-foreground: var(--primary);
+  --sidebar-border: var(--outline-variant);
+  --sidebar-ring: var(--primary);
+}
+
+/* ---------------------------------------------------------------------------
+   2) TEMA OSCURO — "Neon Tokyo" (derivado)
+   Anclas: primary #ff2d78, secondary #00ffcc, tertiary #ffe04a, bg #0a0a12.
+   Superficies por elevación de tono (no por sombra). Neón solo como acento.
+   -------------------------------------------------------------------------- */
+.dark {
+  /* Superficies: jerarquía por tono, más claro = más elevado */
+  --background: #0a0a12;
+  --surface: #0a0a12;
+  --surface-dim: #06060c;
+  --surface-bright: #2d2d3e;
+  --surface-container-lowest: #06060c;
+  --surface-container-low: #12121c;
+  --surface-container: #171722;
+  --surface-container-high: #1e1e2b;
+  --surface-container-highest: #252534;
+  --surface-variant: #1e1e2b;
+  --on-background: #e8e8f5;
+
+  /* Texto: claro, nunca blanco puro */
+  --on-surface: #e8e8f5;
+  --on-surface-variant: #a5a5c0;
+
+  /* Inversos (superficie clara para contraste puntual) */
+  --inverse-surface: #12121c;
+  --inverse-on-surface: #e8e8f5;
+  --inverse-primary: #ff2d78;
+
+  /* Bordes neón tenues (finos, definen jerarquía en vez de sombras) */
+  --outline: rgba(255, 45, 120, 0.5);
+  --outline-variant: rgba(255, 45, 120, 0.22);
+  --surface-tint: #ff2d78;
+
+  /* Primario — rosa neón */
+  --primary: #ff2d78;
+  --on-primary: #0a0a12;
+  --primary-container: rgba(255, 45, 120, 0.16);
+  --on-primary-container: #ffb3d1;
+
+  /* Secundario — cian neón */
+  --secondary: #00ffcc;
+  --on-secondary: #0a0a12;
+  --secondary-container: rgba(0, 255, 204, 0.14);
+  --on-secondary-container: #9dffee;
+
+  /* Terciario — amarillo neón */
+  --tertiary: #ffe04a;
+  --on-tertiary: #0a0a12;
+  --tertiary-container: rgba(255, 224, 74, 0.14);
+  --on-tertiary-container: #fff2b0;
+
+  /* Error — rojo neón */
+  --error: #ff4d6d;
+  --on-error: #0a0a12;
+  --error-container: rgba(255, 77, 109, 0.16);
+  --on-error-container: #ffb3c0;
+
+  /* Fixed set (versiones neón tenues para acentos) */
+  --primary-fixed: rgba(255, 45, 120, 0.24);
+  --primary-fixed-dim: rgba(255, 45, 120, 0.4);
+  --on-primary-fixed: #ffe0ec;
+  --on-primary-fixed-variant: #ff85b0;
+  --secondary-fixed: rgba(0, 255, 204, 0.24);
+  --secondary-fixed-dim: rgba(0, 255, 204, 0.4);
+  --on-secondary-fixed: #d6fff7;
+  --on-secondary-fixed-variant: #5cffdf;
+  --tertiary-fixed: rgba(255, 224, 74, 0.24);
+  --tertiary-fixed-dim: rgba(255, 224, 74, 0.4);
+  --on-tertiary-fixed: #fff8d6;
+  --on-tertiary-fixed-variant: #ffe97a;
+
+  /* ---- Paleta de etiquetas del tablero (Neon Tokyo) ----
+     Puntos neón saturados; pills = tinte translúcido con texto claro. */
+  --palette-blue-dot: #4d9bff;
+  --palette-blue-surface: rgba(77, 155, 255, 0.16);
+  --palette-blue-on-surface: #a9ccff;
+  --palette-orange-dot: #ff9f40;
+  --palette-orange-surface: rgba(255, 159, 64, 0.16);
+  --palette-orange-on-surface: #ffcf9a;
+  --palette-green-dot: #2ee6a8;
+  --palette-green-surface: rgba(46, 230, 168, 0.16);
+  --palette-green-on-surface: #9dffe0;
+  --palette-purple-dot: #b085ff;
+  --palette-purple-surface: rgba(176, 133, 255, 0.16);
+  --palette-purple-on-surface: #d8c7ff;
+  --palette-red-dot: #ff4d6d;
+  --palette-red-surface: rgba(255, 77, 109, 0.16);
+  --palette-red-on-surface: #ffb3c0;
+  --palette-pink-dot: #ff2d78;
+  --palette-pink-surface: rgba(255, 45, 120, 0.16);
+  --palette-pink-on-surface: #ffb3d1;
+  --palette-gray-dot: #9aa3b8;
+  --palette-gray-surface: rgba(154, 163, 184, 0.16);
+  --palette-gray-on-surface: #cfd4e2;
+
+  /* Sin sombras de elevación en dark: usa glow/bordes */
+  --elevation-1: none;
+  --elevation-2: none;
+  --elevation-3: none;
+
+  /* Glass (dark): oscuro translúcido */
+  --glass-bg: rgba(10, 10, 18, 0.8);
+  --glass-border: rgba(255, 45, 120, 0.18);
+
+  /* ------ Tokens shadcn (mapeados sobre la paleta Neon Tokyo) ------ */
+  --foreground: var(--on-surface);
+  --card: var(--surface-container-low);
+  --card-foreground: var(--on-surface);
+  --popover: var(--surface-container-high);
+  --popover-foreground: var(--on-surface);
+  --primary-foreground: var(--on-primary);
+  --secondary-foreground: var(--on-secondary-container);
+  --muted: var(--surface-container);
+  --muted-foreground: var(--on-surface-variant);
+  --accent: var(--primary-container);
+  --accent-foreground: var(--on-primary-container);
+  --destructive: var(--error);
+  --border: var(--outline-variant);
+  --input: var(--outline-variant);
+  --ring: var(--primary);
+  --chart-1: var(--primary);
+  --chart-2: var(--secondary);
+  --chart-3: var(--tertiary);
+  --chart-4: var(--error);
+  --chart-5: var(--inverse-primary);
+  --sidebar: var(--surface-container-low);
+  --sidebar-foreground: var(--on-surface);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--on-primary);
+  --sidebar-accent: var(--surface-container-high);
+  --sidebar-accent-foreground: var(--on-surface);
+  --sidebar-border: var(--outline-variant);
+  --sidebar-ring: var(--primary);
+}
+
+/* ---------------------------------------------------------------------------
+   3) @theme inline — expone tokens como utilidades Tailwind
+   -------------------------------------------------------------------------- */
+@theme inline {
+  /* Fuentes */
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-display: var(--font-display-family);
+  --font-heading: var(--font-display-family);
+  --font-mono: var(--font-mono-family);
+
+  /* ---- Colores M3 → utilidades (bg-surface, text-on-surface, …) ---- */
+  --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-surface-variant: var(--surface-variant);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-background: var(--background);
+  --color-on-background: var(--on-background);
+
+  --color-inverse-surface: var(--inverse-surface);
+  --color-inverse-on-surface: var(--inverse-on-surface);
+  --color-inverse-primary: var(--inverse-primary);
+
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-surface-tint: var(--surface-tint);
+
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+
+  --color-tertiary: var(--tertiary);
+  --color-on-tertiary: var(--on-tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+
+  --color-error: var(--error);
+  --color-on-error: var(--on-error);
+  --color-error-container: var(--error-container);
+  --color-on-error-container: var(--on-error-container);
+
+  /* ---- Paleta de etiquetas (bg-palette-blue-dot, text-palette-blue-on-surface, …) ---- */
+  --color-palette-blue-dot: var(--palette-blue-dot);
+  --color-palette-blue-surface: var(--palette-blue-surface);
+  --color-palette-blue-on-surface: var(--palette-blue-on-surface);
+  --color-palette-orange-dot: var(--palette-orange-dot);
+  --color-palette-orange-surface: var(--palette-orange-surface);
+  --color-palette-orange-on-surface: var(--palette-orange-on-surface);
+  --color-palette-green-dot: var(--palette-green-dot);
+  --color-palette-green-surface: var(--palette-green-surface);
+  --color-palette-green-on-surface: var(--palette-green-on-surface);
+  --color-palette-purple-dot: var(--palette-purple-dot);
+  --color-palette-purple-surface: var(--palette-purple-surface);
+  --color-palette-purple-on-surface: var(--palette-purple-on-surface);
+  --color-palette-red-dot: var(--palette-red-dot);
+  --color-palette-red-surface: var(--palette-red-surface);
+  --color-palette-red-on-surface: var(--palette-red-on-surface);
+  --color-palette-pink-dot: var(--palette-pink-dot);
+  --color-palette-pink-surface: var(--palette-pink-surface);
+  --color-palette-pink-on-surface: var(--palette-pink-on-surface);
+  --color-palette-gray-dot: var(--palette-gray-dot);
+  --color-palette-gray-surface: var(--palette-gray-surface);
+  --color-palette-gray-on-surface: var(--palette-gray-on-surface);
+
+  --color-primary-fixed: var(--primary-fixed);
+  --color-primary-fixed-dim: var(--primary-fixed-dim);
+  --color-on-primary-fixed: var(--on-primary-fixed);
+  --color-on-primary-fixed-variant: var(--on-primary-fixed-variant);
+  --color-secondary-fixed: var(--secondary-fixed);
+  --color-secondary-fixed-dim: var(--secondary-fixed-dim);
+  --color-on-secondary-fixed: var(--on-secondary-fixed);
+  --color-on-secondary-fixed-variant: var(--on-secondary-fixed-variant);
+  --color-tertiary-fixed: var(--tertiary-fixed);
+  --color-tertiary-fixed-dim: var(--tertiary-fixed-dim);
+  --color-on-tertiary-fixed: var(--on-tertiary-fixed);
+  --color-on-tertiary-fixed-variant: var(--on-tertiary-fixed-variant);
+
+  /* ---- Tokens shadcn → utilidades ---- */
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ---- Radios ---- */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-full: 9999px;
+}
+
+/* Familias que cambian por modo:
+   - CLARO: la spec pide Inter en todo (incluidos headlines).
+   - OSCURO: Sora para headlines, Space Grotesk para labels/mono técnicos. */
+:root {
+  --font-display-family: 'Inter Variable', system-ui, sans-serif;
+  --font-mono-family: 'Space Grotesk Variable', ui-monospace, monospace;
+}
+.dark {
+  --font-display-family: 'Sora Variable', system-ui, sans-serif;
+  --font-mono-family: 'Space Grotesk Variable', ui-monospace, monospace;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans antialiased;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Utilidades: escala tipográfica (spec M3)
+   -------------------------------------------------------------------------- */
+@layer utilities {
+  .text-display {
+    font-family: var(--font-display-family);
+    font-size: 3rem;      /* 48 */
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .text-headline-lg {
+    font-family: var(--font-display-family);
+    font-size: 2rem;      /* 32 */
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .text-headline-lg-mobile {
+    font-family: var(--font-display-family);
+    font-size: 1.75rem;   /* 28 */
+    line-height: 1.25;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .text-headline-md {
+    font-family: var(--font-display-family);
+    font-size: 1.5rem;    /* 24 */
+    line-height: 1.3;
+    font-weight: 600;
+  }
+  .text-title-lg {
+    font-family: var(--font-display-family);
+    font-size: 1.25rem;   /* 20 */
+    line-height: 1.4;
+    font-weight: 600;
+  }
+  .text-body-lg {
+    font-size: 1rem;      /* 16 */
+    line-height: 1.5;
+    font-weight: 400;
+  }
+  .text-body-md {
+    font-size: 0.875rem;  /* 14 */
+    line-height: 1.5;
+    font-weight: 400;
+  }
+  .text-label-md {
+    font-size: 0.75rem;   /* 12 */
+    line-height: 1.4;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  /* Familias como utilidades font-* (compat. clases existentes) */
+  .font-body-md {
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  .font-heading {
+    font-family: var(--font-display-family);
+    font-weight: 600;
+  }
+  .font-display {
+    font-family: var(--font-display-family);
+  }
+  .font-mono {
+    font-family: var(--font-mono-family);
+  }
+
+  /* ------ Glow (solo dark; inerte/sutil en claro) ------ */
+  .glow-text {
+    text-shadow: 0 0 8px currentColor;
+  }
+  .glow-primary {
+    box-shadow: 0 0 16px rgba(255, 45, 120, 0.4);
+  }
+  .glow-secondary {
+    box-shadow: 0 0 16px rgba(0, 255, 204, 0.35);
+  }
+  .glow-tertiary {
+    box-shadow: 0 0 16px rgba(255, 224, 74, 0.35);
+  }
+  .glow-border {
+    box-shadow: 0 0 12px rgba(255, 45, 120, 0.25), inset 0 0 8px rgba(255, 45, 120, 0.08);
+  }
+  /* En claro, los glows quedan inertes para no ensuciar la superficie */
+  :root .glow-text {
+    text-shadow: none;
+  }
+  :root .glow-primary,
+  :root .glow-secondary,
+  :root .glow-tertiary,
+  :root .glow-border {
+    box-shadow: var(--elevation-1);
+  }
+
+  /* ------ Glassmorphism (sidebar / headers sticky) ------ */
+  .glass {
+    background-color: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-color: var(--glass-border);
+  }
+
+  /* ------ Elevación (cards / modales en claro; nula en dark) ------ */
+  .elevation-1 {
+    box-shadow: var(--elevation-1);
+  }
+  .elevation-2 {
+    box-shadow: var(--elevation-2);
+  }
+  .elevation-3 {
+    box-shadow: var(--elevation-3);
+  }
+
+  /* ------ Loader de marca (QleoLoader / QleoMark animado) ------ */
+  /* Barras que "laten": suben y bajan en secuencia desde su base. `fill-box` hace que el
+     origen sea relativo a cada rect dentro del SVG, así el escalado no desplaza el layout. */
+  .qleo-mark-bar {
+    transform-box: fill-box;
+    transform-origin: center bottom;
+    animation: qleo-bar 1.1s ease-in-out infinite;
+    animation-delay: var(--qleo-bar-delay, 0ms);
+    will-change: transform;
+  }
+  /* Latido sutil del icono completo, en fase con las barras. */
+  .qleo-mark-pulse {
+    animation: qleo-pulse 2.2s ease-in-out infinite;
+  }
+}
+
+@keyframes qleo-bar {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes qleo-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Accesibilidad: sin movimiento si el usuario lo pidió. */
+@media (prefers-reduced-motion: reduce) {
+  .qleo-mark-bar,
+  .qleo-mark-pulse {
+    animation: none;
+  }
+}
