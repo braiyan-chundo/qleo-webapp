@@ -4,7 +4,7 @@ import { ClipboardList, Folder } from 'lucide-react';
 /**
  * Acciones rápidas del dashboard (§3.14). Solo destinos que YA existen en la app: no
  * inventa features sin backing. "Ver mis tareas" → `/tasks`; "Ver proyectos" → `/projects`
- * (donde se crea un nuevo expediente). La creación de tareas vive dentro de cada proyecto,
+ * (donde se crea un nuevo proyecto). La creación de tareas vive dentro de cada proyecto,
  * así que no se ofrece un "Nueva tarea" suelto sin contexto de proyecto.
  */
 export function QuickActions() {

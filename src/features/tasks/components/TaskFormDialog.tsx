@@ -198,7 +198,7 @@ export function TaskFormDialog({
             </Label>
             <Input
               id="title"
-              placeholder="Reservar hotel en Cancún"
+              placeholder="Redactar la propuesta"
               className="h-10"
               {...register('title')}
             />

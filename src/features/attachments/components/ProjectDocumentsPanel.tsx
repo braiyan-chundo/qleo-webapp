@@ -26,7 +26,7 @@ interface ProjectDocumentsPanelProps {
 }
 
 /**
- * Pestaña "Documentos" del proyecto (QL-41, §3.18): adjuntos **generales** del expediente
+ * Pestaña "Documentos" del proyecto (QL-41, §3.18): adjuntos **generales** del proyecto
  * (`scope='project'`), no ligados a una tarea. Reusa el mismo objeto `Attachment`, la fila
  * visual (`AttachmentListItem`) y la descarga con token que los adjuntos de tarea.
  *
@@ -87,7 +87,7 @@ export function ProjectDocumentsPanel({ project }: ProjectDocumentsPanelProps) {
           <div>
             <p className="text-sm font-medium text-on-surface">Documentos del proyecto</p>
             <p className="text-xs text-on-surface-variant">
-              Archivos generales del expediente (cotizaciones, contratos, itinerarios…).
+              Archivos generales del proyecto (cotizaciones, contratos, informes…).
             </p>
           </div>
         </div>

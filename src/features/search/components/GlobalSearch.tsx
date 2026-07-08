@@ -102,7 +102,7 @@ export function GlobalSearch({ variant = 'bar' }: GlobalSearchProps) {
           className="group flex h-10 w-full max-w-md items-center gap-2 rounded-lg border border-outline-variant/50 bg-surface-container-low px-3 text-sm text-on-surface-variant transition-colors hover:border-primary/60 hover:bg-surface focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
         >
           <Search className="size-4 shrink-0 text-outline" />
-          <span className="flex-1 text-left">Buscar expedientes y tareas…</span>
+          <span className="flex-1 text-left">Buscar proyectos y tareas…</span>
           <Kbd className="hidden sm:inline-flex">⌘K</Kbd>
         </button>
       )}
@@ -118,7 +118,7 @@ export function GlobalSearch({ variant = 'bar' }: GlobalSearchProps) {
           <CommandInput
             value={term}
             onValueChange={setTerm}
-            placeholder="Buscar expedientes y tareas…"
+            placeholder="Buscar proyectos y tareas…"
           />
           <CommandList>
           {belowThreshold ? (

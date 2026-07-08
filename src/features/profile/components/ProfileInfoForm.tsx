@@ -108,7 +108,7 @@ export function ProfileInfoForm({ user }: ProfileInfoFormProps) {
         <Input
           id="jobTitle"
           className="h-10"
-          placeholder="Diseñador de itinerarios"
+          placeholder="Coordinador de proyectos"
           {...register('jobTitle')}
         />
       </div>

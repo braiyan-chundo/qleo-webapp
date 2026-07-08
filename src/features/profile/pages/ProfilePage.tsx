@@ -1,4 +1,4 @@
-import { Bell, KeyRound, Palette, SlidersHorizontal, UserCog } from 'lucide-react';
+import { Bell, Fingerprint, KeyRound, Palette, SlidersHorizontal, UserCog } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -7,6 +7,7 @@ import { ProfileInfoForm } from '../components/ProfileInfoForm';
 import { ChangePasswordForm } from '../components/ChangePasswordForm';
 import { NotificationsSettings } from '../components/NotificationsSettings';
 import { ThemePreference } from '../components/ThemePreference';
+import { BiometricAccessCard } from '../components/BiometricAccessCard';
 
 /**
  * Página "Mi cuenta" (QL-26, §3.15; rediseño QL-34). En desktop, dos columnas: datos del
@@ -96,6 +97,22 @@ export function ProfilePage() {
                 <ThemePreference />
               </div>
             </div>
+          </section>
+
+          {/* Acceso biométrico / passkeys (QL-45 F2). Solo se pinta si el dispositivo lo
+              soporta; si no, muestra un aviso claro sin botón. */}
+          <section className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-5 md:p-6">
+            <div className="mb-5 flex items-center gap-2">
+              <Fingerprint className="size-5 text-on-surface-variant" />
+              <h2 className="text-lg font-semibold text-on-surface">
+                Acceso biométrico
+              </h2>
+            </div>
+            <p className="mb-4 max-w-2xl text-sm text-on-surface-variant">
+              Entra sin contraseña usando la huella, el rostro o el PIN de tus
+              dispositivos (passkeys). Cada dispositivo se activa por separado.
+            </p>
+            <BiometricAccessCard />
           </section>
         </div>
       )}

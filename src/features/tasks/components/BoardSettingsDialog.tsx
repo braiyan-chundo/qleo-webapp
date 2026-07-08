@@ -30,7 +30,7 @@ export function BoardSettingsDialog({
         <DialogHeader>
           <DialogTitle>Configurar tablero</DialogTitle>
           <DialogDescription>
-            Define las etapas del expediente y las columnas de estado del Kanban.
+            Define las etapas del proyecto y las columnas de estado del Kanban.
           </DialogDescription>
         </DialogHeader>
 

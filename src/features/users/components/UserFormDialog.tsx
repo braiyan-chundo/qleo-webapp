@@ -235,7 +235,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
               <Input
                 id="jobTitle"
                 className="h-10"
-                placeholder="Coordinador de viajes"
+                placeholder="Coordinador de proyectos"
                 {...editForm.register('jobTitle')}
               />
             </div>
@@ -339,7 +339,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
               <Input
                 id="jobTitle"
                 className="h-10"
-                placeholder="Coordinador de viajes"
+                placeholder="Coordinador de proyectos"
                 {...createForm.register('jobTitle')}
               />
             </div>

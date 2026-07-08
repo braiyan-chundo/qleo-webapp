@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useLogin, useRegister } from '../hooks/use-auth';
 import { LastAccountCard } from '../components/LastAccountCard';
+import { BiometricLoginButton } from '../components/BiometricLoginButton';
 import { clearLastAccount, getLastAccount } from '../lib/last-account';
 
 import { Mail, Lock, EyeOff, Eye, User, Briefcase } from 'lucide-react';
@@ -220,6 +221,13 @@ export const LoginPage = () => {
             >
               {isLoading ? 'Iniciando...' : 'Entrar a la plataforma'}
             </Button>
+
+            {/* QL-45 F3: "Entrar con huella". Se auto-oculta si el dispositivo no soporta
+                biometría. Resuelve el email del campo o de la cuenta recordada (QL-44). */}
+            <BiometricLoginButton
+              typedEmail={loginForm.watch('email')}
+              disabled={isLoading}
+            />
           </form>
         ) : (
           <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-5">
@@ -273,7 +281,7 @@ export const LoginPage = () => {
                 <Input
                   id="jobTitle"
                   type="text"
-                  placeholder="Diseñador de itinerarios"
+                  placeholder="Coordinador de proyectos"
                   {...registerForm.register('jobTitle')}
                   className="w-full h-12 pl-10 pr-4 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
                 />
