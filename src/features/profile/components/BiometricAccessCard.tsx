@@ -129,7 +129,7 @@ export function BiometricAccessCard() {
           type="button"
           onClick={handleEnroll}
           disabled={enroll.isPending}
-          className="justify-center"
+          className="h-auto justify-center whitespace-normal py-2.5 text-center leading-snug"
         >
           {enroll.isPending ? (
             <Loader2 className="animate-spin" />

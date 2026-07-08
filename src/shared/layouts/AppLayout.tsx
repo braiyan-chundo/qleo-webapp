@@ -11,6 +11,7 @@ import { GlobalSearch } from '@/features/search/components/GlobalSearch';
 import { LogOut, UserCircle } from 'lucide-react';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 import { QleoLogo } from '@/shared/components/QleoLogo';
+import { getDailySlogan } from '@/shared/config/slogans';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,12 +54,18 @@ export function AppLayout() {
               {/* Sidebar Trigger — solo desktop (en móvil se navega con el bottom nav) */}
               <SidebarTrigger className="text-on-surface-variant hover:bg-surface-container-low w-10 h-10 hidden md:inline-flex" />
 
-              {/* Logo compacto — solo móvil (el logo del sidebar no está visible) */}
-              <QleoLogo
-                size={24}
-                className="text-primary dark:text-inverse-primary dark:glow-text md:hidden"
-                textClassName="text-xl"
-              />
+              {/* Logo compacto + eslogan del día — solo móvil (QL-56; en desktop viven en el
+                  sidebar). El eslogan se trunca para no empujar las acciones de la derecha. */}
+              <div className="flex min-w-0 flex-col md:hidden">
+                <QleoLogo
+                  size={24}
+                  className="text-primary dark:text-inverse-primary dark:glow-text"
+                  textClassName="text-xl"
+                />
+                <span className="truncate text-[11px] leading-none text-on-surface-variant">
+                  {getDailySlogan()}
+                </span>
+              </div>
 
               {/* Buscador global (QL-28): command palette con ⌘K, integrado en la topbar.
                   En md+ la barra ancha; en móvil (QL-33) queda como icono en las acciones. */}

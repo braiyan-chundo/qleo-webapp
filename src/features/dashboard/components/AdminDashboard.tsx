@@ -86,20 +86,20 @@ export function AdminDashboard() {
         </p>
       </header>
 
-      {/* KPIs — solo métricas reales del endpoint */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* KPIs — solo métricas reales del endpoint. En móvil: 3 columnas compactas (QL-55). */}
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         <KpiCard
-          icon={<FolderKanban className="size-5" />}
+          icon={<FolderKanban className="size-4 sm:size-5" />}
           value={data.activeProjects}
           label="Proyectos activos"
         />
         <KpiCard
-          icon={<UserCheck className="size-5" />}
+          icon={<UserCheck className="size-4 sm:size-5" />}
           value={data.activeUsers}
           label="Usuarios activos"
         />
         <KpiCard
-          icon={<Users className="size-5" />}
+          icon={<Users className="size-4 sm:size-5" />}
           value={totalUsers}
           label="Total de usuarios"
         />
@@ -122,17 +122,17 @@ interface KpiCardProps {
   label: string;
 }
 
-/** Tarjeta KPI: icono + número grande + etiqueta. */
+/** Tarjeta KPI: icono + número grande + etiqueta. Compacta en móvil (QL-55). */
 function KpiCard({ icon, value, label }: KpiCardProps) {
   return (
-    <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-5">
+    <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-3 sm:p-5">
       {/* Par tonal legible (QL-40): icono `on-primary-container` sobre `primary-container`
           contrasta en claro y oscuro (antes `text-primary` se perdía sobre el fondo tenue). */}
-      <div className="flex size-10 items-center justify-center rounded-lg bg-primary-container text-on-primary-container">
+      <div className="flex size-8 items-center justify-center rounded-lg bg-primary-container text-on-primary-container sm:size-10">
         {icon}
       </div>
-      <p className="mt-4 text-3xl font-bold tabular-nums text-on-surface">{value}</p>
-      <p className="mt-1 text-sm text-on-surface-variant">{label}</p>
+      <p className="mt-3 text-xl font-bold tabular-nums text-on-surface sm:mt-4 sm:text-3xl">{value}</p>
+      <p className="mt-1 text-[11px] leading-tight text-on-surface-variant sm:text-sm">{label}</p>
     </div>
   );
 }

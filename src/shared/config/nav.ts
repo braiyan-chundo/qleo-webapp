@@ -7,6 +7,7 @@ import {
   History,
   HelpCircle,
   CalendarDays,
+  UserCircle,
 } from 'lucide-react';
 
 /**
@@ -37,6 +38,7 @@ export const primaryNavItems: NavItem[] = [
 /** Ítems del pie del sidebar (desktop). */
 export const footerNavItems: NavItem[] = [
   { title: 'Auditoría', url: '/audit', icon: History, adminOnly: true },
+  { title: 'Mi cuenta', url: '/profile', icon: UserCircle },
   { title: 'Ayuda', url: '/help', icon: HelpCircle },
 ];
 
