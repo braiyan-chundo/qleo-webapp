@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,15 +16,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
+import { useAuthStore } from '@/store/auth.store';
+import type { UserDirectoryEntry } from '@/features/users/services/users.service';
 
-import { useCreateProject, useUpdateProject } from '../hooks/use-projects';
+import {
+  useCreateProjectWithMembers,
+  useUpdateProject,
+} from '../hooks/use-projects';
 import {
   projectFormSchema,
   type ProjectFormValues,
 } from '../schemas/project.schema';
-import { DatePicker } from '@/components/ui/date-picker';
 
 import { ProjectColorPicker } from './ProjectColorPicker';
+import { MemberMultiSelect } from './MemberMultiSelect';
+import { ProjectMembersPanel } from './ProjectMembersPanel';
 import type { ProjectPayload } from '../services/projects.service';
 import type { Project } from '../types/project';
 import {
@@ -44,7 +52,6 @@ const emptyValues: ProjectFormValues = {
   name: '',
   code: '',
   clientGroup: '',
-  destination: '',
   description: '',
   startDate: '',
   endDate: '',
@@ -57,7 +64,6 @@ function toPayload(values: ProjectFormValues): ProjectPayload {
     name: values.name.trim(),
     code: values.code?.trim() || undefined,
     clientGroup: values.clientGroup?.trim() || undefined,
-    destination: values.destination?.trim() || undefined,
     description: values.description?.trim() || undefined,
     startDate: dateInputToIso(values.startDate),
     endDate: dateInputToIso(values.endDate),
@@ -72,8 +78,15 @@ export function ProjectFormDialog({
   project,
 }: ProjectFormDialogProps) {
   const isEdit = !!project;
-  const createMutation = useCreateProject();
+  const user = useAuthStore((s) => s.user);
+  const createMutation = useCreateProjectWithMembers();
   const updateMutation = useUpdateProject();
+
+  // Miembros pre-seleccionados en la CREACIÓN (en edición se gestionan en vivo).
+  const [members, setMembers] = useState<UserDirectoryEntry[]>([]);
+
+  const canManage =
+    isEdit && !!user && (user.role === 'ADMIN' || project.createdBy === user.id);
 
   const {
     register,
@@ -89,12 +102,12 @@ export function ProjectFormDialog({
   // Rellena / reinicia el formulario cuando cambia el proyecto o se abre el diálogo.
   useEffect(() => {
     if (!open) return;
+    setMembers([]);
     if (project) {
       reset({
         name: project.name,
         code: project.code ?? '',
         clientGroup: project.clientGroup ?? '',
-        destination: project.destination ?? '',
         description: project.description ?? '',
         startDate: isoToDateInput(project.startDate),
         endDate: isoToDateInput(project.endDate),
@@ -118,11 +131,27 @@ export function ProjectFormDialog({
         { id: project.id, data: payload },
         { onSuccess: () => onOpenChange(false) },
       );
-    } else {
-      createMutation.mutate(payload, {
-        onSuccess: () => onOpenChange(false),
-      });
+      return;
     }
+
+    // Creación: crea el proyecto y luego añade cada miembro (POST /projects/:id/members).
+    createMutation.mutate(
+      { data: payload, members },
+      {
+        onSuccess: ({ failed }) => {
+          if (failed.length > 0) {
+            toast.warning(
+              `Proyecto creado, pero no se pudo añadir a: ${failed
+                .map((m) => m.name)
+                .join(', ')}. Puedes reintentarlo desde el proyecto.`,
+            );
+          } else {
+            toast.success('Proyecto creado');
+          }
+          onOpenChange(false);
+        },
+      },
+    );
   };
 
   return (
@@ -133,7 +162,7 @@ export function ProjectFormDialog({
             {isEdit ? 'Editar proyecto' : 'Nuevo proyecto'}
           </DialogTitle>
           <DialogDescription>
-            Un proyecto es un expediente de viaje. El nombre es obligatorio; el
+            Un proyecto agrupa tareas y personas. El nombre es obligatorio; el
             resto de campos son opcionales.
           </DialogDescription>
         </DialogHeader>
@@ -155,7 +184,7 @@ export function ProjectFormDialog({
             </Label>
             <Input
               id="name"
-              placeholder="EXP-001 - Grupo Alfa - Cancún - Jul 2026"
+              placeholder="Nombre del proyecto"
               className="h-10"
               {...register('name')}
             />
@@ -173,7 +202,7 @@ export function ProjectFormDialog({
               </Label>
               <Input
                 id="code"
-                placeholder="EXP-001"
+                placeholder="PRJ-001"
                 className="h-10"
                 {...register('code')}
               />
@@ -184,29 +213,17 @@ export function ProjectFormDialog({
               </Label>
               <Input
                 id="clientGroup"
-                placeholder="Grupo Alfa"
+                placeholder="Cliente o grupo"
                 className="h-10"
                 {...register('clientGroup')}
               />
             </div>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="destination" className="text-on-surface">
-              Destino
-            </Label>
-            <Input
-              id="destination"
-              placeholder="Cancún, México"
-              className="h-10"
-              {...register('destination')}
-            />
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="startDate" className="text-on-surface">
-                Inicio del viaje
+                Inicio
               </Label>
               <Controller
                 control={control}
@@ -224,7 +241,7 @@ export function ProjectFormDialog({
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="endDate" className="text-on-surface">
-                Fin del viaje
+                Fin
               </Label>
               <Controller
                 control={control}
@@ -254,7 +271,7 @@ export function ProjectFormDialog({
             <Textarea
               id="description"
               rows={3}
-              placeholder="Notas del expediente, alcance, condiciones…"
+              placeholder="Notas del proyecto, alcance, condiciones…"
               {...register('description')}
             />
           </div>
@@ -274,6 +291,38 @@ export function ProjectFormDialog({
           </div>
         </form>
 
+        {/* Miembros: pre-selección en creación; gestión en vivo en edición (gate canManage). */}
+        <div className="grid gap-1.5 border-t border-outline-variant/40 pt-4">
+          {isEdit && project ? (
+            canManage ? (
+              <ProjectMembersPanel
+                projectId={project.id}
+                createdBy={project.createdBy}
+                canManage={canManage}
+              />
+            ) : null
+          ) : (
+            <>
+              <Label className="text-on-surface">Miembros</Label>
+              <p className="text-xs text-on-surface-variant">
+                Solo los miembros ven el proyecto y pueden recibir sus tareas.
+              </p>
+              {user && (
+                <MemberMultiSelect
+                  value={members}
+                  onChange={setMembers}
+                  creator={{
+                    id: user.id,
+                    name: user.name,
+                    avatarDownloadUrl: user.avatarDownloadUrl,
+                    avatarUrl: user.avatarUrl,
+                  }}
+                />
+              )}
+            </>
+          )}
+        </div>
+
         <DialogFooter>
           <Button
             type="button"
@@ -281,7 +330,7 @@ export function ProjectFormDialog({
             onClick={() => onOpenChange(false)}
             disabled={isPending}
           >
-            Cancelar
+            {isEdit ? 'Cerrar' : 'Cancelar'}
           </Button>
           <Button type="submit" form="project-form" disabled={isPending}>
             {isPending && <Loader2 className="animate-spin" />}

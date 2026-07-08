@@ -83,7 +83,7 @@ export function ProjectsPage() {
         <div>
           <h1 className="text-3xl font-bold text-on-surface">Proyectos</h1>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Expedientes de viaje. Crea, edita y organiza tus proyectos.
+            Crea, edita y organiza tus proyectos.
           </p>
         </div>
         <Button onClick={openCreate} className="h-10">
@@ -99,7 +99,7 @@ export function ProjectsPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, código, cliente o destino…"
+            placeholder="Buscar por nombre, código o cliente…"
             className="h-10 border-outline-variant/50 bg-surface-container-low pl-9"
           />
         </div>
@@ -163,7 +163,7 @@ export function ProjectsPage() {
               ? 'Prueba con otros términos de búsqueda.'
               : archived
                 ? 'Los proyectos que archives aparecerán aquí.'
-                : 'Crea tu primer expediente de viaje para empezar a trabajar.'}
+                : 'Crea tu primer proyecto para empezar a trabajar.'}
           </p>
           {!archived && !debouncedSearch && (
             <Button onClick={openCreate} className="mt-5 h-10">

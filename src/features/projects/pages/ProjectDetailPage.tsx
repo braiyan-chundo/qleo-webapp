@@ -47,9 +47,12 @@ import { useTaskFilters } from '@/features/tasks/hooks/use-task-filters';
 import { useStages } from '@/features/stages/hooks/use-stages';
 import { projectDot } from '@/features/tasks/lib/palette';
 
+import { useAuthStore } from '@/store/auth.store';
+
 import { useProject } from '../hooks/use-projects';
 import { ProjectFormDialog } from '../components/ProjectFormDialog';
 import { ArchiveProjectDialog } from '../components/ArchiveProjectDialog';
+import { ProjectMembersPanel } from '../components/ProjectMembersPanel';
 import { formatDate } from '../utils/dates';
 
 type BoardView = 'kanban' | 'list' | 'gantt' | 'planner' | 'documents';
@@ -86,6 +89,7 @@ function MetaField({ label, value }: MetaFieldProps) {
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const user = useAuthStore((s) => s.user);
   const { data: project, isLoading, isError, error } = useProject(id);
 
   // Datos compartidos por las vistas del board (misma caché de Query que consumen dentro).
@@ -141,6 +145,9 @@ export function ProjectDetailPage() {
     project.startDate || project.endDate
       ? `${formatDate(project.startDate) || '—'} → ${formatDate(project.endDate) || '—'}`
       : undefined;
+
+  const canManage =
+    !!user && (user.role === 'ADMIN' || project.createdBy === user.id);
 
   return (
     <div className="p-4 md:p-8">
@@ -247,7 +254,7 @@ export function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* Detalles del expediente (colapsable, no domina la vista) */}
+      {/* Detalles del proyecto (colapsable, no domina la vista) */}
       <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen} className="mb-4">
         <CollapsibleTrigger asChild>
           <button
@@ -260,15 +267,21 @@ export function ProjectDetailPage() {
                 detailsOpen && 'rotate-180',
               )}
             />
-            Detalles del expediente
+            Detalles del proyecto
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-3 grid gap-4 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-4 sm:grid-cols-2 lg:grid-cols-4">
             <MetaField label="Cliente / grupo" value={project.clientGroup} />
-            <MetaField label="Destino" value={project.destination} />
-            <MetaField label="Fechas del viaje" value={dateRange} />
+            <MetaField label="Fechas" value={dateRange} />
             <MetaField label="Creado" value={formatDate(project.createdAt)} />
+          </div>
+          <div className="mt-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-4">
+            <ProjectMembersPanel
+              projectId={project.id}
+              createdBy={project.createdBy}
+              canManage={canManage}
+            />
           </div>
         </CollapsibleContent>
       </Collapsible>

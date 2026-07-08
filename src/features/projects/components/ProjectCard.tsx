@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import {
   Archive,
   Calendar,
-  MapPin,
   MoreVertical,
   Pencil,
   Users,
@@ -162,12 +161,6 @@ export function ProjectCard({ project, onEdit, onArchive }: ProjectCardProps) {
           <span className="flex items-center gap-1.5">
             <Users className="size-3.5 shrink-0 text-outline" />
             <span className="truncate">{project.clientGroup}</span>
-          </span>
-        )}
-        {project.destination && (
-          <span className="flex items-center gap-1.5">
-            <MapPin className="size-3.5 shrink-0 text-outline" />
-            <span className="truncate">{project.destination}</span>
           </span>
         )}
         {dateRange && (

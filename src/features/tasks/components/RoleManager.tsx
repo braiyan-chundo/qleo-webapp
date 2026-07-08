@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 
-import { useUserDirectory } from '@/features/users/hooks/use-users';
+import { useProjectMembers } from '@/features/projects/hooks/use-projects';
 
 import { useAssignRole, useRemoveRole } from '../hooks/use-tasks';
 import type { Task, TaskRole } from '../services/tasks.service';
@@ -39,6 +39,8 @@ function roleErrorMessage(err: unknown): string {
         return 'Solo el Creador de la tarea puede gestionar los roles.';
       case 'READ_ONLY_ROLE':
         return 'No tienes permisos para esta acción (rol de solo lectura).';
+      case 'USER_NOT_PROJECT_MEMBER':
+        return 'Solo puedes asignar a miembros del proyecto.';
     }
   }
   return err instanceof Error ? err.message : 'No se pudo actualizar el rol';
@@ -47,8 +49,9 @@ function roleErrorMessage(err: unknown): string {
 /**
  * Gestión de la matriz de roles por tarea (QL-08). La lista de assignments siempre se
  * muestra; las acciones de mutación (cambiar/quitar/añadir) solo si el usuario actual es el
- * CREATOR de la tarea. El picker usa el directorio (`GET /users/directory`), accesible a
- * cualquier autenticado — no requiere rol ADMIN de plataforma.
+ * CREATOR de la tarea. El picker se alimenta de la **membresía del proyecto**
+ * (`GET /projects/:id/members`, QL-52): solo se puede asignar a miembros del proyecto, no al
+ * directorio global. Para gestionar quién es miembro se usa el panel de miembros del proyecto.
  */
 export function RoleManager({ task }: RoleManagerProps) {
   const isCreator = task.currentUserRole === 'CREATOR';
@@ -58,22 +61,28 @@ export function RoleManager({ task }: RoleManagerProps) {
   const [selectedRole, setSelectedRole] = useState<TaskRole>('COLLABORATOR');
 
   // El picker solo es visible (y por tanto la query solo se dispara) para el CREATOR.
-  const { data: users, isLoading: usersLoading } = useUserDirectory(search, {
-    enabled: isCreator,
-  });
+  const { data: members, isLoading: membersLoading } = useProjectMembers(
+    task.projectId,
+    { enabled: isCreator },
+  );
 
   const assignRole = useAssignRole(task.projectId, task.id);
   const removeRole = useRemoveRole(task.projectId, task.id);
 
-  // Usuarios que aún no participan en la tarea (candidatos a añadir).
+  // Miembros del proyecto que aún no participan en la tarea (candidatos a añadir),
+  // filtrados en cliente por el término de búsqueda (la lista de miembros es acotada).
   const assignedIds = useMemo(
     () => new Set(task.assignments.map((a) => a.userId)),
     [task.assignments],
   );
-  const candidates = useMemo(
-    () => (users ?? []).filter((u) => !assignedIds.has(u.id)),
-    [users, assignedIds],
-  );
+  const candidates = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (members ?? []).filter(
+      (m) =>
+        !assignedIds.has(m.id) &&
+        (!term || m.name.toLowerCase().includes(term)),
+    );
+  }, [members, assignedIds, search]);
 
   const handleAssign = (userId: string, role: TaskRole) => {
     if (!userId) return;
@@ -185,28 +194,28 @@ export function RoleManager({ task }: RoleManagerProps) {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar usuario por nombre o email…"
+              placeholder="Buscar miembro por nombre…"
               className="h-9"
-              aria-label="Buscar usuario"
+              aria-label="Buscar miembro"
             />
             <div className="flex flex-wrap items-center gap-2">
               <NativeSelect
                 className="min-w-[10rem] flex-1 [&>select]:h-9"
                 value={selectedUserId}
-                disabled={usersLoading}
+                disabled={membersLoading}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                aria-label="Usuario a añadir"
+                aria-label="Miembro a añadir"
               >
                 <NativeSelectOption value="" disabled>
-                  {usersLoading
-                    ? 'Cargando usuarios…'
+                  {membersLoading
+                    ? 'Cargando miembros…'
                     : candidates.length === 0
-                      ? 'Sin usuarios disponibles'
-                      : 'Selecciona un usuario'}
+                      ? 'Sin miembros disponibles'
+                      : 'Selecciona un miembro'}
                 </NativeSelectOption>
-                {candidates.map((u) => (
-                  <NativeSelectOption key={u.id} value={u.id}>
-                    {u.name} · {u.email}
+                {candidates.map((m) => (
+                  <NativeSelectOption key={m.id} value={m.id}>
+                    {m.name}
                   </NativeSelectOption>
                 ))}
               </NativeSelect>

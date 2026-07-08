@@ -20,7 +20,6 @@ export const projectFormSchema = z
     name: z.string().trim().min(1, 'El nombre es obligatorio'),
     code: z.string().trim().optional(),
     clientGroup: z.string().trim().optional(),
-    destination: z.string().trim().optional(),
     description: z.string().trim().optional(),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
