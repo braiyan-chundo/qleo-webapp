@@ -50,6 +50,11 @@ export interface Project {
   /** Color distintivo del proyecto (QL-29), o `null` si no tiene. */
   color: ProjectColor | null;
   archived: boolean;
+  /**
+   * (QL-61) Si es `false`, la columna Backlog y sus tareas se ocultan a los miembros que no
+   * son el creador ni ADMIN. Default `true`. Editable vía `PATCH /projects/:id`.
+   */
+  showBacklogToMembers: boolean;
   createdBy: string;
   createdAt: string;
   /** (QL-37) Tareas del proyecto; `done` = completadas (`completedAt != null`). */

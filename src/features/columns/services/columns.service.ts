@@ -17,6 +17,12 @@ export interface Column {
   name: string;
   order: number;
   isDefault: boolean;
+  /** (QL-61) `true` = columna **Backlog** del proyecto (una por proyecto; nace como default). */
+  isBacklog: boolean;
+  /** (QL-62) `true` = columna de **inicio** (máx. una); al mover aquí se fija `Task.startedAt`. */
+  isStart: boolean;
+  /** (QL-62) `true` = columna de **fin** (máx. una); al mover aquí se fija `Task.finishedAt`. */
+  isEnd: boolean;
   /** Clave de paleta para el punto de color, o `null` (se deriva por índice). */
   color: ColumnColor | null;
   createdAt: string;
@@ -26,12 +32,20 @@ export interface Column {
 export interface CreateColumnPayload {
   name: string;
   isDefault?: boolean;
+  /** (QL-62) marca esta columna como inicio; el backend desmarca la anterior. */
+  isStart?: boolean;
+  /** (QL-62) marca esta columna como fin; el backend desmarca la anterior. */
+  isEnd?: boolean;
 }
 
-/** Body para renombrar / marcar como default una columna (§3.6). */
+/** Body para renombrar / marcar default / configurar inicio-fin una columna (§3.6, §3.22). */
 export interface UpdateColumnPayload {
   name?: string;
   isDefault?: boolean;
+  /** (QL-62) `true` marca inicio (desmarca la anterior); `false` la quita. Gated a ADMIN/creador. */
+  isStart?: boolean;
+  /** (QL-62) `true` marca fin (desmarca la anterior); `false` la quita. Gated a ADMIN/creador. */
+  isEnd?: boolean;
 }
 
 export const columnsService = {
@@ -51,6 +65,15 @@ export const columnsService = {
     return api.patch<Column[]>(`/projects/${projectId}/columns/reorder`, {
       orderedIds,
     });
+  },
+
+  /**
+   * (QL-61) "Usar plantilla básica": añade las columnas estándar que falten (`Por hacer`,
+   * `En progreso`, `Hecho`) tras las existentes. Idempotente. Devuelve **todas** las columnas
+   * del proyecto ya ordenadas, para refrescar la caché sin un GET extra. Solo ADMIN/creador.
+   */
+  applyTemplate: (projectId: string) => {
+    return api.post<Column[]>(`/projects/${projectId}/columns/apply-template`);
   },
 
   remove: (id: string) => {

@@ -7,13 +7,40 @@ import { api } from '@/core/api/fetch-client';
  * fetch-client ya desenvuelve `{ success, data }` y maneja el 401 global).
  */
 
-/** Festivo configurado por el ADMIN. `date` es el día del festivo en `YYYY-MM-DD`. */
+/**
+ * Origen de un festivo (QL-68, §3.23): `MANUAL` = alta manual del ADMIN (día extra);
+ * `AUTO` = festivo colombiano generado por el sistema (Ley Emiliani + móviles de Pascua).
+ * Los `AUTO` no se pueden borrar (se desactivan con `autoColombianHolidays`).
+ */
+export type HolidaySource = 'MANUAL' | 'AUTO';
+
+/** Festivo del calendario laboral. `date` es el día del festivo en `YYYY-MM-DD`. */
 export interface Holiday {
   id: string;
   date: string; // 'YYYY-MM-DD'
   name: string;
+  /** (QL-68) origen del festivo. */
+  source: HolidaySource;
+  /** (QL-68) año del festivo `AUTO`, o `null` en los `MANUAL`. */
+  year: number | null;
   createdAt: string; // ISO8601
 }
+
+/**
+ * Configuración del calendario laboral (QL-68, §3.23). Singleton; se auto-crea con defaults
+ * (`weekendDays: [0,6]`, `country: 'CO'`, `autoColombianHolidays: true`) la primera vez.
+ */
+export interface CalendarConfig {
+  /** Días de fin de semana: `0`=Dom … `6`=Sáb. Sin duplicados. */
+  weekendDays: number[];
+  /** País ISO alpha-2 (2 letras). */
+  country: string;
+  /** Si `true`, se generan/consideran los festivos colombianos automáticos. */
+  autoColombianHolidays: boolean;
+}
+
+/** Body parcial de `PATCH /work-calendar/config` (solo ADMIN). */
+export type UpdateCalendarConfigDto = Partial<CalendarConfig>;
 
 /** Por qué una fecha NO es laborable. `null` si sí lo es. */
 export type NonWorkingReason = 'WEEKEND' | 'HOLIDAY';
@@ -60,10 +87,27 @@ export const workCalendarService = {
   listHolidays: (params?: HolidaysParams) =>
     api.get<Holiday[]>(`/work-calendar/holidays${buildQuery({ ...params })}`),
 
-  /** Registra un festivo (solo ADMIN). 409 `HOLIDAY_ALREADY_EXISTS` si ya existe ese día. */
+  /** Registra un festivo MANUAL (solo ADMIN). 409 `HOLIDAY_ALREADY_EXISTS` si ya existe ese día. */
   createHoliday: (dto: CreateHolidayDto) =>
     api.post<Holiday>('/work-calendar/holidays', dto),
 
-  /** Elimina un festivo por id (solo ADMIN). */
+  /**
+   * Elimina un festivo por id (solo ADMIN). Solo festivos `MANUAL`; sobre un `AUTO` → 400
+   * `AUTO_HOLIDAY_NOT_DELETABLE`.
+   */
   deleteHoliday: (id: string) => api.delete<Holiday>(`/work-calendar/holidays/${id}`),
+
+  /** (QL-68) Lee la config del calendario (singleton). Cualquier autenticado. */
+  getConfig: () => api.get<CalendarConfig>('/work-calendar/config'),
+
+  /** (QL-68) Actualiza la config (solo ADMIN). Body parcial; 400 si `weekendDays` inválido. */
+  updateConfig: (dto: UpdateCalendarConfigDto) =>
+    api.patch<CalendarConfig>('/work-calendar/config', dto),
+
+  /**
+   * (QL-68) Genera (idempotente) los festivos colombianos de un año (solo ADMIN). Requiere
+   * `autoColombianHolidays=true` (si no → 400). Devuelve los `AUTO` del año ordenados.
+   */
+  generateHolidays: (year: number) =>
+    api.post<Holiday[]>(`/work-calendar/holidays/generate${buildQuery({ year })}`),
 };

@@ -6,9 +6,11 @@ import { ProjectDetailPage } from '@/features/projects/pages/ProjectDetailPage';
 import { MyTasksPage } from '@/features/tasks/pages/MyTasksPage';
 import { TaskDetailPage } from '@/features/tasks/pages/TaskDetailPage';
 import { ProfilePage } from '@/features/profile/pages/ProfilePage';
+import { HelpPage } from '@/features/help/pages/HelpPage';
 import { NotificationsPage } from '@/features/notifications/pages/NotificationsPage';
 import { UsersAdminPage } from '@/features/users/pages/UsersAdminPage';
 import { AuditLogPage } from '@/features/audit/pages/AuditLogPage';
+import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
 import { HolidaysAdminPage } from '@/features/work-calendar/pages/HolidaysAdminPage';
 import { SessionGate } from '@/shared/components/SessionGate';
 import { PublicOnlyRoute } from '@/shared/components/PublicOnlyRoute';
@@ -49,6 +51,10 @@ function App() {
                 />
                 <Route path="/tasks" element={<MyTasksPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/help" element={<HelpPage />} />
+                {/* Analíticas (QL-66): autenticada; overview solo ADMIN, por-proyecto
+                    ADMIN o creador (el backend autoriza). El acceso del menú es adminOnly. */}
+                <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
 
                 {/* Área de administración (solo ADMIN) */}

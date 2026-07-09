@@ -58,6 +58,15 @@ export interface Task {
   completedBy: TaskCompletedBy | null;
   /** `true` si `completedAt != null` (QL-17, §3.13). */
   isCompleted: boolean;
+  /**
+   * (QL-62, §3.22) Timing automático por columna (independiente del cierre RF-2.5):
+   * `startedAt` = 1ª vez que se movió a la columna `isStart`; `finishedAt` = último cruce a
+   * la columna `isEnd`; `durationMs` = `finishedAt − startedAt` (ms) o `null` si falta alguno.
+   * El backend los rellena solo al mover; el front no los escribe.
+   */
+  startedAt: string | null;
+  finishedAt: string | null;
+  durationMs: number | null;
   createdAt: string;
 }
 

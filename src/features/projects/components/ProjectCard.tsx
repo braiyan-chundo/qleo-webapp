@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Archive,
   Calendar,
+  Eye,
   MoreVertical,
   Pencil,
   Users,
@@ -59,6 +60,9 @@ const STATUS_CONFIG: Record<
 };
 
 export function ProjectCard({ project, onEdit, onArchive }: ProjectCardProps) {
+  const navigate = useNavigate();
+  const detailUrl = `/projects/${project.id}`;
+
   const dateRange =
     project.startDate || project.endDate
       ? `${formatDate(project.startDate) || '—'} → ${formatDate(project.endDate) || '—'}`
@@ -94,16 +98,14 @@ export function ProjectCard({ project, onEdit, onArchive }: ProjectCardProps) {
                 className={cn('size-2.5 shrink-0 rounded-full', dotClass)}
               />
             )}
-            <Link
-              to={`/projects/${project.id}`}
-              className="line-clamp-2 text-base font-semibold text-on-surface hover:underline"
-            >
+            <span className="line-clamp-2 text-base font-semibold text-on-surface">
               {project.name}
-            </Link>
+            </span>
           </span>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        {/* Controles internos: por encima del overlay (z-10) para no navegar al usarlos. */}
+        <div className="relative z-10 flex shrink-0 items-center gap-1">
           <span
             className={cn(
               'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap',
@@ -120,6 +122,7 @@ export function ProjectCard({ project, onEdit, onArchive }: ProjectCardProps) {
                 size="icon-sm"
                 className="text-on-surface-variant"
                 aria-label="Acciones del proyecto"
+                onClick={(e) => e.stopPropagation()}
               >
                 <MoreVertical />
               </Button>
@@ -128,6 +131,13 @@ export function ProjectCard({ project, onEdit, onArchive }: ProjectCardProps) {
               align="end"
               className="border border-outline-variant/30 bg-surface-container-lowest"
             >
+              <DropdownMenuItem
+                onClick={() => navigate(detailUrl)}
+                className="cursor-pointer rounded-lg"
+              >
+                <Eye className="mr-2 size-4" />
+                Ver
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => onEdit(project)}
                 className="cursor-pointer rounded-lg"
@@ -204,13 +214,30 @@ export function ProjectCard({ project, onEdit, onArchive }: ProjectCardProps) {
           <span className="text-xs text-on-surface-variant">Sin miembros</span>
         )}
 
-        {project.archived && (
-          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-surface-container-high px-2 py-0.5 text-xs font-medium text-on-surface-variant">
-            <Archive className="size-3" />
-            Archivado
-          </span>
-        )}
+        <div className="relative z-10 flex items-center gap-2">
+          {project.archived && (
+            <span className="inline-flex w-fit items-center gap-1 rounded-full bg-surface-container-high px-2 py-0.5 text-xs font-medium text-on-surface-variant">
+              <Archive className="size-3" />
+              Archivado
+            </span>
+          )}
+          <Button asChild variant="outline" size="sm">
+            <Link to={detailUrl}>
+              <Eye className="size-4" />
+              Ver
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      {/* Overlay que hace toda la card clicable → detalle (QL-67). Va por encima del
+          contenido estático (z-0) pero por debajo de los controles (z-10), que quedan
+          libres de navegar. Soporta abrir en pestaña nueva (⌘/Ctrl+clic) al ser un `<Link>`. */}
+      <Link
+        to={detailUrl}
+        aria-label={`Abrir proyecto ${project.name}`}
+        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+      />
     </div>
   );
 }

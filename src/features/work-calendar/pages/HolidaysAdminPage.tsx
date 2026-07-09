@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { CalendarDays, Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { ApiError } from '@/core/api/fetch-client';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,7 +25,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DataCard, DataTableCard } from '@/shared/components/data-table';
-import { HolidayCalendar } from '../components/HolidayCalendar';
+import { CalendarConfigPanel } from '../components/CalendarConfigPanel';
+import { WorkCalendarView } from '../components/WorkCalendarView';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +40,7 @@ import {
 import { cn } from '@/lib/utils';
 
 import {
+  useCalendarConfig,
   useCreateHoliday,
   useDeleteHoliday,
   useHolidays,
@@ -78,9 +81,20 @@ function formatHolidayDate(isoDay: string): string {
   });
 }
 
+/** Badge del origen del festivo (QL-68): automático (tertiary) vs. manual (secondary). */
+function SourceBadge({ source }: { source: Holiday['source'] }) {
+  return source === 'AUTO' ? (
+    <Badge className="bg-tertiary-container text-on-tertiary-container">Automático</Badge>
+  ) : (
+    <Badge className="bg-secondary-container text-on-secondary-container">Manual</Badge>
+  );
+}
+
 /**
- * Pantalla de administración de festivos (QL-10, §3.12). Solo ADMIN (montada bajo
- * `AdminRoute`). Lista los festivos, permite añadir (rhf+zod) y borrar (con confirmación).
+ * Pantalla de administración del calendario laboral (QL-10 + QL-68/QL-69). Solo ADMIN (montada
+ * bajo `AdminRoute`). Configura fines de semana y festivos automáticos, visualiza el calendario
+ * por rango con leyenda y días laborables, y gestiona los festivos manuales (alta/baja). Los
+ * festivos automáticos no se pueden borrar (se desactivan con el toggle).
  */
 export function HolidaysAdminPage() {
   const currentYear = new Date().getFullYear();
@@ -93,6 +107,8 @@ export function HolidaysAdminPage() {
   );
 
   const { data: holidays = [], isLoading, isError, error } = useHolidays(params);
+  const { data: config } = useCalendarConfig();
+  const weekendDays = config?.weekendDays ?? [0, 6];
   const createHoliday = useCreateHoliday();
   const deleteHoliday = useDeleteHoliday();
 
@@ -106,15 +122,11 @@ export function HolidaysAdminPage() {
     control,
     handleSubmit,
     reset,
-    setValue,
-    watch,
     formState: { errors },
   } = useForm<HolidayFormValues>({
     resolver: zodResolver(holidayFormSchema),
     defaultValues: { date: '', name: '' },
   });
-
-  const selectedDate = watch('date');
 
   const onSubmit = (values: HolidayFormValues) => {
     createHoliday.mutate(
@@ -145,6 +157,13 @@ export function HolidaysAdminPage() {
         setToDelete(null);
       },
       onError: (err) => {
+        setToDelete(null);
+        if (err instanceof ApiError && err.code === 'AUTO_HOLIDAY_NOT_DELETABLE') {
+          toast.error(
+            'Los festivos automáticos no se borran: desactívalos con el toggle de festivos colombianos.',
+          );
+          return;
+        }
         toast.error(
           err instanceof Error ? err.message : 'No se pudo eliminar el festivo',
         );
@@ -163,18 +182,14 @@ export function HolidaysAdminPage() {
         </p>
       </div>
 
-      {/* Calendario visual: fines de semana atenuados + festivos resaltados */}
+      {/* Configuración del calendario (fines de semana, festivos automáticos) */}
       <div className="mb-8">
-        <HolidayCalendar
-          holidays={holidays}
-          selectedDate={selectedDate}
-          onSelectDate={(iso) =>
-            setValue('date', iso, { shouldValidate: true, shouldDirty: true })
-          }
-        />
-        <p className="mt-2 text-xs text-on-surface-variant">
-          Haz clic en un día para prellenar la fecha del formulario.
-        </p>
+        <CalendarConfigPanel />
+      </div>
+
+      {/* Calendario visual: rango de fechas, multi-mes, leyenda de 4 tipos y días laborables */}
+      <div className="mb-8">
+        <WorkCalendarView weekendDays={weekendDays} />
       </div>
 
       {/* Formulario: añadir festivo */}
@@ -278,55 +293,79 @@ export function HolidaysAdminPage() {
         </div>
       ) : (
         <DataTableCard
-          cards={holidays.map((holiday) => (
-            <DataCard key={holiday.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-semibold text-on-surface">{holiday.name}</p>
-                  <p className="mt-0.5 text-sm text-on-surface-variant">
-                    {formatHolidayDate(holiday.date)}
-                  </p>
+          cards={holidays.map((holiday) => {
+            const isAuto = holiday.source === 'AUTO';
+            return (
+              <DataCard key={holiday.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-on-surface">{holiday.name}</p>
+                      <SourceBadge source={holiday.source} />
+                    </div>
+                    <p className="mt-0.5 text-sm text-on-surface-variant">
+                      {formatHolidayDate(holiday.date)}
+                    </p>
+                  </div>
+                  {!isAuto && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-on-surface-variant hover:text-error"
+                      onClick={() => setToDelete(holiday)}
+                      aria-label={`Eliminar ${holiday.name}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0 text-on-surface-variant hover:text-error"
-                  onClick={() => setToDelete(holiday)}
-                  aria-label={`Eliminar ${holiday.name}`}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-            </DataCard>
-          ))}
+              </DataCard>
+            );
+          })}
         >
           <TableHeader>
             <TableRow>
               <TableHead>Fecha</TableHead>
               <TableHead>Nombre</TableHead>
+              <TableHead>Origen</TableHead>
               <TableHead className="text-right">Acción</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {holidays.map((holiday) => (
-              <TableRow key={holiday.id}>
-                <TableCell className="font-medium text-on-surface">
-                  {formatHolidayDate(holiday.date)}
-                </TableCell>
-                <TableCell className="text-on-surface">{holiday.name}</TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-on-surface-variant hover:text-error"
-                    onClick={() => setToDelete(holiday)}
-                    aria-label={`Eliminar ${holiday.name}`}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {holidays.map((holiday) => {
+              const isAuto = holiday.source === 'AUTO';
+              return (
+                <TableRow key={holiday.id}>
+                  <TableCell className="font-medium text-on-surface">
+                    {formatHolidayDate(holiday.date)}
+                  </TableCell>
+                  <TableCell className="text-on-surface">{holiday.name}</TableCell>
+                  <TableCell>
+                    <SourceBadge source={holiday.source} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {isAuto ? (
+                      <span
+                        className="text-xs text-on-surface-variant"
+                        title="Los festivos automáticos se gestionan con el toggle de festivos colombianos."
+                      >
+                        Automático
+                      </span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-on-surface-variant hover:text-error"
+                        onClick={() => setToDelete(holiday)}
+                        aria-label={`Eliminar ${holiday.name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </DataTableCard>
       )}

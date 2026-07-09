@@ -76,6 +76,23 @@ export function useReorderColumns(projectId: string) {
 }
 
 /**
+ * (QL-61) Aplica la plantilla básica de columnas (`Por hacer`/`En progreso`/`Hecho`). El
+ * endpoint es idempotente y devuelve **todas** las columnas ya ordenadas, así que sembramos
+ * la caché con la respuesta (evita parpadeo) además de invalidar.
+ */
+export function useApplyColumnTemplate(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => columnsService.applyTemplate(projectId),
+    onSuccess: (columns: Column[]) => {
+      queryClient.setQueryData(columnKeys.list(projectId), columns);
+      queryClient.invalidateQueries({ queryKey: columnKeys.list(projectId) });
+    },
+  });
+}
+
+/**
  * Elimina una columna e invalida el listado. Puede rechazar con `ApiError`
  * (`code === 'COLUMN_HAS_TASKS'`, 409); el componente decide el mensaje.
  */

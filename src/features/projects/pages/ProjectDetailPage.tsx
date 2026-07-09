@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   Archive,
   ArrowLeft,
@@ -71,6 +71,15 @@ const VIEW_TABS: ViewTab[] = [
   { key: 'documents', label: 'Documentos', icon: <FileText className="size-4" /> },
 ];
 
+/** Tab de vista por defecto cuando el query `?view=` está ausente o es inválido. */
+const DEFAULT_VIEW: BoardView = 'kanban';
+const VIEW_KEYS = VIEW_TABS.map((tab) => tab.key);
+
+/** Type-guard: ¿el valor del query `?view=` es un `BoardView` conocido? */
+function isBoardView(value: string | null): value is BoardView {
+  return value !== null && (VIEW_KEYS as string[]).includes(value);
+}
+
 interface MetaFieldProps {
   label: string;
   value?: string;
@@ -101,8 +110,25 @@ export function ProjectDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
-  const [view, setView] = useState<BoardView>('kanban');
   const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // Pestaña de vista persistida en la URL (`?view=`, QL-72): deep-link compartible y
+  // sobrevive a recargas. Valor inválido/ausente → 'kanban'. `replace: true` evita llenar
+  // el history con cada cambio de tab (el back sigue volviendo al listado de proyectos).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewParam = searchParams.get('view');
+  const view: BoardView = isBoardView(viewParam) ? viewParam : DEFAULT_VIEW;
+  const setView = (next: BoardView) => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next === DEFAULT_VIEW) params.delete('view');
+        else params.set('view', next);
+        return params;
+      },
+      { replace: true },
+    );
+  };
 
   if (isLoading) {
     return (
@@ -331,7 +357,11 @@ export function ProjectDetailPage() {
         <GanttView projectId={project.id} filterTasks={filters.filter} />
       )}
       {view === 'planner' && (
-        <PlannerView projectId={project.id} filterTasks={filters.filter} />
+        <PlannerView
+          projectId={project.id}
+          filterTasks={filters.filter}
+          project={project}
+        />
       )}
       {view === 'documents' && <ProjectDocumentsPanel project={project} />}
 

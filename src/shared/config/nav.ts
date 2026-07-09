@@ -8,6 +8,7 @@ import {
   HelpCircle,
   CalendarDays,
   UserCircle,
+  BarChart3,
 } from 'lucide-react';
 
 /**
@@ -32,6 +33,7 @@ export const primaryNavItems: NavItem[] = [
   { title: 'Mis tareas', url: '/tasks', icon: ClipboardList },
   { title: 'Notificaciones', url: '/notifications', icon: Bell },
   { title: 'Calendario', url: '/calendar', icon: CalendarDays, adminOnly: true },
+  { title: 'Analíticas', url: '/analytics', icon: BarChart3, adminOnly: true },
   { title: 'Administración', url: '/admin', icon: Settings, adminOnly: true },
 ];
 

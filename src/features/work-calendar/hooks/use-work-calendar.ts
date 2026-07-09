@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   workCalendarService,
   type CreateHolidayDto,
   type Holiday,
   type HolidaysParams,
+  type UpdateCalendarConfigDto,
 } from '../services/work-calendar.service';
 
 /**
@@ -20,6 +21,7 @@ export const calendarKeys = {
   holidays: () => [...calendarKeys.all, 'holidays'] as const,
   holidayList: (params?: HolidaysParams) =>
     [...calendarKeys.holidays(), params ?? {}] as const,
+  config: () => [...calendarKeys.all, 'config'] as const,
 };
 
 /**
@@ -41,6 +43,65 @@ export function useHolidays(params?: HolidaysParams) {
     queryKey: calendarKeys.holidayList(params),
     queryFn: () => workCalendarService.listHolidays(params),
     staleTime: 30 * 60 * 1000,
+  });
+}
+
+/**
+ * (QL-69) Festivos de **varios años** en paralelo, unidos en una sola lista. Se consulta por
+ * `year` (no por rango `from/to`) porque el backend genera los `AUTO` on-demand justo cuando se
+ * pide un año concreto; así una vista de rango multi-año tiene sus festivos automáticos.
+ */
+export function useHolidaysForYears(years: number[]) {
+  const results = useQueries({
+    queries: years.map((year) => ({
+      queryKey: calendarKeys.holidayList({ year }),
+      queryFn: () => workCalendarService.listHolidays({ year }),
+      staleTime: 30 * 60 * 1000,
+    })),
+  });
+
+  return {
+    holidays: results.flatMap((r) => r.data ?? []),
+    isLoading: results.some((r) => r.isLoading),
+    isError: results.some((r) => r.isError),
+  };
+}
+
+/** (QL-68) Config del calendario laboral (fines de semana, país, festivos automáticos). */
+export function useCalendarConfig() {
+  return useQuery({
+    queryKey: calendarKeys.config(),
+    queryFn: () => workCalendarService.getConfig(),
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+/**
+ * (QL-68) Actualiza la config (ADMIN). Invalida config **y** festivos: el toggle
+ * `autoColombianHolidays` genera/elimina los `AUTO`, cambiando las listas.
+ */
+export function useUpdateCalendarConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (dto: UpdateCalendarConfigDto) =>
+      workCalendarService.updateConfig(dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: calendarKeys.config() });
+      queryClient.invalidateQueries({ queryKey: calendarKeys.holidays() });
+    },
+  });
+}
+
+/** (QL-68) Genera los festivos colombianos de un año (ADMIN) e invalida las listas. */
+export function useGenerateHolidays() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (year: number) => workCalendarService.generateHolidays(year),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: calendarKeys.holidays() });
+    },
   });
 }
 

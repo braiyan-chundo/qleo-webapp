@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronRight, ListChecks, Lock, Search } from 'lucide-react';
 
@@ -22,13 +23,21 @@ import { useMyTasks } from '../hooks/use-tasks';
 import type { Task, TaskRole } from '../services/tasks.service';
 import { projectDot } from '../lib/palette';
 import { TASK_ROLE_BADGE_CLASS, TASK_ROLE_LABEL } from '../lib/roles';
-import { formatDueDate, isOverdue } from '../lib/deadline';
+import { formatDueDate, isDueToday, isOverdue } from '../lib/deadline';
 
 /** Valor sentinela para "todos los roles" en el select (los roles reales nunca son vacíos). */
 const ALL_ROLES = '';
 
 /** Filtro por estado de cierre de la tarea. */
 type StatusFilter = 'all' | 'pending' | 'completed';
+
+/**
+ * Modo de orden de la lista (QL-73, estado de cliente):
+ * - `deadline`: lista PLANA por fecha límite asc (vencidas → próximas → sin fecha), tal cual
+ *   la entrega `GET /tasks/mine`; hace visible el "más próximo primero" global.
+ * - `project`: agrupada por proyecto (el comportamiento histórico de la pantalla).
+ */
+type SortMode = 'deadline' | 'project';
 
 /** Un grupo de tareas del usuario pertenecientes a un mismo proyecto. */
 interface ProjectGroup {
@@ -56,6 +65,9 @@ export function MyTasksPage() {
   const [roleFilter, setRoleFilter] = useQueryParamState<TaskRole | ''>('rol', ALL_ROLES);
   const [statusFilter, setStatusFilter] = useQueryParamState<StatusFilter>('estado', 'all');
   const debouncedSearch = committed.toLowerCase();
+
+  // Orden de la lista: estado de cliente puro (QL-73), no filtra datos del servidor.
+  const [sortMode, setSortMode] = useState<SortMode>('deadline');
 
   const projectById = useMemo(() => {
     const map = new Map<string, Project>();
@@ -103,8 +115,8 @@ export function MyTasksPage() {
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-on-surface">Mis tareas</h1>
         <p className="mt-1 text-on-surface-variant">
-          Todas las tareas en las que participas, agrupadas por proyecto y ordenadas por
-          fecha límite.
+          Todas las tareas en las que participas. Ordénalas por fecha límite (más próximas
+          primero) o agrúpalas por proyecto.
         </p>
       </header>
 
@@ -149,6 +161,29 @@ export function MyTasksPage() {
             <NativeSelectOption value="completed">Completadas</NativeSelectOption>
           </NativeSelect>
         </label>
+
+        {/* Orden de la lista (QL-73): por vencimiento (plana) o por proyecto (agrupada). */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-on-surface-variant">Ordenar</span>
+          <div
+            role="group"
+            aria-label="Ordenar tareas"
+            className="flex h-10 items-center rounded-lg bg-surface-container-low p-1"
+          >
+            <SortButton
+              active={sortMode === 'deadline'}
+              onClick={() => setSortMode('deadline')}
+            >
+              Por vencimiento
+            </SortButton>
+            <SortButton
+              active={sortMode === 'project'}
+              onClick={() => setSortMode('project')}
+            >
+              Por proyecto
+            </SortButton>
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
@@ -170,6 +205,21 @@ export function MyTasksPage() {
 
           {filtered.length === 0 ? (
             <EmptyState hasFilters={hasFilters} />
+          ) : sortMode === 'deadline' ? (
+            // Lista plana: conserva el orden `dueDate` asc global (vencidas → próximas → sin fecha).
+            <ul className="overflow-hidden rounded-lg border border-outline-variant/40 divide-y divide-outline-variant/30">
+              {filtered.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  project={projectById.get(task.projectId)}
+                  emphasize
+                  onOpen={() =>
+                    navigate(`/projects/${task.projectId}/tasks/${task.id}`)
+                  }
+                />
+              ))}
+            </ul>
           ) : (
             <div className="space-y-6">
               {groups.map((group) => (
@@ -186,6 +236,31 @@ export function MyTasksPage() {
         </>
       )}
     </div>
+  );
+}
+
+interface SortButtonProps {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}
+
+/** Botón segmentado del control de orden (QL-73), mismo look que el toggle de Proyectos. */
+function SortButton({ active, onClick, children }: SortButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+        active
+          ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+          : 'text-on-surface-variant hover:text-on-surface',
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -255,11 +330,17 @@ function ProjectSection({ group, onOpen }: ProjectSectionProps) {
 interface TaskRowProps {
   task: Task;
   onOpen: () => void;
+  /** En modo "Por vencimiento" (lista plana) se muestra a qué proyecto pertenece la tarea. */
+  project?: Project;
+  /** Resalta vencidas (acento error) y próximas/hoy (acento primario) con un borde lateral. */
+  emphasize?: boolean;
 }
 
 /** Fila de tarea: título + estado de cierre, mi rol y fecha límite. Click abre el detalle. */
-function TaskRow({ task, onOpen }: TaskRowProps) {
+function TaskRow({ task, onOpen, project, emphasize }: TaskRowProps) {
   const overdue = isOverdue(task.dueDate) && !task.isCompleted;
+  const dueToday = !overdue && !task.isCompleted && isDueToday(task.dueDate);
+  const dotClass = projectDot(project?.color);
 
   return (
     <li>
@@ -267,7 +348,11 @@ function TaskRow({ task, onOpen }: TaskRowProps) {
         type="button"
         onClick={onOpen}
         aria-label={`Abrir tarea ${task.title}`}
-        className="flex w-full items-center gap-3 bg-surface-container-lowest px-4 py-3 text-left transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+        className={cn(
+          'flex w-full items-center gap-3 bg-surface-container-lowest px-4 py-3 text-left transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
+          emphasize && overdue && 'border-l-2 border-l-error',
+          emphasize && dueToday && 'border-l-2 border-l-primary',
+        )}
       >
         <div className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
@@ -286,6 +371,18 @@ function TaskRow({ task, onOpen }: TaskRowProps) {
               {task.title}
             </span>
           </span>
+          {project && (
+            <span className="mt-0.5 flex items-center gap-1.5 text-xs text-on-surface-variant">
+              {dotClass && (
+                <span
+                  aria-hidden
+                  className={cn('size-2 shrink-0 rounded-full', dotClass)}
+                />
+              )}
+              <span className="truncate">{project.name}</span>
+              {project.code && <span className="shrink-0">· {project.code}</span>}
+            </span>
+          )}
         </div>
 
         {task.currentUserRole && (
@@ -300,13 +397,20 @@ function TaskRow({ task, onOpen }: TaskRowProps) {
               <span
                 className={cn(
                   'text-sm font-medium',
-                  overdue ? 'text-error' : 'text-on-surface',
+                  overdue
+                    ? 'text-error'
+                    : dueToday
+                      ? 'text-primary'
+                      : 'text-on-surface',
                 )}
               >
                 {formatDueDate(task.dueDate)}
               </span>
               {overdue && (
                 <span className="text-xs font-medium text-error">(vencida)</span>
+              )}
+              {dueToday && (
+                <span className="text-xs font-medium text-primary">(hoy)</span>
               )}
               {task.deadlineLocked && (
                 <Lock

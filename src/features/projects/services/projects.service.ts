@@ -14,8 +14,14 @@ export interface ProjectPayload {
   color?: ProjectColor | null;
 }
 
-/** En PATCH todos los campos son opcionales. */
-export type UpdateProjectPayload = Partial<ProjectPayload>;
+/**
+ * En PATCH todos los campos de creación son opcionales, más los específicos de config del
+ * tablero (§3.21): `showBacklogToMembers` (QL-61), que no está en el payload de creación.
+ */
+export type UpdateProjectPayload = Partial<ProjectPayload> & {
+  /** (QL-61) togglea la visibilidad del Backlog para los miembros no-creador/no-ADMIN. */
+  showBacklogToMembers?: boolean;
+};
 
 /** Filtros de listado de proyectos. */
 export interface ProjectListParams {

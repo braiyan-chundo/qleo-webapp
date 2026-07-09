@@ -13,6 +13,7 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Settings2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -182,10 +183,37 @@ export function TaskBoard({
       if (currentIndex === destIndex) return;
     }
 
-    moveTask.mutate({
-      id: activeTaskId,
-      data: { columnId: destColumnId, order: destIndex },
-    });
+    // (QL-63) ¿La tarea cruza a otra columna que es inicio/fin? El aviso es informativo y
+    // NO bloqueante: el timing lo fija el backend igual; solo se muestra tras el move OK.
+    const crossedColumn = moved.columnId !== destColumnId;
+    const destColumn = crossedColumn
+      ? columns?.find((c) => c.id === destColumnId)
+      : undefined;
+
+    moveTask.mutate(
+      {
+        id: activeTaskId,
+        data: { columnId: destColumnId, order: destIndex },
+      },
+      {
+        onSuccess: () => {
+          if (!destColumn) return;
+          if (destColumn.isStart) {
+            toast.info(
+              <span>
+                Al mover a esta etapa se considera el <strong>inicio</strong> de la tarea.
+              </span>,
+            );
+          } else if (destColumn.isEnd) {
+            toast.info(
+              <span>
+                Al mover a esta etapa se considera que <strong>terminaste</strong> la tarea.
+              </span>,
+            );
+          }
+        },
+      },
+    );
   }
 
   return (

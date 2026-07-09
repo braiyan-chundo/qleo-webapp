@@ -72,6 +72,10 @@ export function TaskFormDialog({
     open ? projectId : undefined,
   );
   const defaultColumn = columns?.find((c) => c.isDefault);
+  // (QL-63) Al crear se preselecciona explícitamente la columna Backlog (equivale a la
+  // `isDefault` inicial); si no hubiera, cae en la default. El selector sigue editable.
+  const backlogColumn = columns?.find((c) => c.isBacklog) ?? defaultColumn;
+  const backlogColumnId = backlogColumn?.id;
 
   const createTask = useCreateTask(projectId);
   const updateTask = useUpdateTask(projectId);
@@ -103,10 +107,12 @@ export function TaskFormDialog({
       reset({
         ...emptyValues,
         stageId: stages?.[0]?.id ?? '',
-        columnId: presetColumnId ?? '',
+        // Preselección explícita: la columna concreta si se abrió desde "+ Añadir tarea" de
+        // una columna; si no, la Backlog. '' solo si aún no cargaron las columnas.
+        columnId: presetColumnId ?? backlogColumnId ?? '',
       });
     }
-  }, [open, task, stages, presetColumnId, reset]);
+  }, [open, task, stages, presetColumnId, backlogColumnId, reset]);
 
   const onSubmit = (values: TaskFormValues) => {
     const description = values.description?.trim() || undefined;

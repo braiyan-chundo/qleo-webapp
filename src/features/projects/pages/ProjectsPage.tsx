@@ -3,13 +3,16 @@ import {
   ChevronLeft,
   ChevronRight,
   FolderPlus,
+  LayoutGrid,
   Plus,
   Search,
+  Table2,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 import {
   useQueryParamNumber,
   useQueryParamSearch,
@@ -18,11 +21,24 @@ import {
 
 import { useProjects } from '../hooks/use-projects';
 import { ProjectCard } from '../components/ProjectCard';
+import { ProjectsTable } from '../components/ProjectsTable';
 import { ProjectFormDialog } from '../components/ProjectFormDialog';
 import { ArchiveProjectDialog } from '../components/ArchiveProjectDialog';
 import type { Project } from '../types/project';
 
 const PAGE_SIZE = 12;
+
+/** Disposición de la lista de proyectos (QL-67): tarjetas o tabla (tabla = solo desktop). */
+type ProjectsLayout = 'cards' | 'table';
+const LAYOUT_STORAGE_KEY = 'qleo:projects-layout';
+
+/** Lee la disposición persistida en localStorage; por defecto tarjetas. */
+function readStoredLayout(): ProjectsLayout {
+  if (typeof window === 'undefined') return 'cards';
+  return window.localStorage.getItem(LAYOUT_STORAGE_KEY) === 'table'
+    ? 'table'
+    : 'cards';
+}
 
 export function ProjectsPage() {
   // Filtros + paginación persistidos en la URL (params: `q`, `arch`, `page`).
@@ -35,6 +51,12 @@ export function ProjectsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Project | undefined>(undefined);
   const [archiving, setArchiving] = useState<Project | null>(null);
+
+  // Disposición (tarjetas/tabla): estado de cliente persistido en localStorage (QL-67).
+  const [layout, setLayout] = useState<ProjectsLayout>(readStoredLayout);
+  useEffect(() => {
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
+  }, [layout]);
 
   const debouncedSearch = committed;
 
@@ -128,6 +150,45 @@ export function ProjectsPage() {
             Archivados
           </button>
         </div>
+
+        {/* Disposición tarjetas/tabla (QL-67). La tabla es solo desktop → el toggle se
+            oculta en móvil (`hidden md:flex`), donde siempre se muestran tarjetas. */}
+        <div
+          role="group"
+          aria-label="Disposición de la lista"
+          className="hidden rounded-lg bg-surface-container-low p-1 md:flex"
+        >
+          <button
+            type="button"
+            onClick={() => setLayout('cards')}
+            aria-pressed={layout === 'cards'}
+            aria-label="Ver como tarjetas"
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              layout === 'cards'
+                ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+                : 'text-on-surface-variant hover:text-on-surface',
+            )}
+          >
+            <LayoutGrid className="size-4" />
+            Tarjetas
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayout('table')}
+            aria-pressed={layout === 'table'}
+            aria-label="Ver como tabla"
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              layout === 'table'
+                ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+                : 'text-on-surface-variant hover:text-on-surface',
+            )}
+          >
+            <Table2 className="size-4" />
+            Tabla
+          </button>
+        </div>
       </div>
 
       {/* Contenido */}
@@ -174,7 +235,18 @@ export function ProjectsPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* Tabla (solo desktop): en móvil se cae siempre a tarjetas. */}
+          {layout === 'table' && (
+            <div className="hidden md:block">
+              <ProjectsTable projects={projects} />
+            </div>
+          )}
+          <div
+            className={cn(
+              'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+              layout === 'table' && 'md:hidden',
+            )}
+          >
             {projects.map((project) => (
               <ProjectCard
                 key={project.id}
