@@ -1,42 +1,58 @@
+import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 
 /**
- * Control de preferencia de tema para "Mi cuenta" (QL-34). Reutiliza la misma lógica de
- * `next-themes` que el `ThemeToggle` de la topbar (no lo sustituye; es un control equivalente
- * dentro del perfil). Segmentado claro/oscuro para que la opción activa sea explícita.
+ * Control de preferencia de tema para "Mi cuenta" (QL-34, ampliado en QL-76). Reutiliza la
+ * lógica de `next-themes` (no sustituye al `ThemeToggle` de la topbar; es un control
+ * equivalente dentro del perfil). Segmentado con 3 opciones: Claro, Oscuro y Sistema.
+ *
+ * El estado activo se lee de `theme` (la PREFERENCIA), no de `resolvedTheme`: con
+ * `theme === 'system'` la opción activa es "Sistema" aunque el SO resuelva a oscuro.
  *
  * El tema es estado de UI puro (clase `.dark` en <html>); no hay estado de servidor aquí.
  */
-export function ThemePreference() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+const options = [
+  { value: 'light', label: 'Claro', icon: Sun },
+  { value: 'dark', label: 'Oscuro', icon: Moon },
+  { value: 'system', label: 'Sistema', icon: Monitor },
+] as const;
 
-  const options = [
-    { value: 'light', label: 'Claro', icon: Sun },
-    { value: 'dark', label: 'Oscuro', icon: Moon },
-  ] as const;
+export function ThemePreference() {
+  const { theme, resolvedTheme, setTheme } = useTheme();
+
+  // `theme` es `undefined` en el primer render (antes del efecto de next-themes). Sin este
+  // flag, el grupo marcaría "Claro" por error y provocaría layout shift al hidratar.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const systemLabel =
+    theme === 'system' && resolvedTheme
+      ? `Actualmente: ${resolvedTheme === 'dark' ? 'oscuro' : 'claro'}`
+      : null;
 
   return (
     <div className="grid gap-3">
       <div className="grid gap-1">
         <Label className="text-on-surface">Tema de la aplicación</Label>
         <p className="text-sm text-on-surface-variant">
-          Elige entre el tema claro y el oscuro. Se aplica al instante en este dispositivo.
+          Elige el tema claro u oscuro, o deja que &quot;Sistema&quot; siga la preferencia
+          de tu dispositivo. Se aplica al instante.
         </p>
       </div>
 
       <div
         role="radiogroup"
         aria-label="Tema de la aplicación"
-        className="flex w-full max-w-xs gap-1 rounded-xl border border-outline-variant/40 bg-surface-container-low p-1"
+        className="flex w-full max-w-sm gap-1 rounded-xl border border-outline-variant/40 bg-surface-container-low p-1"
       >
         {options.map((option) => {
-          const active =
-            option.value === 'dark' ? isDark : !isDark;
+          const active = mounted && theme === option.value;
           const Icon = option.icon;
           return (
             <button
@@ -58,6 +74,10 @@ export function ThemePreference() {
           );
         })}
       </div>
+
+      {systemLabel && (
+        <p className="text-xs text-on-surface-variant">{systemLabel}</p>
+      )}
     </div>
   );
 }

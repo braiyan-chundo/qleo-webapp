@@ -33,7 +33,12 @@ export default defineConfig({
         short_name: 'Qleo',
         description: 'Gestión colaborativa de tareas y proyectos',
         theme_color: '#2160E8',
-        background_color: '#2160E8',
+        // QL-75: `background_color` pinta el splash de arranque de la PWA instalada. El
+        // Web App Manifest es ESTÁTICO (se lee al instalar y no puede seguir el tema en
+        // caliente), así que lo fijamos al `--surface` claro (#f8f9ff) para un splash
+        // neutro que encaje con la app en vez del azul intenso anterior. Limitación del
+        // estándar del Web App Manifest, no un bug.
+        background_color: '#f8f9ff',
         icons: [
           {
             src: 'pwa-192x192.png',

@@ -1,5 +1,6 @@
 import type { CSSProperties, SVGProps } from 'react';
 import { cn } from '@/lib/utils';
+import { BetaBadge } from '@/shared/components/BetaBadge';
 
 /**
  * Marca de Qleo (icono): una "Q" formada por lente redondeada + 2 barras + mango de lupa.
@@ -106,6 +107,8 @@ interface QleoLogoProps {
   textClassName?: string;
   /** Oculta el wordmark (equivale a usar sólo `QleoMark`, útil en layouts responsive). */
   hideWordmark?: boolean;
+  /** Muestra la píldora "Beta" tras el wordmark (QL-74). */
+  beta?: boolean;
 }
 
 export function QleoLogo({
@@ -114,6 +117,7 @@ export function QleoLogo({
   markClassName,
   textClassName,
   hideWordmark = false,
+  beta = false,
 }: QleoLogoProps) {
   return (
     <span className={cn('inline-flex items-center gap-2', className)}>
@@ -128,6 +132,7 @@ export function QleoLogo({
           Qleo
         </span>
       )}
+      {beta && <BetaBadge className="self-start" size="xs" />}
     </span>
   );
 }

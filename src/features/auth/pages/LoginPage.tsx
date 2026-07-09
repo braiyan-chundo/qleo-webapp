@@ -89,6 +89,7 @@ export const LoginPage = () => {
       <CardHeader className="text-center pt-8 sm:pt-10 px-8 sm:px-10 pb-0 gap-3">
         <CardTitle className="flex justify-center">
           <QleoLogo
+            beta
             size={44}
             className="gap-3 text-primary dark:text-inverse-primary dark:glow-text"
             textClassName="text-4xl font-extrabold tracking-tight"

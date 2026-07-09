@@ -58,8 +58,9 @@ export function AppLayout() {
                   sidebar). El eslogan se trunca para no empujar las acciones de la derecha. */}
               <div className="flex min-w-0 flex-col md:hidden">
                 <QleoLogo
+                  beta
                   size={24}
-                  className="text-primary dark:text-inverse-primary dark:glow-text"
+                  className="shrink-0 text-primary dark:text-inverse-primary dark:glow-text"
                   textClassName="text-xl"
                 />
                 <span className="truncate text-[11px] leading-none text-on-surface-variant">

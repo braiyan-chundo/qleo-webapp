@@ -4,14 +4,18 @@ import { useTheme } from 'next-themes';
 /**
  * Mantiene `<meta name="theme-color">` sincronizado con el tema activo (QL-47).
  *
- * El tema lo gobierna next-themes por **clase** (`enableSystem={false}`), así que el meta
- * fijo del `index.html` dejaba la barra del SO azul también en oscuro. Aquí, en cada
- * cambio de `resolvedTheme`, leemos el color `primary` **del token del design system**
+ * El tema lo gobierna next-themes por **clase**, así que el meta fijo del `index.html`
+ * dejaba la barra del SO con un color equivocado al cambiar de tema. Aquí, en cada cambio
+ * de `resolvedTheme`, leemos el color `primary` **del token del design system**
  * (`--primary`, ya resuelto por la clase `.dark`) y lo escribimos en el meta, sin inventar
  * hex nuevos. Los fallbacks solo aplican si el token no puede leerse.
+ *
+ * QL-75: el arranque (recarga dura) ya lo cubre el script inline pre-paint de `index.html`;
+ * este hook sigue siendo necesario para los cambios de tema **en caliente** (toggle,
+ * opción "Sistema" siguiendo al SO) que ocurren después de montar React.
  */
 const FALLBACK_PRIMARY = {
-  light: '#2160E8',
+  light: '#004ccd',
   dark: '#ff2d78',
 } as const;
 

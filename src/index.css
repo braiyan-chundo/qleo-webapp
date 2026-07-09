@@ -465,6 +465,21 @@
   html {
     @apply font-sans antialiased;
   }
+
+  /* QL-75: fondo del documento ANTES de que monte React (el `bg-background` de arriba
+     vive en `@layer base`, pero dejamos explícito el fondo + `color-scheme` para que el
+     primer paint —loader del SessionGate— respete el tema resuelto por el script inline
+     de index.html). `--background` == `--surface` en ambos temas. */
+  :root {
+    color-scheme: light;
+  }
+  :root.dark {
+    color-scheme: dark;
+  }
+  html,
+  body {
+    background-color: var(--background);
+  }
 }
 
 /* ---------------------------------------------------------------------------

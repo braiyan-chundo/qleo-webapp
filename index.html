@@ -4,9 +4,39 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="theme-color" content="#2160E8" />
+    <meta name="theme-color" content="#004ccd" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Qleo</title>
+    <!--
+      Script bloqueante PRE-PAINT (QL-75). next-themes aplica la clase `.dark` en un
+      useEffect, es decir DESPUÉS del primer paint: sin esto, una recarga dura con tema
+      oscuro pinta un frame con los tokens claros (fondo blanco + loader azul).
+
+      Reproduce aquí la resolución de tema de next-themes (storageKey 'theme',
+      defaultTheme 'system') para dejar `.dark` + `color-scheme` + `theme-color` listos
+      antes de que el navegador pinte. ÚNICO sitio donde se permiten hex: deben
+      mantenerse en sync con los tokens de src/index.css:
+        claro  → --primary: #004ccd · --surface: #f8f9ff
+        oscuro → --primary: #ff2d78 · --surface: #0a0a12
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          var isDark =
+            stored === 'dark' ||
+            ((!stored || stored === 'system') &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
+          root.classList.toggle('dark', isDark);
+          root.style.colorScheme = isDark ? 'dark' : 'light';
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', isDark ? '#ff2d78' : '#004ccd');
+        } catch (e) {
+          /* Safari en modo privado puede lanzar al tocar localStorage: no rompemos. */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

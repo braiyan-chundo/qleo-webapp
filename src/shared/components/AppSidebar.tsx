@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { QleoMark } from '@/shared/components/QleoLogo';
+import { BetaBadge } from '@/shared/components/BetaBadge';
 import { useAuthStore } from '@/store/auth.store';
 import {
   primaryNavItems,
@@ -75,7 +76,10 @@ export function AppSidebar() {
           <QleoMark size={26} label="Qleo" />
         </div>
         <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-          <span className="font-heading font-bold text-primary dark:text-inverse-primary dark:glow-text text-xl leading-tight tracking-tight">Qleo</span>
+          <div className="flex items-center gap-2">
+            <span className="font-heading font-bold text-primary dark:text-inverse-primary dark:glow-text text-xl leading-tight tracking-tight">Qleo</span>
+            <BetaBadge size="xs" />
+          </div>
           <span className="text-xs font-medium text-on-surface-variant">{getDailySlogan()}</span>
         </div>
       </SidebarHeader>
