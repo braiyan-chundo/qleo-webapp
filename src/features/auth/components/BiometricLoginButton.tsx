@@ -70,7 +70,7 @@ export function BiometricLoginButton({ typedEmail, disabled }: BiometricLoginBut
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2 sm:space-y-3">
       {/* Divisor */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
@@ -88,7 +88,7 @@ export function BiometricLoginButton({ typedEmail, disabled }: BiometricLoginBut
         variant="outline"
         onClick={handleClick}
         disabled={disabled || login.isPending}
-        className="h-14 w-full rounded-xl border-outline-variant/60 bg-surface-container-lowest text-base font-semibold text-on-surface hover:bg-surface-container-low"
+        className="h-12 sm:h-13 w-full rounded-xl border-outline-variant/60 bg-surface-container-lowest text-base font-semibold text-on-surface hover:bg-surface-container-low"
       >
         {login.isPending ? (
           <Loader2 className="size-5 animate-spin" />

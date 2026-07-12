@@ -86,13 +86,14 @@ export const LoginPage = () => {
   return (
     <Card className="rounded-[24px] shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-outline-variant/30 ring-0 w-full animate-in fade-in zoom-in-95 duration-500 p-0 overflow-visible">
 
-      <CardHeader className="text-center pt-8 sm:pt-10 px-8 sm:px-10 pb-0 gap-3">
+      <CardHeader className="text-center pt-5 sm:pt-6 px-8 sm:px-10 pb-0 gap-1.5 sm:gap-2.5">
         <CardTitle className="flex justify-center">
           <QleoLogo
             beta
-            size={44}
+            size={36}
+            markClassName="sm:size-11"
             className="gap-3 text-primary dark:text-inverse-primary dark:glow-text"
-            textClassName="text-4xl font-extrabold tracking-tight"
+            textClassName="text-3xl sm:text-4xl font-extrabold tracking-tight"
           />
         </CardTitle>
         <CardDescription className="text-sm text-on-surface-variant font-medium">
@@ -100,7 +101,7 @@ export const LoginPage = () => {
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="px-8 sm:px-10 py-8">
+      <CardContent className="px-8 sm:px-10 py-4 sm:py-5">
         {/* Segmented Control / Tabs (QL-38: oculto mientras el registro esté desactivado;
             sin él, el login ocupa el card sin dejar el switch vacío). */}
         {AUTH_FEATURES.register && (
@@ -135,10 +136,10 @@ export const LoginPage = () => {
 
         {/* Form Section */}
         {!AUTH_FEATURES.register || activeTab === 'login' ? (
-          <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-5">
+          <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-2.5 sm:space-y-4">
             {/* Última cuenta recordada (QL-44): tarjeta "¿Esta es tu cuenta?" + "Usar otra cuenta". */}
             {rememberedAccount && (
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <p className="ml-1 text-xs font-medium text-on-surface-variant">
                   ¿Esta es tu cuenta?
                 </p>
@@ -170,7 +171,7 @@ export const LoginPage = () => {
                   type="email"
                   placeholder="ejemplo@agencia.com"
                   {...loginForm.register('email')}
-                  className="w-full h-12 pl-10 pr-4 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
+                  className="w-full h-11 sm:h-12 pl-10 pr-4 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
                 />
               </div>
               {loginForm.formState.errors.email && (
@@ -192,7 +193,7 @@ export const LoginPage = () => {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   {...loginForm.register('password')}
-                  className="w-full h-12 pl-10 pr-10 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
+                  className="w-full h-11 sm:h-12 pl-10 pr-10 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
                 />
                 <button
                   type="button"
@@ -218,7 +219,7 @@ export const LoginPage = () => {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-14 rounded-xl shadow-sm text-base font-semibold text-on-primary bg-primary hover:bg-on-primary-fixed-variant mt-2"
+              className="w-full h-12 sm:h-13 rounded-xl shadow-sm text-base font-semibold text-on-primary bg-primary hover:bg-on-primary-fixed-variant mt-2"
             >
               {isLoading ? 'Iniciando...' : 'Entrar a la plataforma'}
             </Button>
@@ -231,7 +232,7 @@ export const LoginPage = () => {
             />
           </form>
         ) : (
-          <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-5">
+          <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
             {/* Name Input */}
             <div className="space-y-1.5">
               <Label className="block text-xs font-medium text-on-surface ml-1" htmlFor="name">Nombre completo</Label>
@@ -244,7 +245,7 @@ export const LoginPage = () => {
                   type="text"
                   placeholder="Tu nombre"
                   {...registerForm.register('name')}
-                  className="w-full h-12 pl-10 pr-4 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
+                  className="w-full h-11 sm:h-12 pl-10 pr-4 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
                 />
               </div>
               {registerForm.formState.errors.name && (
@@ -264,7 +265,7 @@ export const LoginPage = () => {
                   type="email"
                   placeholder="ejemplo@agencia.com"
                   {...registerForm.register('email')}
-                  className="w-full h-12 pl-10 pr-4 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
+                  className="w-full h-11 sm:h-12 pl-10 pr-4 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
                 />
               </div>
               {registerForm.formState.errors.email && (
@@ -284,7 +285,7 @@ export const LoginPage = () => {
                   type="text"
                   placeholder="Coordinador de proyectos"
                   {...registerForm.register('jobTitle')}
-                  className="w-full h-12 pl-10 pr-4 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
+                  className="w-full h-11 sm:h-12 pl-10 pr-4 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
                 />
               </div>
               {registerForm.formState.errors.jobTitle && (
@@ -304,7 +305,7 @@ export const LoginPage = () => {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   {...registerForm.register('password')}
-                  className="w-full h-12 pl-10 pr-10 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
+                  className="w-full h-11 sm:h-12 pl-10 pr-10 bg-surface-bright border-outline-variant/60 rounded-xl text-sm text-on-surface placeholder:text-outline-variant/80 focus-visible:ring-primary/20 focus-visible:border-primary transition-all duration-200"
                 />
                 <button
                   type="button"
@@ -323,7 +324,7 @@ export const LoginPage = () => {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-14 rounded-xl shadow-sm text-base font-semibold text-on-primary bg-primary hover:bg-on-primary-fixed-variant mt-2"
+              className="w-full h-12 sm:h-13 rounded-xl shadow-sm text-base font-semibold text-on-primary bg-primary hover:bg-on-primary-fixed-variant mt-2"
             >
               {isLoading ? 'Registrando...' : 'Crear cuenta'}
             </Button>
@@ -331,7 +332,7 @@ export const LoginPage = () => {
         )}
       </CardContent>
 
-      <CardFooter className="flex-col items-stretch px-8 sm:px-10 pb-8 sm:pb-10 pt-0 bg-transparent border-t-0 gap-0">
+      <CardFooter className="flex-col items-stretch px-8 sm:px-10 pb-4 sm:pb-5 pt-0 bg-transparent border-t-0 gap-0">
         {/* Acceso con Google (QL-38: oculto por defecto, reactivable con el flag). */}
         {AUTH_FEATURES.googleSignIn && (
           <>
@@ -363,7 +364,7 @@ export const LoginPage = () => {
         )}
 
         {/* Footer / Privacy */}
-        <div className="mt-8 text-center">
+        <div className="mt-2 sm:mt-4 text-center">
           <p className="text-xs font-medium text-outline">
             Al continuar, aceptas nuestros <a href="#" className="text-primary hover:underline underline-offset-2">Términos de servicio</a> y <a href="#" className="text-primary hover:underline underline-offset-2">Política de privacidad</a>.
           </p>

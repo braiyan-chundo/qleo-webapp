@@ -18,12 +18,12 @@ export function LastAccountCard({ account, onSelect }: LastAccountCardProps) {
     <button
       type="button"
       onClick={onSelect}
-      className="group flex w-full items-center gap-3 rounded-2xl border border-outline-variant/50 bg-surface-container-low p-3 text-left transition-all hover:border-primary/40 hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+      className="group flex w-full items-center gap-3 rounded-2xl border border-outline-variant/50 bg-surface-container-low p-2.5 sm:p-3 text-left transition-all hover:border-primary/40 hover:bg-surface-container focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
     >
       <AuthedAvatar
         avatarUrl={account.avatar}
         name={account.name}
-        className="h-11 w-11 shrink-0 border border-outline-variant/50"
+        className="h-10 w-10 sm:h-11 sm:w-11 shrink-0 border border-outline-variant/50"
         fallbackClassName={identityAvatarFallback}
       />
       <div className="min-w-0 flex-1">
