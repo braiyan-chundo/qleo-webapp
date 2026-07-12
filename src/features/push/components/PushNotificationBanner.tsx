@@ -10,6 +10,8 @@ import { usePush } from '@/features/push/hooks/use-push';
  * (mismo estado/acciones que el toggle de `/profile`), sin duplicar lógica.
  *
  * Estados:
+ * - **Estado de suscripción aún desconocido** (`isSubscribed === undefined`, resolviéndose
+ *   `getSubscription()`) ⇒ NO se renderiza nada (evita el "flash" del banner al cargar).
  * - No soportado o ya suscrito ⇒ no se muestra.
  * - Permiso denegado permanentemente ⇒ variante `warning` con texto de guía y botón
  *   deshabilitado (el permiso solo se recupera desde los ajustes del navegador).
@@ -19,7 +21,10 @@ import { usePush } from '@/features/push/hooks/use-push';
 export function PushNotificationBanner() {
   const { isSupported, permission, isSubscribed, isBusy, enable } = usePush();
 
-  if (!isSupported || isSubscribed) return null;
+  // Solo decidimos cuando el estado es DEFINITIVO. Mientras `isSubscribed` es `undefined`
+  // (desconocido) no pintamos ni banner ni placeholder; solo mostramos cuando es exactamente
+  // `false` (resuelto: soportado y sin suscripción).
+  if (!isSupported || isSubscribed !== false) return null;
 
   const isDenied = permission === 'denied';
 

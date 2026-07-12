@@ -9,7 +9,7 @@ import { ThemeToggle } from '@/shared/components/ThemeToggle';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { GlobalSearch } from '@/features/search/components/GlobalSearch';
 import { LogOut, UserCircle } from 'lucide-react';
-import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
+import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
 import { QleoLogo } from '@/shared/components/QleoLogo';
 import { getDailySlogan } from '@/shared/config/slogans';
 import {
@@ -91,7 +91,7 @@ export function AppLayout() {
                     avatarUrl={user?.avatarUrl}
                     name={user?.name ?? 'Usuario'}
                     className="w-10 h-10 border border-outline-variant/50 cursor-pointer hover:ring-2 ring-primary/20 transition-all"
-                    fallbackClassName="bg-primary-container text-primary font-bold"
+                    fallbackClassName={identityAvatarFallback}
                   />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-sm">

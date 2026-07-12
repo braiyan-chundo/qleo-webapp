@@ -1,6 +1,6 @@
 import { ChevronRight } from 'lucide-react';
 
-import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
+import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
 import type { LastAccount } from '../lib/last-account';
 
 interface LastAccountCardProps {
@@ -24,7 +24,7 @@ export function LastAccountCard({ account, onSelect }: LastAccountCardProps) {
         avatarUrl={account.avatar}
         name={account.name}
         className="h-11 w-11 shrink-0 border border-outline-variant/50"
-        fallbackClassName="bg-primary-container text-primary font-bold"
+        fallbackClassName={identityAvatarFallback}
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-on-surface">{account.name}</p>

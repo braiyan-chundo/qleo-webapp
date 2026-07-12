@@ -55,8 +55,14 @@ interface UsePushResult {
   isSupported: boolean;
   /** `Notification.permission` (o `null` si no soportado). */
   permission: PushPermission;
-  /** Hay una suscripción activa en este dispositivo. */
-  isSubscribed: boolean;
+  /**
+   * Estado de la suscripción de este dispositivo en **tri-estado** (QL-46):
+   * - `undefined` → **desconocido** (aún resolviendo `pushManager.getSubscription()`): los
+   *   consumidores NO deben decidir nada todavía (evita el "flash" del banner al cargar).
+   * - `false` → resuelto: no hay suscripción.
+   * - `true` → resuelto: hay suscripción activa.
+   */
+  isSubscribed: boolean | undefined;
   /** Hay una operación de enable/disable en curso. */
   isBusy: boolean;
   /** Pide permiso y suscribe este dispositivo. Llamar desde un gesto del usuario. */
@@ -71,7 +77,8 @@ export function usePush(): UsePushResult {
   const [permission, setPermission] = useState<PushPermission>(
     supported ? Notification.permission : null,
   );
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  // Tri-estado: `undefined` = aún no resuelto (no decidir nada mientras tanto).
+  const [isSubscribed, setIsSubscribed] = useState<boolean | undefined>(undefined);
   const [isBusy, setIsBusy] = useState(false);
 
   // La clave VAPID solo hace falta para suscribir; se pide de forma perezosa y se cachea.
@@ -85,7 +92,12 @@ export function usePush(): UsePushResult {
 
   // Al montar, deriva el estado real de la suscripción del navegador (no solo del permiso).
   useEffect(() => {
-    if (!supported) return;
+    // Sin soporte no hay suscripción posible: resuelve el tri-estado a `false` (no `undefined`)
+    // para que los consumidores controlados (p.ej. el switch de /profile) tengan un valor firme.
+    if (!supported) {
+      setIsSubscribed(false);
+      return;
+    }
 
     let cancelled = false;
     serviceWorkerReady()

@@ -12,6 +12,11 @@ export interface User {
   /** QL-32: proxy privado del avatar SUBIDO (`/users/:id/avatar`), o `null` si no hay. */
   avatarDownloadUrl?: string | null;
   jobTitle?: string;
+  /**
+   * QL-88 (D2) / QL-91: push **genérico** del Muro Corporativo silenciado (default `false`).
+   * Las @menciones del muro siguen llegando. Se togglea desde `/profile`.
+   */
+  wallPushMuted?: boolean;
 }
 
 interface AuthState {

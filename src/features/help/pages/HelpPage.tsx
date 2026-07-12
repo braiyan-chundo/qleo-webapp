@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  AtSign,
   Bell,
+  BellOff,
   Fingerprint,
   Info,
   KanbanSquare,
@@ -9,9 +11,16 @@ import {
   Layers,
   LifeBuoy,
   Lock,
+  Mail,
+  MessagesSquare,
+  Mic,
   Moon,
+  Paperclip,
+  Pin,
+  Reply,
   Rocket,
   Search,
+  Send,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -24,35 +33,80 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 /** Correo de soporte del equipo (contenido estático, sin backend). */
 const SUPPORT_EMAIL = 'soporte@viajeshappy.com.co';
 
+/** Pestañas de la Ayuda (QL-106): una sección por pestaña, con su icono para escaneo rápido. */
+const HELP_TABS: { value: string; label: string; icon: ReactNode }[] = [
+  { value: 'guia', label: 'Guía rápida', icon: <Rocket /> },
+  { value: 'muro', label: 'Muro', icon: <MessagesSquare /> },
+  { value: 'roles', label: 'Roles', icon: <Users /> },
+  { value: 'conceptos', label: 'Conceptos', icon: <Info /> },
+  { value: 'atajos', label: 'Atajos', icon: <Keyboard /> },
+  { value: 'faq', label: 'FAQ', icon: <LifeBuoy /> },
+  { value: 'soporte', label: 'Soporte', icon: <Mail /> },
+];
+
 /**
- * Vista de Ayuda (QL-60, `/help`). Contenido 100% estático: guía de uso, matriz de roles,
- * conceptos clave, atajos, FAQ y soporte. Sin llamadas al backend (no aplica TanStack Query);
- * es una página informativa. Estilos en tokens Material 3 (claro/oscuro) y responsive.
+ * Vista de Ayuda (QL-60, `/help`). Contenido 100% estático: guía de uso, muro corporativo,
+ * matriz de roles, conceptos clave, atajos, FAQ y soporte. Sin llamadas al backend (no aplica
+ * TanStack Query); es una página informativa. Estilos en tokens Material 3 (claro/oscuro).
+ *
+ * **Layout (QL-106):** se reorganiza en **pestañas de shadcn** (una sección por pestaña) en
+ * lugar del *masonry* con CSS `columns` (QL-101). El masonry balanceaba columnas y dejaba
+ * huecos que hacían "percibir estrecha" la página; las pestañas dan a cada sección **todo el
+ * ancho** y una navegación más clara. La tira de pestañas **scrollea en su propio contenedor**
+ * en móvil (`overflow-x-auto`), sin provocar scroll horizontal de la página.
  */
 export function HelpPage() {
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-8">
-      <header className="mb-8">
+    <div className="w-full p-4 md:p-6 lg:p-8">
+      <header className="mb-6">
         <h1 className="text-3xl font-bold text-on-surface">Ayuda</h1>
         <p className="mt-1 text-on-surface-variant">
-          Todo lo que necesitas para sacarle partido a Qleo: primeros pasos, roles,
-          conceptos, atajos y respuestas rápidas.
+          Todo lo que necesitas para sacarle partido a Qleo: primeros pasos, el muro
+          corporativo, roles, conceptos, atajos y respuestas rápidas.
         </p>
       </header>
 
-      <div className="space-y-6">
-        <QuickStartSection />
-        <RolesSection />
-        <ConceptsSection />
-        <ShortcutsSection />
-        <FaqSection />
-        <SupportSection />
-      </div>
+      <Tabs defaultValue="guia" className="w-full">
+        {/* Tira de pestañas: scroll horizontal contenido en móvil (no desborda la página). */}
+        <div className="-mx-1 overflow-x-auto px-1 pb-1">
+          <TabsList variant="line" className="w-max">
+            {HELP_TABS.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value} className="shrink-0">
+                {tab.icon}
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+
+        <TabsContent value="guia" className="mt-4">
+          <QuickStartSection />
+        </TabsContent>
+        <TabsContent value="muro" className="mt-4">
+          <WallSection />
+        </TabsContent>
+        <TabsContent value="roles" className="mt-4">
+          <RolesSection />
+        </TabsContent>
+        <TabsContent value="conceptos" className="mt-4">
+          <ConceptsSection />
+        </TabsContent>
+        <TabsContent value="atajos" className="mt-4">
+          <ShortcutsSection />
+        </TabsContent>
+        <TabsContent value="faq" className="mt-4">
+          <FaqSection />
+        </TabsContent>
+        <TabsContent value="soporte" className="mt-4">
+          <SupportSection />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -134,7 +188,7 @@ function QuickStartSection() {
       title="Guía rápida"
       description="De cero a tu primer tablero en seis pasos."
     >
-      <ol className="space-y-3">
+      <ol className="grid gap-3 sm:grid-cols-2 sm:gap-x-8 lg:grid-cols-3">
         {QUICK_STEPS.map((step, i) => (
           <li key={step.title} className="flex gap-3">
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-container text-xs font-semibold text-on-secondary-container tabular-nums">
@@ -152,7 +206,78 @@ function QuickStartSection() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 2. Roles por tarea                                                         */
+/* 2. Muro Corporativo                                                        */
+/* -------------------------------------------------------------------------- */
+
+const WALL_TOPICS: { icon: ReactNode; term: string; desc: string }[] = [
+  {
+    icon: <MessagesSquare className="size-4 text-primary" />,
+    term: 'Qué es',
+    desc: 'Un canal único para todo el equipo: anuncios, novedades y conversación abierta, siempre a la vista de todos.',
+  },
+  {
+    icon: <Send className="size-4 text-primary" />,
+    term: 'Publicar',
+    desc: 'Escribe en la barra inferior y pulsa enviar (o Enter). Usa Shift + Enter para saltar de línea sin enviar.',
+  },
+  {
+    icon: <AtSign className="size-4 text-primary" />,
+    term: 'Menciones',
+    desc: 'Escribe «@» y elige a alguien del directorio para avisarle. La persona mencionada aparece resaltada en el mensaje.',
+  },
+  {
+    icon: <Paperclip className="size-4 text-primary" />,
+    term: 'Adjuntos',
+    desc: 'Pulsa «+» para adjuntar. Según el dispositivo podrás elegir archivo, foto o vídeo, galería o cámara.',
+  },
+  {
+    icon: <Mic className="size-4 text-primary" />,
+    term: 'Notas de voz',
+    desc: 'Graba y envía un mensaje de audio cuando escribir no sea cómodo. Se reproduce en línea dentro de la conversación.',
+  },
+  {
+    icon: <Reply className="size-4 text-primary" />,
+    term: 'Responder',
+    desc: 'Cita un mensaje para responderlo en contexto; se muestra a qué mensaje contestas para no perder el hilo.',
+  },
+  {
+    icon: <Pin className="size-4 text-primary" />,
+    term: 'Fijados',
+    desc: 'Solo un Administrador puede fijar (o desfijar) mensajes destacados para que queden accesibles en la parte superior.',
+  },
+  {
+    icon: <BellOff className="size-4 text-primary" />,
+    term: 'No leídos y silenciar',
+    desc: 'El indicador del menú muestra cuántos mensajes no has leído. Puedes silenciar el canal si prefieres no recibir avisos.',
+  },
+];
+
+function WallSection() {
+  return (
+    <Section
+      icon={<MessagesSquare className="size-5" />}
+      title="Muro Corporativo"
+      description="El canal del equipo: publica, menciona, adjunta y mantente al día."
+    >
+      <ul className="grid gap-3 sm:grid-cols-2 sm:gap-x-8 lg:grid-cols-3">
+        {WALL_TOPICS.map((topic) => (
+          <li key={topic.term} className="flex gap-3">
+            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-surface-container-high">
+              {topic.icon}
+            </span>
+            <div className="min-w-0">
+              <p className="font-medium text-on-surface">{topic.term}</p>
+              <p className="text-sm text-on-surface-variant">{topic.desc}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 3. Roles por tarea                                                         */
 /* -------------------------------------------------------------------------- */
 
 const TASK_ROLES: { label: string; badgeClass: string; desc: string }[] = [
@@ -186,7 +311,7 @@ function RolesSection() {
       title="Roles por tarea"
       description="Cada tarea define quién hace qué. Es independiente del rol de plataforma."
     >
-      <ul className="space-y-3">
+      <ul className="grid gap-3 lg:grid-cols-2 lg:gap-x-8">
         {TASK_ROLES.map((role) => (
           <li key={role.label} className="flex flex-col gap-1 sm:flex-row sm:gap-3">
             <Badge className={cn('h-fit w-fit shrink-0 sm:mt-0.5', role.badgeClass)}>
@@ -217,7 +342,7 @@ function RolesSection() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 3. Conceptos clave                                                         */
+/* 4. Conceptos clave                                                         */
 /* -------------------------------------------------------------------------- */
 
 const CONCEPTS: { term: string; icon: ReactNode; desc: string }[] = [
@@ -250,7 +375,7 @@ function ConceptsSection() {
       title="Conceptos clave"
       description="Los términos que conviene tener claros."
     >
-      <dl className="grid gap-4 sm:grid-cols-2">
+      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {CONCEPTS.map((c) => (
           <div
             key={c.term}
@@ -269,7 +394,7 @@ function ConceptsSection() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 4. Atajos y trucos                                                         */
+/* 5. Atajos y trucos                                                         */
 /* -------------------------------------------------------------------------- */
 
 function ShortcutsSection() {
@@ -279,7 +404,7 @@ function ShortcutsSection() {
       title="Atajos y trucos"
       description="Pequeñas ayudas para ir más rápido."
     >
-      <ul className="space-y-3 text-sm">
+      <ul className="grid gap-3 text-sm sm:grid-cols-2 sm:gap-x-8">
         <li className="flex flex-wrap items-center gap-2">
           <Search className="size-4 shrink-0 text-on-surface-variant" />
           <span className="text-on-surface-variant">Buscador global:</span>
@@ -322,7 +447,7 @@ function ShortcutsSection() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 5. FAQ                                                                     */
+/* 6. FAQ                                                                     */
 /* -------------------------------------------------------------------------- */
 
 const FAQS: { q: string; a: ReactNode }[] = [
@@ -380,7 +505,7 @@ function FaqSection() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 6. Soporte / acerca de                                                     */
+/* 7. Soporte / acerca de                                                     */
 /* -------------------------------------------------------------------------- */
 
 function SupportSection() {

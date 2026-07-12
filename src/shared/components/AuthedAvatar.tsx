@@ -7,6 +7,19 @@ import { useAuthedAvatar } from '@/shared/hooks/use-authed-avatar';
 
 type AvatarRootProps = ComponentProps<typeof Avatar>;
 
+/**
+ * Clase estándar del fallback de **iniciales sobre el color de identidad** (`primary-container`),
+ * fuente única para todos los avatares de la app.
+ *
+ * Contraste correcto en **claro** (texto `on-primary-container`, casi blanco, sobre el azul del
+ * contenedor) y aspecto neón intacto en **oscuro** (`dark:text-primary`, se re-afirma el color
+ * original → el modo oscuro NO cambia). Antes se usaba `text-primary` también en claro, lo que
+ * dejaba iniciales azules sobre fondo azul (ilegibles). Añade el tamaño con una clase extra:
+ * `cn(identityAvatarFallback, 'text-xs')`.
+ */
+export const identityAvatarFallback =
+  'bg-primary-container text-on-primary-container dark:text-primary font-bold';
+
 interface AuthedAvatarProps extends Omit<AvatarRootProps, 'children'> {
   /** Proxy privado del avatar SUBIDO (`/users/:id/avatar`); requiere token → fetch+blob. */
   avatarDownloadUrl?: string | null;

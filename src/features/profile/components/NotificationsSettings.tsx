@@ -15,8 +15,10 @@ export function NotificationsSettings() {
 
   const isDenied = permission === 'denied';
   // El switch se deshabilita si el dispositivo no soporta push, si el usuario bloqueó el
-  // permiso, o mientras hay una operación en curso.
-  const isDisabled = !isSupported || isDenied || isBusy;
+  // permiso, mientras hay una operación en curso, o mientras el estado de suscripción aún es
+  // desconocido (`undefined`, resolviéndose) para no interactuar antes de tiempo.
+  const isDisabled =
+    !isSupported || isDenied || isBusy || isSubscribed === undefined;
 
   const handleChange = (checked: boolean) => {
     if (checked) {
@@ -45,7 +47,7 @@ export function NotificationsSettings() {
           )}
           <Switch
             id="push-toggle"
-            checked={isSubscribed}
+            checked={isSubscribed === true}
             disabled={isDisabled}
             onCheckedChange={handleChange}
           />

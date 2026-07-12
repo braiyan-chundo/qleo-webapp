@@ -4,7 +4,7 @@ import { ImageUp, Loader2, Trash2 } from 'lucide-react';
 
 import { ApiError } from '@/core/api/fetch-client';
 import { Button } from '@/components/ui/button';
-import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
+import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
 import type { User } from '@/store/auth.store';
 
 import { useDeleteAvatar, useUploadAvatar } from '../hooks/use-profile';
@@ -91,7 +91,7 @@ export function AvatarUploader({ user }: AvatarUploaderProps) {
         avatarDownloadUrl={user.avatarDownloadUrl}
         avatarUrl={user.avatarUrl}
         name={user.name}
-        fallbackClassName="bg-primary-container text-primary text-xl font-bold"
+        fallbackClassName={`${identityAvatarFallback} text-xl`}
       />
 
       <div className="flex min-w-0 flex-col gap-2">

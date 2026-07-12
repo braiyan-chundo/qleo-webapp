@@ -12,9 +12,10 @@ export interface AttachmentUploader {
 
 /**
  * Alcance de un adjunto (§3.18). `'task'` cuelga de una tarea (permisos por rol de tarea);
- * `'project'` es un documento general del proyecto (permisos de proyecto).
+ * `'project'` es un documento general del proyecto (permisos de proyecto); `'wall'` es un
+ * adjunto de un mensaje del **Muro Corporativo** (QL-87, §3.25 — incluye notas de voz, QL-104).
  */
-export type AttachmentScope = 'task' | 'project';
+export type AttachmentScope = 'task' | 'project' | 'wall';
 
 /** DTO de respuesta del backend para un adjunto (QL-14 §3.11, QL-41 §3.18). */
 export interface Attachment {
@@ -34,6 +35,16 @@ export interface Attachment {
   mimeType: string;
   /** Tamaño en **bytes**. */
   size: number;
+  /**
+   * **(QL-87)** ObjectId del mensaje del muro al que está vinculado (`scope='wall'`), o `null`
+   * en un adjunto de muro recién subido (aún sin mensaje) y en adjuntos de tarea/proyecto.
+   */
+  wallMessageId?: string | null;
+  /**
+   * **(QL-104)** Duración en segundos de una **nota de voz** del muro (`scope='wall'`, audio),
+   * o `null` en cualquier adjunto que no sea audio. Se usa para pintar el reproductor.
+   */
+  durationSec?: number | null;
   uploadedBy: AttachmentUploader;
   createdAt: string;
   /**

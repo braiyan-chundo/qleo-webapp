@@ -39,7 +39,7 @@ export function MentionText({ body, mentions }: MentionTextProps) {
     <>
       {parts.map((part, i) =>
         part.isMention ? (
-          <span key={i} className="font-medium text-primary">
+          <span key={i} className="font-semibold text-primary">
             {part.text}
           </span>
         ) : (

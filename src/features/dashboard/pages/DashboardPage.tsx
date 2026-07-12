@@ -4,9 +4,11 @@ import { AdminDashboard } from '../components/AdminDashboard';
 import { PersonalDashboard } from '../components/PersonalDashboard';
 
 /**
- * Vista inicial tras login (`/`). Ramifica por **rol de plataforma** (QL-20):
- * - **ADMIN** → resumen de sistema (`GET /dashboard/admin`), su landing.
- * - **MEMBER** → dashboard personal (`GET /dashboard/me`, QL-19).
+ * Vista inicial tras login (`/`): el **panel role-aware** (QL-20). ADMIN ve el resumen de la
+ * plataforma (`AdminDashboard`); el resto, su panel personal (`PersonalDashboard`).
+ *
+ * QL-95 (D-K1) devolvió `/` al panel sin pestañas: el Muro Corporativo vive ahora en su propia
+ * ruta (`/muro`, `WallPage`), no como pestaña del dashboard.
  */
 export function DashboardPage() {
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');

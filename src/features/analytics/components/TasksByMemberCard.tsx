@@ -1,4 +1,4 @@
-import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
+import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
 
 import { ChartCard, ChartState } from './analytics-primitives';
 import type { MemberTaskStats } from '../services/analytics.service';
@@ -65,7 +65,7 @@ export function TasksByMemberCard({
                   avatarDownloadUrl={user.avatarDownloadUrl}
                   name={user.name}
                   className="size-8 shrink-0 border border-outline-variant/50"
-                  fallbackClassName="bg-primary-container text-primary text-xs font-bold"
+                  fallbackClassName={`${identityAvatarFallback} text-xs`}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex items-center justify-between gap-2">

@@ -13,7 +13,9 @@ import {
 import { cn } from '@/lib/utils';
 import { QleoMark } from '@/shared/components/QleoLogo';
 import { BetaBadge } from '@/shared/components/BetaBadge';
+import { NavBadge } from '@/shared/components/NavBadge';
 import { useAuthStore } from '@/store/auth.store';
+import { useWallUnreadCount } from '@/features/wall/hooks/use-wall';
 import {
   primaryNavItems,
   footerNavItems,
@@ -46,7 +48,10 @@ const navLinkActive = cn(
   'bg-surface-container-highest border-r-4 border-primary',
   'hover:bg-surface-container-highest hover:text-primary',
   'group-data-[collapsible=icon]:border-r-0 group-data-[collapsible=icon]:rounded-lg',
-  'group-data-[collapsible=icon]:bg-primary-container group-data-[collapsible=icon]:text-primary',
+  // Colapsado: pastilla `primary-container`. En CLARO el icono/indicador activo usa
+  // `on-primary-container` (casi blanco) sobre el azul del contenedor para que se lea; en
+  // OSCURO se re-afirma `text-primary` (aspecto neón intacto — el modo oscuro NO cambia).
+  'group-data-[collapsible=icon]:bg-primary-container group-data-[collapsible=icon]:text-on-primary-container dark:group-data-[collapsible=icon]:text-primary',
 );
 
 const navLinkInactive =
@@ -55,6 +60,7 @@ const navLinkInactive =
 export function AppSidebar() {
   const { pathname } = useLocation();
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const { count: wallUnread } = useWallUnreadCount();
 
   const visibleNavItems = primaryNavItems.filter(
     (item) => !item.adminOnly || isAdmin,
@@ -90,6 +96,7 @@ export function AppSidebar() {
             <SidebarMenu className="gap-1">
               {visibleNavItems.map((item) => {
                 const isActive = isNavItemActive(pathname, item.url);
+                const badgeCount = item.badge === 'wall' ? wallUnread : 0;
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
@@ -104,7 +111,15 @@ export function AppSidebar() {
                           isActive ? navLinkActive : navLinkInactive,
                         )}
                       >
-                        <item.icon className="w-5 h-5 shrink-0" />
+                        <span className="relative shrink-0">
+                          <item.icon className="w-5 h-5" />
+                          {item.badge && (
+                            <NavBadge
+                              count={badgeCount}
+                              label={`${item.title}, ${badgeCount} sin leer`}
+                            />
+                          )}
+                        </span>
                         <span className="text-sm group-data-[collapsible=icon]:hidden">
                           {item.title}
                         </span>

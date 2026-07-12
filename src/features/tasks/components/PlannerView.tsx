@@ -62,8 +62,15 @@ const RANGE_OPTIONS: { count: number; label: string }[] = [
 ];
 
 /**
- * Estilo de cada hito (QL-71): icono + tokens M3. Deliberadamente distinto de un chip de
- * tarea (borde izquierdo marcado + semibold + icono) para que se lean como eventos clave.
+ * Estilo de cada hito (QL-71, contraste QL-109): icono + tokens M3. Deliberadamente distinto de
+ * un chip de tarea (borde izquierdo marcado + semibold + icono) para que se lean como eventos
+ * clave.
+ *
+ * QL-109: los hitos de **proyecto** usan el set **`*-fixed`** de M3 —pensado para chips de acento
+ * con contraste texto/fondo garantizado y estable en claro **y** oscuro (más opaco que los
+ * `*-container`, que en el tema Neon Tokyo quedaban translúcidos y se confundían con la celda)—;
+ * los de **tarea** usan `surface-container-highest` (más separado del fondo de la celda) con
+ * `on-surface` (máximo contraste). Cada tipo mantiene su color de borde/icono distintivo.
  */
 const MILESTONE_STYLE: Record<
   MilestoneKind,
@@ -71,27 +78,23 @@ const MILESTONE_STYLE: Record<
 > = {
   'project-created': {
     icon: <Sparkles className="size-3 shrink-0" />,
-    className:
-      'border-l-secondary bg-secondary-container text-on-secondary-container',
+    className: 'border-l-secondary bg-secondary-fixed text-on-secondary-fixed',
   },
   'project-start': {
     icon: <Flag className="size-3 shrink-0" />,
-    className:
-      'border-l-tertiary bg-tertiary-container text-on-tertiary-container',
+    className: 'border-l-tertiary bg-tertiary-fixed text-on-tertiary-fixed',
   },
   'project-end': {
     icon: <FlagTriangleRight className="size-3 shrink-0" />,
-    className: 'border-l-primary bg-primary-container text-on-primary-container',
+    className: 'border-l-primary bg-primary-fixed text-on-primary-fixed',
   },
   'task-start': {
     icon: <CircleDot className="size-3 shrink-0" />,
-    className:
-      'border-l-outline bg-surface-container-high text-on-surface',
+    className: 'border-l-outline bg-surface-container-highest text-on-surface',
   },
   'task-end': {
     icon: <CheckCircle2 className="size-3 shrink-0" />,
-    className:
-      'border-l-outline bg-surface-container-high text-on-surface',
+    className: 'border-l-outline bg-surface-container-highest text-on-surface',
   },
 };
 

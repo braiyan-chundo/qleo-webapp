@@ -31,6 +31,20 @@ const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "4rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
+/**
+ * Lee el estado persistido del sidebar desde la cookie `sidebar_state` (QL-21). Se usa como
+ * inicializador perezoso del estado para rehidratar el colapso expandido↔icono al recargar.
+ * Sin cookie (o fuera del navegador) devuelve `fallback`.
+ */
+function readSidebarStateCookie(fallback: boolean): boolean {
+  if (typeof document === "undefined") return fallback
+  const match = document.cookie.match(
+    new RegExp(`(?:^|; )${SIDEBAR_COOKIE_NAME}=([^;]*)`)
+  )
+  if (!match) return fallback
+  return match[1] === "true"
+}
+
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
   open: boolean
@@ -70,7 +84,11 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen)
+  // El estado inicial se rehidrata desde la cookie `sidebar_state` (QL-21) para que el
+  // colapso expandido↔icono persista al recargar; si no hay cookie, cae a `defaultOpen`.
+  const [_open, _setOpen] = React.useState(() =>
+    readSidebarStateCookie(defaultOpen)
+  )
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {

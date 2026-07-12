@@ -6,6 +6,7 @@ import { useMyProfile } from '../hooks/use-profile';
 import { ProfileInfoForm } from '../components/ProfileInfoForm';
 import { ChangePasswordForm } from '../components/ChangePasswordForm';
 import { NotificationsSettings } from '../components/NotificationsSettings';
+import { WallMuteSetting } from '../components/WallMuteSetting';
 import { ThemePreference } from '../components/ThemePreference';
 import { BiometricAccessCard } from '../components/BiometricAccessCard';
 
@@ -85,6 +86,9 @@ export function ProfilePage() {
                   </h3>
                 </div>
                 <NotificationsSettings />
+                <div className="border-t border-outline-variant/30 pt-4">
+                  <WallMuteSetting user={user} />
+                </div>
               </div>
 
               <div className="grid gap-4">

@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -15,9 +16,15 @@ import { cn } from '@/lib/utils';
 import type { CommentMention } from '../services/comments.service';
 import { applyMention, findActiveMention, type ActiveMentionToken } from '../lib/mentions';
 
-/** Handle imperativo para que el padre pueda enfocar el textarea. */
+/** Handle imperativo para que el padre pueda enfocar el textarea o insertar en el caret. */
 export interface MentionTextareaHandle {
   focus: () => void;
+  /**
+   * Inserta `text` en la posición actual del caret (reemplazando la selección), notifica el
+   * nuevo valor vía `onChange` y recoloca el caret tras lo insertado. Usado por el picker de
+   * emojis del muro (QL-90). Si no hay caret conocido, añade al final.
+   */
+  insertAtCaret: (text: string) => void;
 }
 
 interface MentionTextareaProps {
@@ -48,7 +55,52 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
     const [token, setToken] = useState<ActiveMentionToken | null>(null);
     const [highlight, setHighlight] = useState(0);
 
-    useImperativeHandle(ref, () => ({ focus: () => textareaRef.current?.focus() }), []);
+    // Auto-expansión vertical (tipo `Textarea` de shadcn): el textarea crece con el contenido y,
+    // al topar con su `max-height` (CSS), scrollea. Lo resolvemos por JS para ser deterministas y
+    // cross-browser. **Importante:** desactivamos `field-sizing` (el componente base trae
+    // `field-sizing-content`), porque combinado con el `height` explícito descuadra la medición
+    // de `scrollHeight`; con `field-sizing:fixed` el patrón clásico (auto → scrollHeight) mide bien.
+    useLayoutEffect(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.style.setProperty('field-sizing', 'fixed');
+      // Vacío → altura natural (min-height del CSS). Si midiéramos `scrollHeight` en vacío antes de
+      // que el layout flex asigne el ancho, el placeholder (largo) se envolvería en muchas líneas e
+      // inflaría la caja, dejándola "atascada" alta. Solo crecemos con contenido real.
+      if (value.length === 0) {
+        el.style.height = '';
+        return;
+      }
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    }, [value]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        focus: () => textareaRef.current?.focus(),
+        insertAtCaret: (text: string) => {
+          const el = textareaRef.current;
+          if (!el) {
+            onChange(value + text);
+            return;
+          }
+          const start = el.selectionStart ?? value.length;
+          const end = el.selectionEnd ?? value.length;
+          const next = value.slice(0, start) + text + value.slice(end);
+          onChange(next);
+          // Recoloca el caret tras el texto insertado en el próximo frame (post-render).
+          requestAnimationFrame(() => {
+            const node = textareaRef.current;
+            if (!node) return;
+            node.focus();
+            const caret = start + text.length;
+            node.setSelectionRange(caret, caret);
+          });
+        },
+      }),
+      [value, onChange],
+    );
 
     const query = token?.query ?? '';
     const open = token !== null;
@@ -137,7 +189,11 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
         />
 
         {open && (
-          <div className="absolute left-0 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-lg border border-outline-variant/50 bg-surface-container-lowest p-1 shadow-md elevation-2">
+          // Ancho **propio** del desplegable (no depende del texto escrito): mínimo fijo y tope
+          // consistente, anclado al inicio del textarea, sin desbordar en pantallas estrechas.
+          // Se abre **hacia arriba** (`bottom-full`) porque el composer vive al fondo del muro:
+          // hacia abajo la lista quedaba cortada por el borde inferior de la pantalla.
+          <div className="absolute bottom-full left-0 z-50 mb-1 w-full min-w-64 max-w-[min(20rem,calc(100vw-2rem))] max-h-56 overflow-y-auto rounded-lg border border-outline-variant/50 bg-surface-container-lowest p-1 shadow-md elevation-2">
             {isLoading && (
               <div className="flex items-center gap-2 px-2 py-2 text-xs text-on-surface-variant">
                 <Loader2 className="size-3.5 animate-spin" />

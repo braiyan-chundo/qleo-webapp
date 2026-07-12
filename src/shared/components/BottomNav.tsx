@@ -10,7 +10,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { NavBadge } from '@/shared/components/NavBadge';
 import { useAuthStore } from '@/store/auth.store';
+import { useWallUnreadCount } from '@/features/wall/hooks/use-wall';
 import {
   bottomNavItems,
   allNavItems,
@@ -30,6 +32,7 @@ import {
 export function BottomNav() {
   const { pathname } = useLocation();
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const { count: wallUnread } = useWallUnreadCount();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const menuItems = allNavItems.filter((item) => !item.adminOnly || isAdmin);
@@ -43,17 +46,19 @@ export function BottomNav() {
     'group flex flex-1 flex-col items-center justify-end gap-1 py-1 text-xs font-medium';
 
   // Icono dentro de un círculo: relleno `bg-primary` cuando está activo (elevado y
-  // sobresaliendo), o solo contorno cuando está inactivo.
-  const renderIcon = (Icon: NavIcon, isActive: boolean) => (
+  // sobresaliendo), o solo contorno cuando está inactivo. `badgeCount` pinta el badge de no
+  // leídos (QL-91) sobre el círculo (oculto en 0).
+  const renderIcon = (Icon: NavIcon, isActive: boolean, badgeCount = 0) => (
     <span
       className={cn(
-        'flex size-10 items-center justify-center rounded-full transition-all duration-200',
+        'relative flex size-10 items-center justify-center rounded-full transition-all duration-200',
         isActive
           ? '-translate-y-2.5 bg-primary text-on-primary shadow-lg shadow-primary/30 dark:glow-primary'
           : 'text-on-surface-variant group-hover:text-on-surface',
       )}
     >
       <Icon className="size-5" aria-hidden />
+      <NavBadge count={badgeCount} />
     </span>
   );
 
@@ -78,6 +83,7 @@ export function BottomNav() {
       <div className="pointer-events-auto flex w-full max-w-md items-stretch justify-around rounded-3xl border border-outline-variant/40 bg-surface-container px-1.5 py-1.5 elevation-3 shadow-xl">
         {bottomNavItems.map((item) => {
           const isActive = isNavItemActive(pathname, item.url);
+          const badgeCount = item.badge === 'wall' ? wallUnread : 0;
           return (
             <NavLink
               key={item.title}
@@ -85,7 +91,7 @@ export function BottomNav() {
               aria-current={isActive ? 'page' : undefined}
               className={slotBase}
             >
-              {renderIcon(item.icon, isActive)}
+              {renderIcon(item.icon, isActive, badgeCount)}
               {renderLabel(item.title, isActive)}
             </NavLink>
           );
@@ -116,6 +122,7 @@ export function BottomNav() {
             >
               {menuItems.map((item) => {
                 const isActive = isNavItemActive(pathname, item.url);
+                const badgeCount = item.badge === 'wall' ? wallUnread : 0;
                 return (
                   <NavLink
                     key={item.title}
@@ -129,7 +136,10 @@ export function BottomNav() {
                         : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface',
                     )}
                   >
-                    <item.icon className="size-5 shrink-0" aria-hidden />
+                    <span className="relative shrink-0">
+                      <item.icon className="size-5" aria-hidden />
+                      {item.badge && <NavBadge count={badgeCount} />}
+                    </span>
                     <span className="leading-none">{item.title}</span>
                   </NavLink>
                 );

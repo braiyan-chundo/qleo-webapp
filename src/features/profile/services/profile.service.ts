@@ -13,6 +13,8 @@ export interface UpdateMePayload {
   name?: string;
   jobTitle?: string;
   avatarUrl?: string;
+  /** QL-91: silenciar el push genérico del Muro Corporativo (las menciones siguen llegando). */
+  wallPushMuted?: boolean;
 }
 
 /** Body de `PATCH /users/me/password`. */

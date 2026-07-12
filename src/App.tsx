@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
+import { WallPage } from '@/features/wall/pages/WallPage';
 import { ProjectsPage } from '@/features/projects/pages/ProjectsPage';
 import { ProjectDetailPage } from '@/features/projects/pages/ProjectDetailPage';
 import { MyTasksPage } from '@/features/tasks/pages/MyTasksPage';
@@ -43,6 +44,8 @@ function App() {
             <Route element={<SessionGate />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<DashboardPage />} />
+                {/* Muro Corporativo en ruta propia (QL-95, D-K1). */}
+                <Route path="/muro" element={<WallPage />} />
                 <Route path="/projects" element={<ProjectsPage />} />
                 <Route path="/projects/:id" element={<ProjectDetailPage />} />
                 <Route
