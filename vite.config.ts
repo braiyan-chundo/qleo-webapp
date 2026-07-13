@@ -1,9 +1,20 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { createRequire } from 'node:module'
 import path from 'path'
 
+// QL-116: exponemos la versión del producto (fuente de verdad: `package.json`) al bundle
+// como `__APP_VERSION__`. Usamos `createRequire` en lugar de `import pkg from './package.json'`
+// para no depender de `resolveJsonModule` en la config de Node y compilar limpio; el `as`
+// evita que `version` se filtre como `any`.
+const require = createRequire(import.meta.url)
+const pkg = require('./package.json') as { version: string }
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [
     react(),
     VitePWA({
