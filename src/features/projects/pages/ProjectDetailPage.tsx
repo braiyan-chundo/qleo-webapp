@@ -176,7 +176,18 @@ export function ProjectDetailPage() {
     !!user && (user.role === 'ADMIN' || project.createdBy === user.id);
 
   return (
-    <div className="p-4 md:p-8">
+    <div
+      className={cn(
+        'p-4 md:p-8',
+        // QL-36 (desktop): en Kanban la página se vuelve una columna flex acotada al alto del
+        // <main> (sin número mágico): back link + cabecera + tabs toman su alto natural y el
+        // board rellena el espacio restante, scrollando solo por dentro. Así desktop no genera
+        // scroll vertical de página. El resto de vistas (List/Gantt/Planner/Documentos) conserva
+        // el flujo normal con scroll de página, y en < md se mantiene el comportamiento móvil.
+        view === 'kanban' &&
+          'md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden',
+      )}
+    >
       <Link
         to="/projects"
         className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface"

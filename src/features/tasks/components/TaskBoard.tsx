@@ -217,7 +217,7 @@ export function TaskBoard({
   }
 
   return (
-    <section className="mt-4">
+    <section className="mt-4 md:flex md:min-h-0 md:flex-1 md:flex-col">
       <div className="mb-4 flex items-center justify-end">
         <Button
           type="button"
@@ -280,17 +280,20 @@ export function TaskBoard({
           onDragEnd={handleDragEnd}
           onDragCancel={() => setActiveId(null)}
         >
-          {/* QL-36: cada columna ocupa el alto restante del viewport (topbar + cabecera del
-              proyecto + tabs ≈ 15rem) y scrollea su lista de tarjetas por dentro; el board no
-              genera doble scroll de página. El resto de vistas (List/Gantt/Planner) no usa
-              este contenedor, así que no se ven afectadas.
+          {/* QL-36: el board rellena el alto disponible y cada columna scrollea su lista de
+              tarjetas por dentro; nunca genera doble scroll de página. El resto de vistas
+              (List/Gantt/Planner) no usa este contenedor, así que no se ven afectadas.
+              En móvil (< md) usamos `h-[calc(100dvh-15rem)]` (alto de viewport menos el chrome
+              móvil: topbar + bottom nav ≈ 15rem). En desktop (md+) NO usamos número mágico:
+              la página es una columna flex acotada (ver ProjectDetailPage) y aquí el board toma
+              `flex-1` para rellenar exactamente el espacio restante → cero scroll de página.
               QL-117: en móvil (< sm) las columnas van en scroll HORIZONTAL con snap, mostrando
               ~2 por "slide" (cada columna = 50% del ancho visible menos medio gap).
               Desktop (sm+): mismo desplazamiento horizontal (flex + overflow-x-auto), pero con
               columnas de ancho fijo (`sm:w-72` en BoardColumn) para que quepan varias y el resto
               quede accesible con scroll; NUNCA hacen wrap. El snap obligatorio se limita a móvil
               (`sm:snap-none`) → en desktop el scroll es libre. */}
-          <div className="flex h-[calc(100dvh-15rem)] min-h-[24rem] snap-x snap-mandatory items-stretch gap-4 overflow-x-auto pb-2 sm:snap-none">
+          <div className="flex h-[calc(100dvh-15rem)] min-h-[24rem] snap-x snap-mandatory items-stretch gap-4 overflow-x-auto pb-2 sm:snap-none md:h-auto md:min-h-0 md:flex-1">
             {columns.map((column, index) => (
               <BoardColumn
                 key={column.id}
