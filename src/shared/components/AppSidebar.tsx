@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import {
   Sidebar,
   SidebarHeader,
@@ -9,17 +11,31 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuAction,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { QleoMark } from '@/shared/components/QleoLogo';
 import { BetaBadge } from '@/shared/components/BetaBadge';
 import { NavBadge } from '@/shared/components/NavBadge';
 import { useAuthStore } from '@/store/auth.store';
 import { useWallUnreadCount } from '@/features/wall/hooks/use-wall';
+import { useProjects } from '@/features/projects/hooks/use-projects';
+import type { ProjectListParams } from '@/features/projects/services/projects.service';
+import { projectDot } from '@/features/tasks/lib/palette';
 import {
   primaryNavItems,
   footerNavItems,
   isNavItemActive,
+  type NavItem,
 } from '@/shared/config/nav';
 import { getDailySlogan } from '@/shared/config/slogans';
 
@@ -56,6 +72,33 @@ const navLinkActive = cn(
 
 const navLinkInactive =
   'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface';
+
+/**
+ * Clases de un sub-ítem (proyecto) del submenú.
+ *
+ * El primitivo trae su propio par `hover:bg-sidebar-accent` / `data-active:bg-sidebar-accent`;
+ * aquí se re-declaran **con los mismos variantes** en tokens M3 para que `cn` (tailwind-merge)
+ * deje ganar a estos y el activo del sub-ítem hable el mismo idioma visual que el del padre.
+ */
+const subLinkClasses = cn(
+  'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface',
+  'data-active:bg-surface-container-highest data-active:font-semibold data-active:text-primary',
+);
+
+/** Ítem del nav que despliega el submenú de proyectos. */
+const PROJECTS_URL = '/projects';
+
+/** Proyectos del usuario listados como sub-ítems (activos; el resto, tras "Ver todos"). */
+const PROJECTS_NAV_PARAMS: ProjectListParams = { archived: false, limit: 10 };
+
+/**
+ * Id del proyecto de la ruta actual, o `null` si no estamos dentro de uno. Cubre las rutas
+ * hijas (`/projects/:id/tasks/:taskId`) para que el sub-ítem siga marcado dentro de una tarea.
+ */
+function activeProjectId(pathname: string): string | null {
+  const match = /^\/projects\/([^/]+)/.exec(pathname);
+  return match ? match[1] : null;
+}
 
 export function AppSidebar() {
   const { pathname } = useLocation();
@@ -97,6 +140,20 @@ export function AppSidebar() {
               {visibleNavItems.map((item) => {
                 const isActive = isNavItemActive(pathname, item.url);
                 const badgeCount = item.badge === 'wall' ? wallUnread : 0;
+
+                // "Proyectos" es el único ítem con submenú: sigue navegando a `/projects` y
+                // despliega los proyectos del usuario desde su propio chevron.
+                if (item.url === PROJECTS_URL) {
+                  return (
+                    <ProjectsNavItem
+                      key={item.title}
+                      item={item}
+                      isActive={isActive}
+                      pathname={pathname}
+                    />
+                  );
+                }
+
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
@@ -111,18 +168,7 @@ export function AppSidebar() {
                           isActive ? navLinkActive : navLinkInactive,
                         )}
                       >
-                        <span className="relative shrink-0">
-                          <item.icon className="w-5 h-5" />
-                          {item.badge && (
-                            <NavBadge
-                              count={badgeCount}
-                              label={`${item.title}, ${badgeCount} sin leer`}
-                            />
-                          )}
-                        </span>
-                        <span className="text-sm group-data-[collapsible=icon]:hidden">
-                          {item.title}
-                        </span>
+                        <NavItemContent item={item} badgeCount={badgeCount} />
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -159,5 +205,153 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+interface NavItemContentProps {
+  item: NavItem;
+  badgeCount: number;
+}
+
+/**
+ * Interior de un ítem del nav (icono + badge + label). Se extrae como **fragmento**, no como
+ * componente envolvente, para que el `NavLink` siga siendo el hijo directo de
+ * `SidebarMenuButton asChild` (el Slot clona ese hijo y le pasa sus props/estado).
+ */
+function NavItemContent({ item, badgeCount }: NavItemContentProps) {
+  return (
+    <>
+      <span className="relative shrink-0">
+        <item.icon className="w-5 h-5" />
+        {item.badge && (
+          <NavBadge
+            count={badgeCount}
+            label={`${item.title}, ${badgeCount} sin leer`}
+          />
+        )}
+      </span>
+      <span className="text-sm group-data-[collapsible=icon]:hidden">
+        {item.title}
+      </span>
+    </>
+  );
+}
+
+interface ProjectsNavItemProps {
+  item: NavItem;
+  isActive: boolean;
+  pathname: string;
+}
+
+/**
+ * Ítem "Proyectos" con **sub-ítems** de los proyectos del usuario (estilo Jira).
+ *
+ * El label/icono **sigue siendo un link** a `/projects` (no un toggle): el despliegue va por una
+ * acción aparte (chevron), como en el patrón de shadcn. Se auto-expande al entrar en un proyecto
+ * y marca su sub-ítem (también en rutas hijas de tarea). En modo icono el primitivo oculta acción
+ * y submenú (`group-data-[collapsible=icon]:hidden`); no forzamos nada por encima.
+ *
+ * Los proyectos son dato de servidor → TanStack Query (`useProjects`); la caché los comparte con
+ * la página de Proyectos, así que el submenú no añade tráfico extra al navegar.
+ */
+function ProjectsNavItem({ item, isActive, pathname }: ProjectsNavItemProps) {
+  const currentProjectId = activeProjectId(pathname);
+  const [open, setOpen] = useState(() => currentProjectId !== null);
+
+  // Auto-expandir al entrar en un proyecto. No lo cerramos al salir: si el usuario lo abrió,
+  // se queda abierto.
+  useEffect(() => {
+    if (currentProjectId) setOpen(true);
+  }, [currentProjectId]);
+
+  const { data, isLoading } = useProjects(PROJECTS_NAV_PARAMS);
+  const projects = data?.data ?? [];
+  const hasMore = (data?.total ?? 0) > projects.length;
+
+  // Sin proyectos (ya cargado) no pintamos chevron ni submenú: cero ruido.
+  const hasSubmenu = isLoading || projects.length > 0;
+
+  return (
+    <Collapsible asChild open={open} onOpenChange={setOpen}>
+      <SidebarMenuItem>
+        <SidebarMenuButton tooltip={item.title} isActive={isActive} asChild>
+          <NavLink
+            to={item.url}
+            className={cn(navLinkBase, isActive ? navLinkActive : navLinkInactive)}
+          >
+            <NavItemContent item={item} badgeCount={0} />
+          </NavLink>
+        </SidebarMenuButton>
+
+        {hasSubmenu && (
+          <>
+            <CollapsibleTrigger asChild>
+              <SidebarMenuAction
+                className={cn(
+                  'top-2.5 text-on-surface-variant',
+                  'hover:bg-surface-container-high hover:text-on-surface',
+                  'transition-transform data-[state=open]:rotate-90',
+                )}
+              >
+                <ChevronRight />
+                <span className="sr-only">Mostrar mis proyectos</span>
+              </SidebarMenuAction>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent>
+              <SidebarMenuSub className="mt-1 border-outline-variant/50">
+                {isLoading ? (
+                  <>
+                    <SidebarMenuSubItem className="flex h-7 items-center px-2">
+                      <Skeleton className="h-3 w-24" />
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem className="flex h-7 items-center px-2">
+                      <Skeleton className="h-3 w-16" />
+                    </SidebarMenuSubItem>
+                  </>
+                ) : (
+                  <>
+                    {projects.map((project) => (
+                      <SidebarMenuSubItem key={project.id}>
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={currentProjectId === project.id}
+                          className={subLinkClasses}
+                        >
+                          <NavLink to={`/projects/${project.id}`} title={project.name}>
+                            <span
+                              aria-hidden
+                              className={cn(
+                                'size-2 shrink-0 rounded-full',
+                                projectDot(project.color) ?? 'bg-outline-variant',
+                              )}
+                            />
+                            <span>{project.name}</span>
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+
+                    {hasMore && (
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          asChild
+                          size="sm"
+                          className="font-medium text-primary hover:bg-surface-container-high hover:text-primary"
+                        >
+                          <NavLink to={PROJECTS_URL}>
+                            <span>Ver todos</span>
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    )}
+                  </>
+                )}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </>
+        )}
+      </SidebarMenuItem>
+    </Collapsible>
   );
 }

@@ -1,11 +1,14 @@
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UserDirectoryEntry } from '@/features/users/services/users.service';
+import { useAuthStore } from '@/store/auth.store';
 import {
   projectsService,
   type ProjectListParams,
   type ProjectPayload,
   type UpdateProjectPayload,
 } from '../services/projects.service';
+import { useRecentProjectsStore } from '../store/recent-projects.store';
 import type { Project } from '../types/project';
 
 /**
@@ -24,21 +27,57 @@ export const projectKeys = {
   members: (id: string) => [...projectKeys.all, 'members', id] as const,
 };
 
-/** Lista paginada de proyectos con búsqueda y filtro de archivados. */
-export function useProjects(params: ProjectListParams) {
+/**
+ * Lista paginada de proyectos con búsqueda y filtro de archivados. `enabled` permite montar el
+ * hook sin disparar la petición (p. ej. el fallback de "Proyectos recientes", que solo consulta
+ * la API cuando el historial de visitas está vacío).
+ */
+export function useProjects(
+  params: ProjectListParams,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: projectKeys.list(params),
     queryFn: () => projectsService.list(params),
+    enabled,
   });
 }
 
-/** Detalle de un proyecto por id. Solo corre si hay id. */
+/** Detalle de un proyecto por id. Solo corre si hay id. Registra la visita en "recientes". */
 export function useProject(id: string | undefined) {
-  return useQuery({
+  const query = useQuery({
     queryKey: projectKeys.detail(id ?? ''),
     queryFn: () => projectsService.getById(id as string),
     enabled: !!id,
   });
+
+  useTrackRecentProject(query.data);
+
+  return query;
+}
+
+/**
+ * Registra el proyecto abierto en el historial de "recientes" (Zustand, estado de cliente).
+ *
+ * Se hace **aquí y no en `ProjectDetailPage`** a propósito: `useProject` es el único punto por el
+ * que pasa *toda* vista que abre un proyecto (detalle, tarea dedicada, diálogos del tablero), así
+ * que el historial se alimenta solo, sin duplicar lógica en cada página ni acoplar la UI al store.
+ * Que algún consumidor secundario (p. ej. `BoardSettingsDialog`) lo dispare es inofensivo: es el
+ * mismo proyecto que el usuario está viendo.
+ */
+function useTrackRecentProject(project: Project | undefined) {
+  const userId = useAuthStore((s) => s.user?.id);
+  const trackVisit = useRecentProjectsStore((s) => s.trackVisit);
+
+  const projectId = project?.id;
+  const name = project?.name;
+  const code = project?.code ?? null;
+  const color = project?.color ?? null;
+
+  useEffect(() => {
+    if (!userId || !projectId || !name) return;
+    trackVisit(userId, { id: projectId, name, code, color });
+  }, [userId, projectId, name, code, color, trackVisit]);
 }
 
 /** Crea un proyecto e invalida los listados. */
