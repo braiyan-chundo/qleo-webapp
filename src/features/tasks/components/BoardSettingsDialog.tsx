@@ -41,18 +41,22 @@ export function BoardSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* `DialogContent` es una rejilla (`display:grid`): sus hijos tienen `min-width:auto`, así
+          que su min-content actúa de suelo para la pista y el contenido desbordaba a lo ancho en
+          móvil (QL-123). `min-w-0` en los hijos deja que la pista se ajuste al ancho real del
+          diálogo; los paneles ya no aplastan sus filas (ver `StagesPanel`/`ColumnsPanel`). */}
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
+        <DialogHeader className="min-w-0">
           <DialogTitle>Configurar tablero</DialogTitle>
           <DialogDescription>
             Define las etapas del proyecto y las columnas de estado del Kanban.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {canManage && project && <BoardConfigPanel project={project} />}
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
             <StagesPanel projectId={projectId} />
             <ColumnsPanel projectId={projectId} />
           </div>

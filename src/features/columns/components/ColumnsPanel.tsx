@@ -146,7 +146,10 @@ export function ColumnsPanel({ projectId }: ColumnsPanelProps) {
   };
 
   return (
-    <section className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-5">
+    // `min-w-0`: el panel vive dentro de una rejilla (el diálogo de configuración). Sin esto,
+    // su ancho mínimo automático es su min-content y la pista de la rejilla no puede encogerse
+    // → el contenedor desborda a lo ancho en móvil (QL-123).
+    <section className="min-w-0 rounded-xl border border-outline-variant/40 bg-surface-container-low p-5">
       <header className="mb-4 flex items-center gap-2">
         <Columns3 className="size-5 text-primary" />
         <h2 className="text-base font-semibold text-on-surface">Columnas de estado</h2>
@@ -197,9 +200,15 @@ export function ColumnsPanel({ projectId }: ColumnsPanelProps) {
           {columns.map((column, index) => {
             const isEditing = editingId === column.id;
             return (
+              // `flex-wrap` + `basis-24` en el nombre (QL-123): red de seguridad para pantallas
+              // muy estrechas. El chip "Por defecto" no encoge (`shrink-0`); si la fila se
+              // comprime por debajo de su ancho, se saldría de su caja y volvería a desbordar el
+              // diálogo. Con esto, cuando ya no hay sitio son las **acciones** las que bajan a una
+              // segunda línea. A 360px+ (y en desktop) sigue cabiendo en una sola línea: no
+              // envuelve y el diseño no cambia.
               <li
                 key={column.id}
-                className="flex items-center gap-2 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2"
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2"
               >
                 <div className="flex flex-col">
                   <button
@@ -244,7 +253,7 @@ export function ColumnsPanel({ projectId }: ColumnsPanelProps) {
                   <button
                     type="button"
                     onDoubleClick={() => startEditing(column)}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    className="flex min-w-0 grow basis-24 items-center gap-2 text-left"
                     title="Doble clic para renombrar"
                   >
                     <span className="truncate text-sm font-medium text-on-surface">

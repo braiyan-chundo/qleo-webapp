@@ -557,6 +557,18 @@
   .glow-text {
     text-shadow: 0 0 8px currentColor;
   }
+  /* Oculta la barra de scroll sin desactivar el scroll (QL-123). La clase ya se usaba en
+     `sidebar.tsx`, `command.tsx` y `combobox.tsx` (heredada de la plantilla shadcn) pero nunca
+     llegó a definirse aquí: era inerte. La necesitan además los tabs de la vista de proyecto,
+     que en móvil scrollean en horizontal. */
+  .no-scrollbar {
+    scrollbar-width: none;             /* Firefox */
+    -ms-overflow-style: none;          /* Edge legacy */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;                     /* WebKit/Blink */
+  }
+
   .glow-primary {
     box-shadow: 0 0 16px rgba(255, 45, 120, 0.4);
   }

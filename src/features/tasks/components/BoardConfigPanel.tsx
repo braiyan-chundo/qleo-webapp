@@ -137,7 +137,9 @@ export function BoardConfigPanel({ project }: BoardConfigPanelProps) {
   const columnsDisabled = isLoading || updateColumn.isPending;
 
   return (
-    <section className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-5">
+    // `min-w-0`: el panel vive dentro de una rejilla (el diálogo de configuración) y no debe
+    // imponer su min-content como suelo de la pista (QL-123: desbordaba a lo ancho en móvil).
+    <section className="min-w-0 rounded-xl border border-outline-variant/40 bg-surface-container-low p-5">
       <header className="mb-4 flex items-center gap-2">
         <LayoutTemplate className="size-5 text-primary" />
         <h2 className="text-base font-semibold text-on-surface">Configuración del tablero</h2>

@@ -127,7 +127,10 @@ export function StagesPanel({ projectId }: StagesPanelProps) {
   };
 
   return (
-    <section className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-5">
+    // `min-w-0`: el panel vive dentro de una rejilla (el diálogo de configuración). Sin esto,
+    // su ancho mínimo automático es su min-content y la pista de la rejilla no puede encogerse
+    // → el contenedor desborda a lo ancho en móvil (QL-123).
+    <section className="min-w-0 rounded-xl border border-outline-variant/40 bg-surface-container-low p-5">
       <header className="mb-4 flex items-center gap-2">
         <Layers className="size-5 text-primary" />
         <h2 className="text-base font-semibold text-on-surface">Etapas</h2>
@@ -178,9 +181,11 @@ export function StagesPanel({ projectId }: StagesPanelProps) {
           {stages.map((stage, index) => {
             const isEditing = editingId === stage.id;
             return (
+              // `flex-wrap` (QL-123): misma defensa que en las columnas — si la fila no cabe en
+              // móvil, las acciones bajan a una segunda línea en vez de aplastar el nombre.
               <li
                 key={stage.id}
-                className="flex items-center gap-2 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2"
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2"
               >
                 <div className="flex flex-col">
                   <button
@@ -225,7 +230,7 @@ export function StagesPanel({ projectId }: StagesPanelProps) {
                   <button
                     type="button"
                     onDoubleClick={() => startEditing(stage)}
-                    className="min-w-0 flex-1 truncate text-left text-sm font-medium text-on-surface"
+                    className="min-w-0 grow basis-24 truncate text-left text-sm font-medium text-on-surface"
                     title="Doble clic para renombrar"
                   >
                     {stage.name}

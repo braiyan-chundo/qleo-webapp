@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   Archive,
@@ -130,6 +130,16 @@ export function ProjectDetailPage() {
     setDetailsOpen(true);
   };
 
+  /**
+   * Ref-callback del tab activo (QL-123): la fila de tabs hace scroll horizontal en móvil, así
+   * que al montar (deep-link `?view=gantt`) o al cambiar de vista dejamos el tab activo a la
+   * vista. `block: 'nearest'` evita cualquier salto vertical de la página; solo ajusta el eje
+   * que hace falta. React invoca el callback cuando el nodo activo cambia de tab.
+   */
+  const scrollActiveTabIntoView = useCallback((node: HTMLButtonElement | null) => {
+    node?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, []);
+
   if (isLoading) {
     return (
       <div className="p-4 md:p-8">
@@ -193,7 +203,10 @@ export function ProjectDetailPage() {
       {/* Cabecera compacta (board-first): una fila de identidad + acciones y una línea de
           descripción. Los metadatos y la membresía viven en el modal de detalles. */}
       <header className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        {/* QL-123 (solo móvil): la fila de identidad puede envolver, de modo que el par de chips
+            (código/estado) baja bajo el título en vez de robarle el ancho. En `sm+` se fuerza
+            `flex-nowrap` → la cabecera queda exactamente como está hoy. */}
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-nowrap">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -216,43 +229,55 @@ export function ProjectDetailPage() {
               className={cn('size-3 shrink-0 rounded-full', dotClass)}
             />
           )}
-          <h1 className="min-w-0 truncate text-2xl font-bold text-on-surface md:text-3xl">
+          {/* `grow basis-32` en móvil: el título reclama la primera línea entera (y con ella
+              empuja los chips a la siguiente); en `sm+` vuelve a `basis-auto`/`grow-0`, es decir,
+              al reparto de hoy (si creciera en desktop, separaría los chips del título). */}
+          <h1 className="min-w-0 grow basis-32 truncate text-2xl font-bold text-on-surface sm:grow-0 sm:basis-auto md:text-3xl">
             {project.name}
           </h1>
 
-          {project.code && (
-            <span className="shrink-0 rounded-md bg-surface-container-high px-1.5 py-0.5 text-xs font-semibold tracking-wide text-on-surface-variant uppercase">
-              #{project.code}
+          {/* QL-123: en móvil los chips se **apilan** (código encima de estado) en vez de ir en
+              línea, para devolverle ancho al nombre del proyecto, que quedaba sin espacio. En
+              `sm+` vuelven a la fila de siempre (el `gap-2` del padre separa el título del par y
+              el `sm:gap-2` de aquí separa los dos chips → mismo resultado que antes). */}
+          <div className="flex shrink-0 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+            {project.code && (
+              <span className="shrink-0 rounded-md bg-surface-container-high px-1.5 py-0.5 text-xs font-semibold tracking-wide text-on-surface-variant uppercase">
+                #{project.code}
+              </span>
+            )}
+            <span
+              className={cn(
+                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                project.archived
+                  ? 'bg-surface-container-high text-on-surface-variant'
+                  : 'bg-tertiary-container text-on-tertiary-container',
+              )}
+            >
+              {project.archived ? (
+                <>
+                  <Archive className="size-3" />
+                  Archivado
+                </>
+              ) : (
+                'Activo'
+              )}
             </span>
-          )}
-          <span
-            className={cn(
-              'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-              project.archived
-                ? 'bg-surface-container-high text-on-surface-variant'
-                : 'bg-tertiary-container text-on-tertiary-container',
-            )}
-          >
-            {project.archived ? (
-              <>
-                <Archive className="size-3" />
-                Archivado
-              </>
-            ) : (
-              'Activo'
-            )}
-          </span>
+          </div>
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {/* Miembros del proyecto (QL-51): atajo visual a la ficha, con foco en miembros. */}
+          {/* Miembros del proyecto (QL-51): atajo visual a la ficha, con foco en miembros.
+              QL-123: oculto en móvil (`hidden sm:flex`) — se comía el ancho del nombre del
+              proyecto. No se pierde acceso: `···` → "Detalles del proyecto" abre la misma ficha,
+              que siempre renderiza el bloque de miembros. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 onClick={() => openDetails(true)}
                 aria-label={`Miembros del proyecto (${membersLabel})`}
-                className="mr-1 flex items-center rounded-full p-0.5 transition-colors hover:bg-surface-container-high focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="mr-1 hidden items-center rounded-full p-0.5 transition-colors hover:bg-surface-container-high focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:flex"
               >
                 {shownMembers.length > 0 ? (
                   <AvatarGroup>
@@ -362,19 +387,24 @@ export function ProjectDetailPage() {
         )}
       </header>
 
-      {/* Barra de tabs de vista (estilo underline) */}
+      {/* Barra de tabs de vista (estilo underline). QL-123: en móvil los tabs ya no se envuelven
+          a una segunda línea; la fila hace **scroll horizontal** (`flex-nowrap` + `overflow-x-auto`,
+          con la barra oculta vía la utilidad `no-scrollbar` que ya trae el proyecto). El tab activo
+          se lleva a la vista al montar y al cambiar de vista (deep-link `?view=`), y el foco por
+          teclado lo arrastra el propio navegador dentro del contenedor scrollable. */}
       <div className="border-b border-outline-variant/60">
-        <div className="flex flex-wrap gap-1">
+        <div className="no-scrollbar flex flex-nowrap gap-1 overflow-x-auto">
           {VIEW_TABS.map((tab) => {
             const active = view === tab.key;
             return (
               <button
                 key={tab.key}
+                ref={active ? scrollActiveTabIntoView : undefined}
                 type="button"
                 onClick={() => setView(tab.key)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
+                  'inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
                   active
                     ? 'border-primary text-primary'
                     : 'border-transparent text-on-surface-variant hover:text-on-surface',

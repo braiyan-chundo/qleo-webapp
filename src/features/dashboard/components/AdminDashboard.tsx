@@ -20,6 +20,7 @@ import { useAdminDashboard } from '../hooks/use-admin-dashboard';
 import type { AdminDashboard as AdminDashboardData, AuditSummary } from '../services/dashboard.service';
 import { activityPhraseLabel, buildActivityPhrase } from '../lib/audit-activity';
 import { AdminDashboardSkeleton } from './DashboardSkeleton';
+import { RecentProjectsCard } from './RecentProjectsCard';
 import { ThroughputAreaChart } from './charts/ThroughputAreaChart';
 import { ActivityByDayChart } from './charts/ActivityByDayChart';
 import { TasksByStatusChart } from './charts/TasksByStatusChart';
@@ -109,6 +110,12 @@ export function AdminDashboard() {
           label="Total de usuarios"
         />
       </div>
+
+      {/* Proyectos recientes (QL-123): el cliente lo quiere **justo encima** de "Tareas cerradas
+          por semana" (la primera gráfica). Se monta aquí solo para el ADMIN; el MEMBER lo recibe
+          desde `DashboardPage` (su panel no tiene gráficas). Las dos ramas son excluyentes por
+          rol → la tarjeta se renderiza exactamente una vez por usuario. */}
+      <RecentProjectsCard />
 
       {/* Gráficas (QL-112): móvil apiladas, desktop 2×2. Sin overflow horizontal. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
