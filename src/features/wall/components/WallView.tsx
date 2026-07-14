@@ -127,18 +127,6 @@ export function WallView({ infoOpen = false, onToggleInfo }: WallViewProps) {
           <WallSearch onClose={() => setSearchOpen(false)} onJump={handleSearchJump} />
         ) : (
           <>
-            {/* (QL-119) Disparador del buscador, a la izquierda del bloque de info. */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setSearchOpen(true)}
-              aria-label="Buscar en el muro"
-              className="shrink-0 text-on-surface-variant"
-            >
-              <Search className="size-5" />
-            </Button>
-
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container dark:text-primary">
               <MessagesSquare className="size-5" />
             </span>
@@ -160,26 +148,42 @@ export function WallView({ infoOpen = false, onToggleInfo }: WallViewProps) {
               </p>
             </div>
 
-            {/* Trigger del panel de información (QL-97): oculta/muestra el aside en desktop y abre la
-                vista de "info del canal" a pantalla completa en móvil. */}
-            {onToggleInfo && (
+            {/* Acciones a la derecha del header (QL-119): buscar mensaje + info del canal, juntos
+                en el extremo opuesto al icono del muro. `ml-auto` empuja el grupo a la derecha. */}
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              {/* Disparador del buscador (QL-119): junto al icono de información. */}
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={onToggleInfo}
-                aria-pressed={infoOpen}
-                aria-label={
-                  infoOpen ? 'Ocultar información del canal' : 'Mostrar información del canal'
-                }
-                className={cn(
-                  'ml-auto shrink-0',
-                  infoOpen ? 'text-primary' : 'text-on-surface-variant',
-                )}
+                onClick={() => setSearchOpen(true)}
+                aria-label="Buscar en el muro"
+                className="shrink-0 text-on-surface-variant"
               >
-                <Info className="size-5" />
+                <Search className="size-5" />
               </Button>
-            )}
+
+              {/* Trigger del panel de información (QL-97): oculta/muestra el aside en desktop y abre
+                  la vista de "info del canal" a pantalla completa en móvil. */}
+              {onToggleInfo && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={onToggleInfo}
+                  aria-pressed={infoOpen}
+                  aria-label={
+                    infoOpen ? 'Ocultar información del canal' : 'Mostrar información del canal'
+                  }
+                  className={cn(
+                    'shrink-0',
+                    infoOpen ? 'text-primary' : 'text-on-surface-variant',
+                  )}
+                >
+                  <Info className="size-5" />
+                </Button>
+              )}
+            </div>
           </>
         )}
       </header>
