@@ -83,14 +83,42 @@ export interface WallMessage {
   updatedAt: string;
 }
 
-/** Query params del feed (`GET /wall/messages`). `before`/`after` son mutuamente excluyentes. */
+/**
+ * Query params del feed (`GET /wall/messages`). `before`/`after` son mutuamente excluyentes.
+ * **(QL-119)** `around` **prevalece** sobre ambos: pide una ventana centrada en ese mensaje
+ * (para el "saltar al mensaje" del buscador); no lo combines con `before`/`after`.
+ */
 export interface WallFeedParams {
   /** Devuelve mensajes **más antiguos** que ese id → scroll hacia atrás (historial). */
   before?: string;
   /** Devuelve mensajes **más nuevos** que ese id → polling de novedades. */
   after?: string;
+  /**
+   * (QL-119) Centra la ventana en ese mensaje (~limit/2 más nuevos + el propio + ~limit/2 más
+   * antiguos). **Prevalece** sobre `before`/`after`. Id inexistente → 404 `WALL_MESSAGE_NOT_FOUND`.
+   */
+  around?: string;
   /** Tamaño de página 1..50, default 30. */
   limit?: number;
+}
+
+/**
+ * Resultado **mínimo** del buscador del Muro (QL-119, `GET /wall/search`). NO es el
+ * `WallMessage` completo: solo lo justo para pintar el índice tipo WhatsApp (avatar + nombre +
+ * extracto + fecha). El `id` sirve como `?around=<id>` para saltar y cargar el mensaje completo.
+ */
+export interface WallSearchResult {
+  /** Id del mensaje → úsalo como `?around=<id>` para saltar a su posición en el feed. */
+  id: string;
+  /** Extracto del `body` (espacios colapsados, máx ~160 chars, "…" si se truncó). */
+  snippet: string;
+  authorId: string;
+  /** Nombre del autor (poblado). */
+  authorName: string;
+  /** Ruta proxy `/users/:id/avatar` (requiere token → `AuthedAvatar`), o `null` si no hay imagen. */
+  authorAvatarUrl: string | null;
+  /** ISO8601 de creación del mensaje. */
+  createdAt: string;
 }
 
 /**

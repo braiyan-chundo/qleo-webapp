@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Info, Loader2, MessagesSquare, RefreshCw } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { AlertCircle, Info, Loader2, MessagesSquare, RefreshCw, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,10 +15,12 @@ import { useWallScroll } from '../hooks/use-wall-scroll';
 import { useWallPresence } from '../hooks/use-wall-presence';
 import { dateSeparatorLabel, isSameDay, withinGroupWindow } from '../lib/wall-dates';
 import { buildReplyPreview } from '../lib/wall-reply';
+import { notifyWallError } from '../lib/wall-errors';
 import { wallMessageAnchorId, type WallFeedItem } from '../lib/wall-feed';
-import type { WallReplyPreview } from '../types/wall.types';
+import type { WallReplyPreview, WallSearchResult } from '../types/wall.types';
 import { WallComposer } from './WallComposer';
 import { WallMessageItem } from './WallMessageItem';
+import { WallSearch } from './WallSearch';
 
 /**
  * Columna de chat del Muro Corporativo (QL-89/QL-90, rediseño QL-95, §3.25): tablón/chat
@@ -45,12 +47,48 @@ export function WallView({ infoOpen = false, onToggleInfo }: WallViewProps) {
   const send = useSendWallMessage();
   const markRead = useMarkWallRead();
   const presence = useWallPresence();
-  const { scrollRef, handleScroll, scrollToBottom } = useWallScroll({
-    messages: feed.messages,
-    hasMoreOlder: feed.hasMoreOlder,
-    isLoadingOlder: feed.isLoadingOlder,
-    loadOlder: feed.loadOlder,
-  });
+  const { scrollRef, handleScroll, scrollToBottom, beginJump, scrollToMessage } =
+    useWallScroll({
+      messages: feed.messages,
+      hasMoreOlder: feed.hasMoreOlder,
+      isLoadingOlder: feed.isLoadingOlder,
+      loadOlder: feed.loadOlder,
+    });
+
+  // (QL-119) Buscador del muro: estado de UI **local** (toggle + mensaje resaltado tras el salto).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(
+    () => () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    },
+    [],
+  );
+
+  const { jumpToMessage: jumpFeedToMessage } = feed;
+  // (QL-119) Salto desde un resultado de búsqueda: carga la ventana `around` (reemplaza el feed),
+  // cierra la búsqueda y, al montar la ventana, centra el mensaje y lo resalta unos segundos.
+  const handleSearchJump = useCallback(
+    (result: WallSearchResult) => {
+      setSearchOpen(false);
+      beginJump();
+      setHighlightedId(result.id);
+      jumpFeedToMessage(result.id, {
+        onSuccess: () => {
+          // Espera al paint de la nueva ventana para localizar el ancla DOM y centrarla.
+          requestAnimationFrame(() => scrollToMessage(result.id));
+          if (highlightTimer.current) clearTimeout(highlightTimer.current);
+          highlightTimer.current = setTimeout(() => setHighlightedId(null), 2200);
+        },
+        onError: (err) => {
+          setHighlightedId(null);
+          notifyWallError(err, 'No se pudo abrir el mensaje.');
+        },
+      });
+    },
+    [beginJump, jumpFeedToMessage, scrollToMessage],
+  );
 
   // Marca leído al **entrar** al muro (montaje de la ruta `/muro`). `markRead.mutate` es
   // estable, así que el efecto solo corre una vez por apertura, no por render ni por tick del
@@ -82,48 +120,67 @@ export function WallView({ infoOpen = false, onToggleInfo }: WallViewProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-surface-container-lowest">
-      {/* Cabecera del muro */}
-      <header className="flex items-center gap-3 border-b border-outline-variant/40 bg-surface px-4 py-3 md:px-6">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container dark:text-primary">
-          <MessagesSquare className="size-5" />
-        </span>
-        <div className="min-w-0">
-          {/* "· N en línea": presencia en tiempo real por WebSocket (QL-97, §3.26). Mientras
-              no hay conteo aún se omite (no se pinta "· 0 en línea" en frío). */}
-          <div className="flex items-baseline gap-1.5">
-            <h1 className="truncate text-base font-semibold text-on-surface">
-              Muro Corporativo
-            </h1>
-            {!presence.isLoading && (
-              <span className="shrink-0 text-xs font-medium text-on-surface-variant tabular-nums">
-                · {presence.count} en línea
-              </span>
-            )}
-          </div>
-          <p className="truncate text-xs text-on-surface-variant">
-            Un canal para todo el equipo
-          </p>
-        </div>
+      {/* Cabecera del muro. `relative` para anclar el panel de resultados del buscador (QL-119). */}
+      <header className="relative flex items-center gap-2 border-b border-outline-variant/40 bg-surface px-4 py-3 md:px-6">
+        {searchOpen ? (
+          // (QL-119) Modo búsqueda: el input inline sustituye al bloque "Muro Corporativo".
+          <WallSearch onClose={() => setSearchOpen(false)} onJump={handleSearchJump} />
+        ) : (
+          <>
+            {/* (QL-119) Disparador del buscador, a la izquierda del bloque de info. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Buscar en el muro"
+              className="shrink-0 text-on-surface-variant"
+            >
+              <Search className="size-5" />
+            </Button>
 
-        {/* Trigger del panel de información (QL-97): oculta/muestra el aside en desktop y abre la
-            vista de "info del canal" a pantalla completa en móvil. */}
-        {onToggleInfo && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onToggleInfo}
-            aria-pressed={infoOpen}
-            aria-label={
-              infoOpen ? 'Ocultar información del canal' : 'Mostrar información del canal'
-            }
-            className={cn(
-              'ml-auto shrink-0',
-              infoOpen ? 'text-primary' : 'text-on-surface-variant',
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container dark:text-primary">
+              <MessagesSquare className="size-5" />
+            </span>
+            <div className="min-w-0">
+              {/* "· N en línea": presencia en tiempo real por WebSocket (QL-97, §3.26). Mientras
+                  no hay conteo aún se omite (no se pinta "· 0 en línea" en frío). */}
+              <div className="flex items-baseline gap-1.5">
+                <h1 className="truncate text-base font-semibold text-on-surface">
+                  Muro Corporativo
+                </h1>
+                {!presence.isLoading && (
+                  <span className="shrink-0 text-xs font-medium text-on-surface-variant tabular-nums">
+                    · {presence.count} en línea
+                  </span>
+                )}
+              </div>
+              <p className="truncate text-xs text-on-surface-variant">
+                Un canal para todo el equipo
+              </p>
+            </div>
+
+            {/* Trigger del panel de información (QL-97): oculta/muestra el aside en desktop y abre la
+                vista de "info del canal" a pantalla completa en móvil. */}
+            {onToggleInfo && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onToggleInfo}
+                aria-pressed={infoOpen}
+                aria-label={
+                  infoOpen ? 'Ocultar información del canal' : 'Mostrar información del canal'
+                }
+                className={cn(
+                  'ml-auto shrink-0',
+                  infoOpen ? 'text-primary' : 'text-on-surface-variant',
+                )}
+              >
+                <Info className="size-5" />
+              </Button>
             )}
-          >
-            <Info className="size-5" />
-          </Button>
+          </>
         )}
       </header>
 
@@ -165,6 +222,7 @@ export function WallView({ infoOpen = false, onToggleInfo }: WallViewProps) {
                   <WallMessageItem
                     message={message}
                     grouped={grouped}
+                    highlighted={message.id === highlightedId}
                     onReply={startReply}
                     onJumpToMessage={jumpToMessage}
                   />

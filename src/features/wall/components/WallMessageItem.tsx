@@ -58,6 +58,11 @@ interface WallMessageItemProps {
    * nombre, y la burbuja se pega a la anterior. Lo decide `WallView` a partir del mensaje previo.
    */
   grouped?: boolean;
+  /**
+   * (QL-119) `true` mientras este mensaje es el destino de un salto del buscador: un **flash**
+   * temporal (fondo suave) para localizarlo, estilo "jump to message" de WhatsApp.
+   */
+  highlighted?: boolean;
   /** (QL-103) Inicia una respuesta a este mensaje (el composer muestra la cita). */
   onReply?: (message: WallFeedItem) => void;
   /** (QL-103) Salta/scrollea al mensaje citado en el feed (si está cargado). */
@@ -76,6 +81,7 @@ interface WallMessageItemProps {
 export function WallMessageItem({
   message,
   grouped = false,
+  highlighted = false,
   onReply,
   onJumpToMessage,
 }: WallMessageItemProps) {
@@ -239,7 +245,11 @@ export function WallMessageItem({
     return (
       <div
         id={wallMessageAnchorId(message.id)}
-        className={cn('scroll-mt-4', grouped && '-mt-2')}
+        className={cn(
+          'scroll-mt-4 rounded-2xl transition-colors duration-700',
+          grouped && '-mt-2',
+          highlighted && 'bg-primary/15',
+        )}
       >
         <div
           className={cn(
@@ -282,7 +292,11 @@ export function WallMessageItem({
   return (
     <div
       id={wallMessageAnchorId(message.id)}
-      className={cn('scroll-mt-4', grouped && '-mt-2')}
+      className={cn(
+        'scroll-mt-4 rounded-2xl transition-colors duration-700',
+        grouped && '-mt-2',
+        highlighted && 'bg-primary/15',
+      )}
     >
       {/* Indicador de sistema, sutil y centrado, cuando el mensaje está fijado (QL-93, §3.27):
           se **deriva** de `pinnedAt`/`pinnedBy` (no hay mensaje-sistema en el feed). Va justo

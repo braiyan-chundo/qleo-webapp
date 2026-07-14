@@ -10,6 +10,7 @@ import type {
   WallPresenceCount,
   WallReadResult,
   WallReplyPreview,
+  WallSearchResult,
   WallUnreadCount,
 } from '../types/wall.types';
 import type { WallSharedResponse, WallSharedType } from '../types/wall-shared.types';
@@ -92,8 +93,10 @@ function normalizeWallMessage(raw: RawWallMessage): WallMessage {
 
 function buildQuery(params: WallFeedParams): string {
   const search = new URLSearchParams();
-  // `before` prevalece sobre `after` (regla del backend); no los mandamos juntos.
-  if (params.before) search.set('before', params.before);
+  // `around` (QL-119) prevalece sobre `before`/`after` (misma regla del backend); si viene,
+  // ignoramos los cursores para no combinarlos. Si no, `before` prevalece sobre `after`.
+  if (params.around) search.set('around', params.around);
+  else if (params.before) search.set('before', params.before);
   else if (params.after) search.set('after', params.after);
   if (params.limit != null) search.set('limit', String(params.limit));
   const qs = search.toString();
@@ -108,6 +111,31 @@ export const wallService = {
   list: async (params: WallFeedParams = {}): Promise<WallMessage[]> => {
     const page = await api.get<RawWallMessage[]>(`/wall/messages${buildQuery(params)}`);
     return page.map(normalizeWallMessage);
+  },
+
+  /**
+   * (QL-119) Ventana **centrada** en un mensaje (`?around=<id>`) para el "saltar al mensaje" del
+   * buscador: ~limit/2 más nuevos + el propio + ~limit/2 más antiguos, mismo shape y orden que
+   * `list` (descendente, normalizado, **incluye lápidas**). El objetivo siempre viene incluido;
+   * id inexistente → 404 `WALL_MESSAGE_NOT_FOUND`.
+   */
+  around: async (messageId: string, limit?: number): Promise<WallMessage[]> => {
+    const page = await api.get<RawWallMessage[]>(
+      `/wall/messages${buildQuery({ around: messageId, limit })}`,
+    );
+    return page.map(normalizeWallMessage);
+  },
+
+  /**
+   * (QL-119) Busca `q` en el cuerpo de los mensajes vivos (`GET /wall/search`). Case-insensitive
+   * con `trim`; `<2` chars útiles → el backend devuelve `[]` (para search-as-you-type). Orden
+   * descendente (más reciente primero), tope `limit` (default 20, máx 50). Devuelve la forma
+   * **mínima** `WallSearchResult` (índice), NO el `WallMessage` completo.
+   */
+  search: (q: string, limit?: number): Promise<WallSearchResult[]> => {
+    const search = new URLSearchParams({ q });
+    if (limit != null) search.set('limit', String(limit));
+    return api.get<WallSearchResult[]>(`/wall/search?${search.toString()}`);
   },
 
   /** Crea un mensaje; devuelve el `WallMessage` expandido (para reconciliar el optimista). */

@@ -34,6 +34,8 @@ export const wallKeys = {
   unreadCount: () => [...wallKeys.all, 'unread-count'] as const,
   pinned: () => [...wallKeys.all, 'pinned'] as const,
   presence: () => [...wallKeys.all, 'presence'] as const,
+  /** (QL-119) Prefijo de las queries del buscador; el término va como último segmento. */
+  search: () => [...wallKeys.all, 'search'] as const,
 };
 
 /** Tamaño de página de la carga inicial y del historial (`before`). Máx del backend: 50. */
@@ -53,6 +55,15 @@ interface WallFeed {
   loadOlder: () => void;
   isLoadingOlder: boolean;
   hasMoreOlder: boolean;
+  /**
+   * (QL-119) Salta a un mensaje: **reemplaza** el feed por la ventana `around` centrada en él.
+   * El scroll+highlight lo dispara el llamador (`WallView`) al resolver (`onSuccess`).
+   */
+  jumpToMessage: (
+    messageId: string,
+    options?: { onSuccess?: () => void; onError?: (error: Error) => void },
+  ) => void;
+  isJumping: boolean;
 }
 
 /**
@@ -103,6 +114,28 @@ export function useWallFeed(active: boolean): WallFeed {
     olderMutation.mutate();
   }, [olderMutation, hasMoreOlder]);
 
+  // (QL-119) Salto a un mensaje: pide la ventana `around` y **reemplaza** el feed por ella (sin
+  // huecos → los cursores `before`/`after` siguen siendo correctos desde la nueva ventana). Se
+  // asume que puede haber historial anterior (`hasMoreOlder = true`); `loadOlder` descubrirá el
+  // fin cuando una página vuelva incompleta. El polling `after` retoma el avance hacia el presente.
+  const jumpMutation = useMutation({
+    mutationFn: (messageId: string) => wallService.around(messageId, PAGE_SIZE),
+    onSuccess: (window) => {
+      setHasMoreOlder(true);
+      queryClient.setQueryData<WallFeedItem[]>(wallKeys.feed(), () => mergeMessages([], window));
+    },
+  });
+
+  const jumpToMessage = useCallback(
+    (
+      messageId: string,
+      options?: { onSuccess?: () => void; onError?: (error: Error) => void },
+    ) => {
+      jumpMutation.mutate(messageId, options);
+    },
+    [jumpMutation],
+  );
+
   // Polling de novedades. `enabled` gatea por pestaña Muro activa; `refetchInterval` se
   // pausa solo cuando el documento no está visible (comportamiento por defecto de Query).
   useQuery({
@@ -136,6 +169,8 @@ export function useWallFeed(active: boolean): WallFeed {
     loadOlder,
     isLoadingOlder: olderMutation.isPending,
     hasMoreOlder,
+    jumpToMessage,
+    isJumping: jumpMutation.isPending,
   };
 }
 

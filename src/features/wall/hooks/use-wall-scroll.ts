@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef } from 'react';
 
-import type { WallFeedItem } from '../lib/wall-feed';
+import { wallMessageAnchorId, type WallFeedItem } from '../lib/wall-feed';
 
 interface UseWallScrollArgs {
   messages: WallFeedItem[];
@@ -31,6 +31,9 @@ export function useWallScroll({
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const didInitRef = useRef(false);
+  // (QL-119) Mientras hay un salto en curso (buscador), no auto-seguimos al fondo: el destino es
+  // un mensaje concreto, no el final del hilo. Se limpia al scrollear al mensaje objetivo.
+  const jumpingRef = useRef(false);
   const prevRef = useRef<{ firstId: string | null; lastId: string | null; scrollHeight: number }>(
     { firstId: null, lastId: null, scrollHeight: 0 },
   );
@@ -40,6 +43,27 @@ export function useWallScroll({
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior });
     atBottomRef.current = true;
+  }, []);
+
+  /**
+   * (QL-119) Marca el inicio de un salto: suprime el auto-follow al fondo hasta que la nueva
+   * ventana `around` monte y se scrollee al mensaje objetivo (`scrollToMessage`).
+   */
+  const beginJump = useCallback(() => {
+    jumpingRef.current = true;
+  }, []);
+
+  /**
+   * (QL-119) Centra el mensaje `id` en el viewport (efecto "jump to message" de WhatsApp). Se
+   * llama tras cargar la ventana `around`; usa el ancla DOM del mensaje. Marca "no estoy abajo"
+   * para que el polling posterior no arrastre el scroll al fondo.
+   */
+  const scrollToMessage = useCallback((id: string) => {
+    jumpingRef.current = false;
+    const node = document.getElementById(wallMessageAnchorId(id));
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    atBottomRef.current = false;
   }, []);
 
   const handleScroll = useCallback(() => {
@@ -69,8 +93,10 @@ export function useWallScroll({
     } else if (firstId !== prev.firstId && lastId === prev.lastId && prev.scrollHeight) {
       // Prepend de historial: compensa el crecimiento para no saltar.
       el.scrollTop = el.scrollTop + (el.scrollHeight - prev.scrollHeight);
-    } else if (lastId !== prev.lastId && atBottomRef.current) {
-      // Mensaje nuevo al final y el usuario estaba abajo: sigue el chat.
+    } else if (lastId !== prev.lastId && atBottomRef.current && !jumpingRef.current) {
+      // Mensaje nuevo al final y el usuario estaba abajo: sigue el chat. Durante un salto
+      // (QL-119) NO seguimos al fondo: la ventana `around` cambia todo el hilo y el destino es
+      // el mensaje buscado, al que scrollea `scrollToMessage`.
       el.scrollTop = el.scrollHeight;
     }
 
@@ -79,5 +105,5 @@ export function useWallScroll({
     prev.scrollHeight = el.scrollHeight;
   }, [messages]);
 
-  return { scrollRef, handleScroll, scrollToBottom };
+  return { scrollRef, handleScroll, scrollToBottom, beginJump, scrollToMessage };
 }
