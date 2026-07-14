@@ -24,6 +24,7 @@ interface BoardColumnProps {
   /** Posición de la columna (para derivar un color estable si `color` es null). */
   index: number;
   tasks: Task[];
+  /** Click en una tarjeta → abre la tarea (QL-123: navega a su vista completa, sin modal). */
   onOpenTask: (id: string) => void;
   /** Abre el formulario de nueva tarea preseteando esta columna. */
   onAddTask: (columnId: string) => void;

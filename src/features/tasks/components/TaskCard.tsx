@@ -1,4 +1,11 @@
-import { CalendarClock, CheckCircle2, CheckSquare, Lock } from 'lucide-react';
+import {
+  AlignLeft,
+  CalendarClock,
+  CheckCircle2,
+  CheckSquare,
+  Lock,
+  TriangleAlert,
+} from 'lucide-react';
 
 import {
   AvatarGroup,
@@ -7,9 +14,10 @@ import {
 import { cn } from '@/lib/utils';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 
-import type { Task } from '../services/tasks.service';
+import type { Task, TaskAssignment } from '../services/tasks.service';
 import { labelPillByText } from '../lib/palette';
 import {
+  formatDueDate,
   formatDueDateShort,
   isDueToday,
   isOverdue,
@@ -23,13 +31,35 @@ interface TaskCardProps {
 const MAX_AVATARS = 3;
 
 /**
+ * Ordena los participantes poniendo al **Responsable** (ASSIGNEE, único por RF-1.2) primero,
+ * para que sea el avatar que siempre sobrevive al recorte de `MAX_AVATARS`. El resto conserva
+ * su orden original.
+ */
+function assigneeFirst(assignments: TaskAssignment[]): TaskAssignment[] {
+  const idx = assignments.findIndex((a) => a.role === 'ASSIGNEE');
+  if (idx <= 0) return assignments;
+  const assignee = assignments[idx];
+  return [assignee, ...assignments.filter((_, i) => i !== idx)];
+}
+
+/**
  * Card compacta de una tarea (estilo Trello): pill de categoría opcional, título con estado
- * de completada, barra de progreso del checklist, y footer con avatares + fecha límite. El
- * rol por tarea ya no se muestra en la card (se ve en el detalle).
+ * de completada, barra de progreso del checklist, y footer con avatares + señales + fecha
+ * límite. Un click abre la **vista completa** de la tarea (QL-123: el Kanban ya no pasa por
+ * el modal de vistazo rápido).
+ *
+ * (QL-123) Al desaparecer ese modal, la card absorbe sus señales **sin ganar altura**: el
+ * Responsable se destaca dentro del grupo de avatares (primero + anillo `tertiary`, el mismo
+ * token que su badge de rol), la descripción se anuncia con un icono, y el estado de plazo
+ * distingue *vencida* (error + triángulo) de *vence hoy* (warning). Todo sale del objeto
+ * `Task` que ya sirve el board (`GET /tasks?projectId=…`): **cero peticiones por tarjeta**.
+ * El detalle largo (descripción completa, rol propio, etapa, checklist, comentarios,
+ * adjuntos, cronómetro) vive en la vista de tarea, a un click de distancia.
  */
 export function TaskCard({ task, onClick }: TaskCardProps) {
-  const visible = task.assignments.slice(0, MAX_AVATARS);
-  const extra = task.assignments.length - visible.length;
+  const participants = assigneeFirst(task.assignments);
+  const visible = participants.slice(0, MAX_AVATARS);
+  const extra = participants.length - visible.length;
 
   const dueToday = isDueToday(task.dueDate);
   const overdue = isOverdue(task.dueDate) && !task.isCompleted;
@@ -37,6 +67,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
   const checklistPct = hasChecklist
     ? Math.round((task.checklistDone / task.checklistTotal) * 100)
     : 0;
+  const hasDescription = !!task.description?.trim();
 
   return (
     <button
@@ -90,39 +121,70 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
       )}
 
       <div className="mt-3 flex items-center justify-between gap-2">
-        {task.assignments.length > 0 ? (
+        {participants.length > 0 ? (
           <AvatarGroup>
-            {visible.map((a) => (
-              <AuthedAvatar
-                key={a.userId}
-                size="sm"
-                avatarDownloadUrl={a.user?.avatarDownloadUrl}
-                avatarUrl={a.user?.avatarUrl}
-                name={a.user?.name ?? a.userId}
-              />
-            ))}
+            {visible.map((a) => {
+              const name = a.user?.name ?? a.userId;
+              const isAssignee = a.role === 'ASSIGNEE';
+              return (
+                <AuthedAvatar
+                  key={a.userId}
+                  size="sm"
+                  // El anillo del grupo (`ring-background`) gana por especificidad al ser un
+                  // selector de hijo directo: `!` lo sobrescribe para marcar al Responsable.
+                  className={cn(isAssignee && 'ring-tertiary!')}
+                  title={isAssignee ? `${name} · Responsable` : name}
+                  avatarDownloadUrl={a.user?.avatarDownloadUrl}
+                  avatarUrl={a.user?.avatarUrl}
+                  name={name}
+                />
+              );
+            })}
             {extra > 0 && <AvatarGroupCount>+{extra}</AvatarGroupCount>}
           </AvatarGroup>
         ) : (
           <span className="text-xs text-on-surface-variant">Sin asignar</span>
         )}
 
-        {task.dueDate && (
-          <span
-            className={cn(
-              'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-              overdue || dueToday
-                ? 'bg-error-container text-on-error-container'
-                : 'bg-surface-container-high text-on-surface-variant',
-            )}
-          >
-            <CalendarClock className="size-3" />
-            {dueToday ? 'Hoy' : formatDueDateShort(task.dueDate)}
-            {task.deadlineLocked && (
-              <Lock className="size-3" aria-label="Fecha bloqueada" />
-            )}
-          </span>
-        )}
+        {/* Señales compactas (una sola línea, sin alto extra): descripción y plazo. */}
+        <span className="flex shrink-0 items-center gap-1.5">
+          {hasDescription && (
+            <AlignLeft
+              className="size-3.5 text-on-surface-variant"
+              aria-label="Tiene descripción"
+            />
+          )}
+
+          {task.dueDate && (
+            <span
+              title={
+                overdue
+                  ? `Vencida el ${formatDueDate(task.dueDate)}`
+                  : dueToday
+                    ? 'Vence hoy'
+                    : `Vence el ${formatDueDate(task.dueDate)}`
+              }
+              className={cn(
+                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                overdue
+                  ? 'bg-error-container text-on-error-container'
+                  : dueToday
+                    ? 'bg-warning-container text-on-warning-container'
+                    : 'bg-surface-container-high text-on-surface-variant',
+              )}
+            >
+              {overdue ? (
+                <TriangleAlert className="size-3" />
+              ) : (
+                <CalendarClock className="size-3" />
+              )}
+              {dueToday ? 'Hoy' : formatDueDateShort(task.dueDate)}
+              {task.deadlineLocked && (
+                <Lock className="size-3" aria-label="Fecha bloqueada" />
+              )}
+            </span>
+          )}
+        </span>
       </div>
     </button>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   DndContext,
   DragOverlay,
@@ -26,7 +26,6 @@ import { canMoveTask } from '../lib/roles';
 import { TaskCard } from './TaskCard';
 import { BoardColumn } from './BoardColumn';
 import { TaskFormDialog } from './TaskFormDialog';
-import { TaskDetailDialog } from './TaskDetailDialog';
 import { BoardSettingsDialog } from './BoardSettingsDialog';
 
 interface TaskBoardProps {
@@ -52,10 +51,17 @@ interface TaskBoardProps {
  * Tablero de tareas (QL-07) con drag & drop (QL-15): carriles verticales = columnas de
  * estado (de `useColumns`), agrupando las tareas por `columnId` y ordenadas por `order`.
  * Arrastrar reordena dentro de una columna o mueve entre columnas vía `useMoveTask`
- * (optimista). Un click normal sigue abriendo el detalle (el sensor exige mover 6px antes
- * de iniciar el drag). La configuración del tablero (etapas/columnas) vive en un diálogo
- * aparte, abierto desde la cabecera de la página, para dejar el board como contenido
- * primario y no gastar alto vertical con una fila de acciones.
+ * (optimista).
+ *
+ * (QL-123) Un click normal **navega directamente a la vista completa de la tarea**
+ * (`/projects/:id/tasks/:taskId`): el modal de "vistazo rápido" (`TaskDetailDialog`) ya no
+ * se usa en el Kanban — casi toda su información ya está en la card, así que era un salto
+ * intermedio de más. El modal se mantiene en las otras vistas (List/Gantt/Planner). El click
+ * no se roba al drag porque el `PointerSensor` exige mover 6px antes de iniciar el arrastre.
+ *
+ * La configuración del tablero (etapas/columnas) vive en un diálogo aparte, abierto desde la
+ * cabecera de la página, para dejar el board como contenido primario y no gastar alto
+ * vertical con una fila de acciones.
  */
 export function TaskBoard({
   projectId,
@@ -80,21 +86,19 @@ export function TaskBoard({
     [rawTasks, filterTasks],
   );
 
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  // Deep-link opcional `?task=<id>` sobre el tablero: abre el vistazo rápido (modal) y limpia
-  // el parámetro para no reabrirlo al cerrar. Convención "modal = vistazo" (QL-25); la vista
-  // completa vive en su propia ruta `/projects/:id/tasks/:taskId` (a la que navega el modal).
+  // Deep-link opcional `?task=<id>` sobre el tablero: antes abría el modal de vistazo rápido;
+  // desde QL-123 el Kanban no tiene modal, así que redirige a la vista completa de la tarea.
+  // `replace` deja el historial limpio: "atrás" vuelve al proyecto sin re-disparar el deep-link.
   useEffect(() => {
     const taskParam = searchParams.get('task');
     if (!taskParam) return;
-    setOpenTaskId(taskParam);
-    const next = new URLSearchParams(searchParams);
-    next.delete('task');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+    navigate(`/projects/${projectId}/tasks/${taskParam}`, { replace: true });
+  }, [searchParams, projectId, navigate]);
+
   /** Columna preseteada al abrir el form desde "+ Añadir tarea" de una columna. */
   const [presetColumnId, setPresetColumnId] = useState<string | undefined>();
 
@@ -302,7 +306,9 @@ export function TaskBoard({
                 column={column}
                 index={index}
                 tasks={tasksByColumn.get(column.id) ?? []}
-                onOpenTask={setOpenTaskId}
+                onOpenTask={(taskId) =>
+                  navigate(`/projects/${projectId}/tasks/${taskId}`)
+                }
                 onAddTask={openCreateForColumn}
               />
             ))}
@@ -319,13 +325,6 @@ export function TaskBoard({
         onOpenChange={handleCreateOpenChange}
         projectId={projectId}
         presetColumnId={presetColumnId}
-      />
-      <TaskDetailDialog
-        taskId={openTaskId}
-        projectId={projectId}
-        onOpenChange={(o) => {
-          if (!o) setOpenTaskId(null);
-        }}
       />
       <BoardSettingsDialog
         projectId={projectId}
