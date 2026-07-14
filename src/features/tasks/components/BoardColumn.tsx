@@ -59,6 +59,9 @@ export function BoardColumn({
         // QL-36: `h-full min-h-0` para llenar el alto que le da la grid del board; el
         // encabezado y el botón "Añadir tarea" quedan fijos y solo scrollea la lista.
         'flex h-full min-h-0 flex-col rounded-xl border p-3 transition-colors',
+        // QL-117: en móvil cada columna ocupa medio ancho visible (menos medio gap) y se
+        // ancla al snap para ver ~2 columnas por slide. En sm+ vuelve a ser celda de la grid.
+        'w-[calc(50%-0.5rem)] shrink-0 snap-start sm:w-auto sm:shrink',
         isOver
           ? 'border-primary/60 bg-primary-container/30'
           : 'border-outline-variant/40 bg-surface-container-low',

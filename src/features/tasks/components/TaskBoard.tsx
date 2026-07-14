@@ -283,8 +283,11 @@ export function TaskBoard({
           {/* QL-36: cada columna ocupa el alto restante del viewport (topbar + cabecera del
               proyecto + tabs ≈ 15rem) y scrollea su lista de tarjetas por dentro; el board no
               genera doble scroll de página. El resto de vistas (List/Gantt/Planner) no usa
-              esta grid, así que no se ven afectadas. */}
-          <div className="grid h-[calc(100dvh-15rem)] min-h-[24rem] grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              esta grid, así que no se ven afectadas.
+              QL-117: en móvil (< sm) las columnas van en scroll HORIZONTAL con snap, mostrando
+              ~2 por "slide" (cada columna = 50% del ancho visible menos medio gap). En sm+ se
+              mantiene la grid de escritorio intacta (snap/overflow desactivados). */}
+          <div className="flex h-[calc(100dvh-15rem)] min-h-[24rem] snap-x snap-mandatory items-stretch gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:snap-none sm:overflow-x-visible sm:pb-0 lg:grid-cols-3 xl:grid-cols-4">
             {columns.map((column, index) => (
               <BoardColumn
                 key={column.id}
