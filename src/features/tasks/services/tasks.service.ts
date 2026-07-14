@@ -123,6 +123,18 @@ export interface CreateTaskPayload {
   label?: string;
   /** Fecha de inicio ISO opcional. */
   startDate?: string | null;
+  /**
+   * (QL-123) Responsable (`ASSIGNEE`) desde el alta. Debe ser **miembro del proyecto**
+   * (si no → 400 `USER_NOT_PROJECT_MEMBER` y la tarea NO se crea). Responsable **único**
+   * (RF-1.2). Si es el propio creador el backend lo ignora (conserva su rol `CREATOR`).
+   */
+  assigneeId?: string;
+  /**
+   * (QL-123) Colaboradores (`COLLABORATOR`) desde el alta. Todos deben ser **miembros del
+   * proyecto**. El backend deduplica: si un id coincide con `assigneeId` gana `ASSIGNEE`, y
+   * el creador se descarta. Omitir (o `undefined`) = solo el `CREATOR`, como siempre.
+   */
+  collaboratorIds?: string[];
 }
 
 /**

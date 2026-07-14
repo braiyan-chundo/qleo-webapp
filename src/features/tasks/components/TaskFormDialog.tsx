@@ -23,10 +23,14 @@ import {
 
 import { useStages } from '@/features/stages/hooks/use-stages';
 import { useColumns } from '@/features/columns/hooks/use-columns';
+import { useProjectMembers } from '@/features/projects/hooks/use-projects';
+import { ApiError } from '@/core/api/fetch-client';
+import { useAuthStore } from '@/store/auth.store';
 
 import { DatePicker } from '@/components/ui/date-picker';
 
 import { useCreateTask, useUpdateTask } from '../hooks/use-tasks';
+import { TaskParticipantsPicker } from './TaskParticipantsPicker';
 import { taskFormSchema, type TaskFormValues } from '../schemas/task.schema';
 import type { Task } from '../services/tasks.service';
 import {
@@ -53,7 +57,17 @@ const emptyValues: TaskFormValues = {
   columnId: '',
   label: '',
   startDate: '',
+  assigneeId: '',
+  collaboratorIds: [],
 };
+
+/** Traduce el `error.code` de negocio del alta a un mensaje claro (QL-123). */
+function createErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && err.code === 'USER_NOT_PROJECT_MEMBER') {
+    return 'Solo puedes asignar a miembros del proyecto.';
+  }
+  return err instanceof Error ? err.message : 'No se pudo crear la tarea';
+}
 
 /** Crear/editar una tarea (QL-07). Selectores de etapa (obligatorio) y columna (opcional). */
 export function TaskFormDialog({
@@ -77,6 +91,13 @@ export function TaskFormDialog({
   const backlogColumn = columns?.find((c) => c.isBacklog) ?? defaultColumn;
   const backlogColumnId = backlogColumn?.id;
 
+  // (QL-123) Roles en el alta: los candidatos son la membresía del proyecto. Solo se piden
+  // con el diálogo abierto y en modo creación (en edición los roles los lleva el RoleManager).
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  const { data: members, isLoading: membersLoading } = useProjectMembers(
+    open && !isEdit ? projectId : undefined,
+  );
+
   const createTask = useCreateTask(projectId);
   const updateTask = useUpdateTask(projectId);
   const isPending = createTask.isPending || updateTask.isPending;
@@ -86,11 +107,16 @@ export function TaskFormDialog({
     control,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: emptyValues,
   });
+
+  const assigneeId = watch('assigneeId') ?? '';
+  const collaboratorIds = watch('collaboratorIds') ?? [];
 
   useEffect(() => {
     if (!open) return;
@@ -102,6 +128,9 @@ export function TaskFormDialog({
         columnId: task.columnId,
         label: task.label ?? '',
         startDate: isoToDateInput(task.startDate),
+        // En edición los roles NO se tocan aquí (los gestiona el RoleManager del detalle).
+        assigneeId: '',
+        collaboratorIds: [],
       });
     } else {
       reset({
@@ -146,6 +175,13 @@ export function TaskFormDialog({
         },
       );
     } else {
+      // (QL-123) Roles iniciales: ambos opcionales. El Responsable elegido nunca viaja
+      // también como Colaborador (la UI ya lo filtra; esto lo garantiza en el payload).
+      const nextAssigneeId = values.assigneeId || undefined;
+      const nextCollaboratorIds = (values.collaboratorIds ?? []).filter(
+        (id) => id !== nextAssigneeId,
+      );
+
       createTask.mutate(
         {
           projectId,
@@ -155,6 +191,10 @@ export function TaskFormDialog({
           columnId: values.columnId || undefined,
           label,
           startDate,
+          assigneeId: nextAssigneeId,
+          collaboratorIds: nextCollaboratorIds.length
+            ? nextCollaboratorIds
+            : undefined,
         },
         {
           onSuccess: () => {
@@ -162,9 +202,7 @@ export function TaskFormDialog({
             onOpenChange(false);
           },
           onError: (err) => {
-            toast.error(
-              err instanceof Error ? err.message : 'No se pudo crear la tarea',
-            );
+            toast.error(createErrorMessage(err));
           },
         },
       );
@@ -315,6 +353,21 @@ export function TaskFormDialog({
               />
             </div>
           </div>
+
+          {/* (QL-123) Responsable y Colaboradores solo en el ALTA: en edición los roles se
+              gestionan con el RoleManager de la vista de detalle (no se duplica aquí). */}
+          {!isEdit && (
+            <TaskParticipantsPicker
+              members={members}
+              isLoading={membersLoading}
+              currentUserId={currentUserId}
+              assigneeId={assigneeId}
+              collaboratorIds={collaboratorIds}
+              onAssigneeChange={(id) => setValue('assigneeId', id)}
+              onCollaboratorsChange={(ids) => setValue('collaboratorIds', ids)}
+              disabled={isPending}
+            />
+          )}
 
           <div className="grid gap-1.5">
             <Label htmlFor="description" className="text-on-surface">

@@ -100,7 +100,13 @@ export function useTask(id: string | undefined) {
   });
 }
 
-/** Crea una tarea e invalida el listado del proyecto. */
+/**
+ * Crea una tarea e invalida el listado del proyecto. La respuesta del alta trae
+ * `checklistDone`/`checklistTotal` a 0 y (QL-123) los roles iniciales ya poblados, pero se
+ * invalida igual el listado: el board se repinta desde `GET /tasks` con los conteos y los
+ * `assignments` reales (avatar del Responsable en la card) sin tocar la caché a mano.
+ * También se invalida "Mis tareas": el creador siempre participa en la tarea recién creada.
+ */
 export function useCreateTask(projectId: string) {
   const queryClient = useQueryClient();
 
@@ -108,6 +114,7 @@ export function useCreateTask(projectId: string) {
     mutationFn: (data: CreateTaskPayload) => tasksService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
     },
   });
 }

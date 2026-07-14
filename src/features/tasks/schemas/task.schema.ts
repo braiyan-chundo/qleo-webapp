@@ -13,6 +13,13 @@ export const taskFormSchema = z.object({
   label: z.string().trim().optional(),
   /** Fecha de inicio opcional (valor de `<input type="date">`, `YYYY-MM-DD`). */
   startDate: z.string().optional(),
+  /**
+   * (QL-123) Responsable (ASSIGNEE) elegido en el **alta**; `''` = sin responsable.
+   * Solo se usa al crear: en edición los roles se gestionan con el `RoleManager` del detalle.
+   */
+  assigneeId: z.string().optional(),
+  /** (QL-123) Colaboradores (COLLABORATOR) elegidos en el **alta**. Vacío = ninguno. */
+  collaboratorIds: z.array(z.string()).optional(),
 });
 
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
