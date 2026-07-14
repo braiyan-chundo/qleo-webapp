@@ -3,7 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { pushService } from '../services/push.service';
-import { isPushSupported, urlBase64ToUint8Array } from '../lib/push-utils';
+import {
+  applicationServerKeyMatches,
+  isPushSupported,
+  urlBase64ToUint8Array,
+} from '../lib/push-utils';
 
 /**
  * Hook del feature Push (QL-30, §3.17). Expone el estado de las notificaciones push del
@@ -90,7 +94,37 @@ export function usePush(): UsePushResult {
     gcTime: Infinity,
   });
 
-  // Al montar, deriva el estado real de la suscripción del navegador (no solo del permiso).
+  /**
+   * Suscribe este dispositivo con la clave dada y registra la suscripción en el backend.
+   * Núcleo reutilizable por `enable()` (con gesto/permiso) y por la auto-re-suscripción
+   * silenciosa (QL-118). No pide permiso ni muestra toasts: eso lo decide quien la llama.
+   */
+  const subscribeDevice = useCallback(
+    async (registration: ServiceWorkerRegistration, publicKey: string) => {
+      const applicationServerKey = urlBase64ToUint8Array(publicKey);
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+
+      // `toJSON()` produce exactamente el body del contrato (endpoint + keys); tipamos los
+      // campos opcionales de `PushSubscriptionJSON` a lo que el navegador siempre entrega aquí.
+      const json = subscription.toJSON();
+      await pushService.subscribe({
+        endpoint: json.endpoint ?? subscription.endpoint,
+        keys: {
+          p256dh: json.keys?.p256dh ?? '',
+          auth: json.keys?.auth ?? '',
+        },
+      });
+
+      return subscription;
+    },
+    [],
+  );
+
+  // Al montar: deriva el estado real de la suscripción del navegador (no solo del permiso) y,
+  // de paso, auto-recupera un desajuste de clave VAPID (QL-118, ver abajo).
   useEffect(() => {
     // Sin soporte no hay suscripción posible: resuelve el tri-estado a `false` (no `undefined`)
     // para que los consumidores controlados (p.ej. el switch de /profile) tengan un valor firme.
@@ -100,19 +134,44 @@ export function usePush(): UsePushResult {
     }
 
     let cancelled = false;
-    serviceWorkerReady()
-      .then((registration) => registration.pushManager.getSubscription())
-      .then((subscription) => {
+
+    async function reconcileSubscription() {
+      try {
+        const registration = await serviceWorkerReady();
+        let subscription = await registration.pushManager.getSubscription();
+
+        // Auto-recuperación (QL-118): si la suscripción se creó con una `applicationServerKey`
+        // antigua, el push service la rechaza (403) sin limpiarla y los push "solo llegan al
+        // abrir la app". Si la clave no coincide con la VAPID vigente, re-suscribimos en
+        // SILENCIO (ya hay permiso concedido; sin toasts ni `requestPermission`).
+        if (subscription && Notification.permission === 'granted') {
+          const { data } = await refetchVapidKey();
+          const publicKey = data?.publicKey;
+          if (
+            publicKey &&
+            !applicationServerKeyMatches(subscription.options.applicationServerKey, publicKey)
+          ) {
+            const staleEndpoint = subscription.endpoint;
+            await subscription.unsubscribe();
+            subscription = await subscribeDevice(registration, publicKey);
+            // Best-effort: da de baja el registro antiguo en el backend (el nuevo ya quedó
+            // registrado). Silencioso; si falla, el backend igual lo purga al fallar el envío.
+            void pushService.unsubscribe(staleEndpoint).catch(() => undefined);
+          }
+        }
+
         if (!cancelled) setIsSubscribed(!!subscription);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setIsSubscribed(false);
-      });
+      }
+    }
+
+    void reconcileSubscription();
 
     return () => {
       cancelled = true;
     };
-  }, [supported]);
+  }, [supported, refetchVapidKey, subscribeDevice]);
 
   const enable = useCallback(async () => {
     if (!supported || isBusy) return;
@@ -138,22 +197,7 @@ export function usePush(): UsePushResult {
       }
 
       const registration = await serviceWorkerReady();
-      const applicationServerKey = urlBase64ToUint8Array(publicKey);
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey,
-      });
-
-      // `toJSON()` produce exactamente el body del contrato (endpoint + keys); tipamos los
-      // campos opcionales de `PushSubscriptionJSON` a lo que el navegador siempre entrega aquí.
-      const json = subscription.toJSON();
-      await pushService.subscribe({
-        endpoint: json.endpoint ?? subscription.endpoint,
-        keys: {
-          p256dh: json.keys?.p256dh ?? '',
-          auth: json.keys?.auth ?? '',
-        },
-      });
+      await subscribeDevice(registration, publicKey);
 
       setIsSubscribed(true);
       toast.success('Notificaciones push activadas.');
@@ -166,7 +210,7 @@ export function usePush(): UsePushResult {
     } finally {
       setIsBusy(false);
     }
-  }, [supported, isBusy, refetchVapidKey]);
+  }, [supported, isBusy, refetchVapidKey, subscribeDevice]);
 
   const disable = useCallback(async () => {
     if (!supported || isBusy) return;

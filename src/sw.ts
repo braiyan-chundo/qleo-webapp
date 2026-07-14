@@ -28,12 +28,53 @@ self.addEventListener('activate', (event) => {
 })
 
 // --- Payload que envía el backend (F2) ------------------------------------
-// El backend enviará: { title, body, url, type }. En el MVP `url` = '/notifications'.
+// El backend enviará: { title, body, url, type, badge? }. En el MVP `url` = '/notifications'.
 interface PushPayload {
   title?: string
   body?: string
   url?: string
   type?: string
+  /** (QL-118) nº de no leídos del destinatario en el momento del push. Best-effort. */
+  badge?: number
+}
+
+// --- Badging API (QL-118, §3.17) ------------------------------------------
+// Pinta/limpia el contador numérico del icono de la app (estilo WhatsApp). En un SW la API
+// vive en `self.navigator` (WorkerNavigator); `lib.webworker` no la tipa, así que la
+// declaramos de forma mínima. Nunca debe romper el `waitUntil`: todo va con feature-detection
+// y try/catch, y siempre resuelve.
+interface BadgingNavigator {
+  setAppBadge?: (contents?: number) => Promise<void>
+  clearAppBadge?: () => Promise<void>
+}
+
+function setAppBadge(count: number): Promise<void> {
+  const nav = self.navigator as WorkerNavigator & BadgingNavigator
+  if (typeof nav.setAppBadge !== 'function') return Promise.resolve()
+  try {
+    return Promise.resolve(nav.setAppBadge(count)).catch(() => undefined)
+  } catch {
+    return Promise.resolve()
+  }
+}
+
+function clearAppBadge(): Promise<void> {
+  const nav = self.navigator as WorkerNavigator & BadgingNavigator
+  if (typeof nav.clearAppBadge !== 'function') return Promise.resolve()
+  try {
+    return Promise.resolve(nav.clearAppBadge()).catch(() => undefined)
+  } catch {
+    return Promise.resolve()
+  }
+}
+
+/**
+ * Aplica el badge que viene en el payload del push. Si `badge` no es número (el backend no
+ * lo pudo calcular), NO se toca el badge. `badge > 0` lo pinta; `badge === 0` lo limpia.
+ */
+function applyBadgeFromPayload(badge: number | undefined): Promise<void> {
+  if (typeof badge !== 'number') return Promise.resolve()
+  return badge > 0 ? setAppBadge(badge) : clearAppBadge()
 }
 
 const DEFAULT_TITLE = 'Qleo'
@@ -68,7 +109,14 @@ self.addEventListener('push', (event) => {
     data: { url },
   }
 
-  event.waitUntil(self.registration.showNotification(title, options))
+  // Mostramos la notificación y, en paralelo, pintamos el badge numérico del icono (QL-118).
+  // Ambas van dentro del mismo `waitUntil`; el badge es best-effort y no rompe si falla.
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      applyBadgeFromPayload(payload.badge),
+    ]).then(() => undefined),
+  )
 })
 
 // --- Listener `notificationclick`: enfoca/abre la ventana correcta --------
@@ -79,23 +127,25 @@ self.addEventListener('notificationclick', (event) => {
   const targetPath = data.url ?? DEFAULT_URL
   const targetUrl = self.location.origin + targetPath
 
-  event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        // Si ya hay una ventana de la app abierta, la enfocamos y navegamos.
-        for (const client of clientList) {
-          if (client.url.startsWith(self.location.origin) && 'focus' in client) {
-            return client.focus().then((focused) => {
-              if ('navigate' in focused) {
-                return focused.navigate(targetUrl).then(() => undefined)
-              }
-              return undefined
-            })
-          }
+  // Al abrir/enfocar la app el usuario "ve" las novedades: limpiamos el badge del icono
+  // (QL-118). El cliente lo re-sincroniza con el conteo fresco (polling) al montarse.
+  const focusWindow = self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then((clientList) => {
+      // Si ya hay una ventana de la app abierta, la enfocamos y navegamos.
+      for (const client of clientList) {
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          return client.focus().then((focused) => {
+            if ('navigate' in focused) {
+              return focused.navigate(targetUrl).then(() => undefined)
+            }
+            return undefined
+          })
         }
-        // Si no hay ninguna, abrimos una nueva.
-        return self.clients.openWindow(targetUrl).then(() => undefined)
-      }),
-  )
+      }
+      // Si no hay ninguna, abrimos una nueva.
+      return self.clients.openWindow(targetUrl).then(() => undefined)
+    })
+
+  event.waitUntil(Promise.all([focusWindow, clearAppBadge()]).then(() => undefined))
 })

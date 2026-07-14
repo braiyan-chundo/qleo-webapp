@@ -16,6 +16,7 @@
 | `react-ui-shadcn` | shadcn + tokens Material 3 + lucide; cómo agregar componentes | Al construir UI o estilizar |
 | `react-routing-auth` | react-router v7, layouts, ProtectedRoute, guards por rol | Al agregar rutas o proteger vistas |
 | `react-pwa` | Configuración de vite-plugin-pwa, offline, manifest | Al ajustar comportamiento PWA |
+| `react-pwa-push-closed-app` | Push con la PWA cerrada + badge del icono: SW `injectManifest`, Badging API, suscripción VAPID y auto-re-suscripción ante desajuste de clave | Al tocar el flujo de push, el badge del icono o diagnosticar "solo llega al abrir la app" |
 
 ## Dependencias entre Skills
 

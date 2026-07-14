@@ -12,6 +12,7 @@ import { LogOut, UserCircle } from 'lucide-react';
 import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
 import { QleoLogo } from '@/shared/components/QleoLogo';
 import { getDailySlogan } from '@/shared/config/slogans';
+import { useAppBadgeSync } from '@/shared/hooks/use-app-badge-sync';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,10 @@ export function AppLayout() {
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
   const [logoutOpen, setLogoutOpen] = useState(false);
+
+  // Mantiene el badge del icono de la app en sync con los no leídos mientras la PWA está
+  // abierta (QL-118); complementa el badge que pinta el service worker con la app cerrada.
+  useAppBadgeSync();
 
   const handleLogout = () => {
     logout();
