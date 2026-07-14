@@ -35,6 +35,13 @@ interface TaskBoardProps {
   createOpen: boolean;
   onCreateOpenChange: (open: boolean) => void;
   /**
+   * Estado del diálogo de "Configurar tablero", controlado por la página: la acción vive en
+   * la barra de la cabecera (visible solo en Kanban) para que se vea; el diálogo se sigue
+   * renderizando aquí. El estado vacío del board también puede abrirlo.
+   */
+  settingsOpen: boolean;
+  onSettingsOpenChange: (open: boolean) => void;
+  /**
    * Filtro del board (compartido entre vistas). Se aplica a las tareas tras cargarlas para
    * que Kanban/Gantt/Planner muestren el mismo subconjunto. Por defecto, identidad.
    */
@@ -47,12 +54,15 @@ interface TaskBoardProps {
  * Arrastrar reordena dentro de una columna o mueve entre columnas vía `useMoveTask`
  * (optimista). Un click normal sigue abriendo el detalle (el sensor exige mover 6px antes
  * de iniciar el drag). La configuración del tablero (etapas/columnas) vive en un diálogo
- * aparte para dejar el board como contenido primario.
+ * aparte, abierto desde la cabecera de la página, para dejar el board como contenido
+ * primario y no gastar alto vertical con una fila de acciones.
  */
 export function TaskBoard({
   projectId,
   createOpen,
   onCreateOpenChange,
+  settingsOpen,
+  onSettingsOpenChange,
   filterTasks,
 }: TaskBoardProps) {
   const {
@@ -85,7 +95,6 @@ export function TaskBoard({
     next.delete('task');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   /** Columna preseteada al abrir el form desde "+ Añadir tarea" de una columna. */
   const [presetColumnId, setPresetColumnId] = useState<string | undefined>();
 
@@ -218,18 +227,6 @@ export function TaskBoard({
 
   return (
     <section className="mt-4 md:flex md:min-h-0 md:flex-1 md:flex-col">
-      <div className="mb-4 flex items-center justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <Settings2 className="size-4" />
-          Configurar tablero
-        </Button>
-      </div>
-
       {isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -258,7 +255,7 @@ export function TaskBoard({
             variant="outline"
             size="sm"
             className="mt-3"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => onSettingsOpenChange(true)}
           >
             <Settings2 className="size-4" />
             Configurar tablero
@@ -283,8 +280,13 @@ export function TaskBoard({
           {/* QL-36: el board rellena el alto disponible y cada columna scrollea su lista de
               tarjetas por dentro; nunca genera doble scroll de página. El resto de vistas
               (List/Gantt/Planner) no usa este contenedor, así que no se ven afectadas.
-              En móvil (< md) usamos `h-[calc(100dvh-15rem)]` (alto de viewport menos el chrome
-              móvil: topbar + bottom nav ≈ 15rem). En desktop (md+) NO usamos número mágico:
+              En móvil (< md) usamos `h-[calc(100dvh-22rem)]` = alto de viewport menos el chrome
+              móvil: topbar (~4.5rem) + cabecera compacta de la página (~7.5rem: identidad +
+              acciones envueltas + descripción) + tabs (~2.5rem) + bottom nav (~6rem). Antes era
+              15rem, calibrado con la cabecera antigua (back-link + collapsible de detalles +
+              fila de "Configurar tablero"), que desbordaba el viewport y obligaba a scrollear la
+              página; al compactar la cabecera el board ya cabe entero. `min-h-[24rem]` protege
+              las pantallas muy bajas. En desktop (md+) NO usamos número mágico:
               la página es una columna flex acotada (ver ProjectDetailPage) y aquí el board toma
               `flex-1` para rellenar exactamente el espacio restante → cero scroll de página.
               QL-117: en móvil (< sm) las columnas van en scroll HORIZONTAL con snap, mostrando
@@ -293,7 +295,7 @@ export function TaskBoard({
               columnas de ancho fijo (`sm:w-72` en BoardColumn) para que quepan varias y el resto
               quede accesible con scroll; NUNCA hacen wrap. El snap obligatorio se limita a móvil
               (`sm:snap-none`) → en desktop el scroll es libre. */}
-          <div className="flex h-[calc(100dvh-15rem)] min-h-[24rem] snap-x snap-mandatory items-stretch gap-4 overflow-x-auto pb-2 sm:snap-none md:h-auto md:min-h-0 md:flex-1">
+          <div className="flex h-[calc(100dvh-22rem)] min-h-[24rem] snap-x snap-mandatory items-stretch gap-4 overflow-x-auto pb-2 sm:snap-none md:h-auto md:min-h-0 md:flex-1">
             {columns.map((column, index) => (
               <BoardColumn
                 key={column.id}
@@ -301,7 +303,6 @@ export function TaskBoard({
                 index={index}
                 tasks={tasksByColumn.get(column.id) ?? []}
                 onOpenTask={setOpenTaskId}
-                onConfigure={() => setSettingsOpen(true)}
                 onAddTask={openCreateForColumn}
               />
             ))}
@@ -329,7 +330,7 @@ export function TaskBoard({
       <BoardSettingsDialog
         projectId={projectId}
         open={settingsOpen}
-        onOpenChange={setSettingsOpen}
+        onOpenChange={onSettingsOpenChange}
       />
     </section>
   );

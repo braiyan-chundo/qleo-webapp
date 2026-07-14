@@ -3,15 +3,14 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Inbox, MoreHorizontal, Plus, Settings2, Star } from 'lucide-react';
+import { Inbox, Plus, Star } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 import type { Column } from '@/features/columns/services/columns.service';
@@ -26,8 +25,6 @@ interface BoardColumnProps {
   index: number;
   tasks: Task[];
   onOpenTask: (id: string) => void;
-  /** Abre el diálogo de "Configurar tablero". */
-  onConfigure: () => void;
   /** Abre el formulario de nueva tarea preseteando esta columna. */
   onAddTask: (columnId: string) => void;
 }
@@ -36,15 +33,15 @@ interface BoardColumnProps {
  * Carril de una columna de estado (QL-15): contenedor *droppable* + `SortableContext`
  * vertical con sus tareas ordenadas por `order`. El id droppable es el `columnId`, así el
  * board puede resolver el destino incluso al soltar sobre una columna vacía. El encabezado
- * muestra un punto de color (token), el nombre, el contador y un menú `···`; al pie hay un
- * botón para añadir una tarea directamente en esta columna.
+ * muestra un punto de color (token), el nombre, el contador y un botón `+` para añadir una
+ * tarea directamente en esta columna; la configuración del tablero vive en la cabecera de la
+ * página (antes duplicada en un menú `···` por columna).
  */
 export function BoardColumn({
   column,
   index,
   tasks,
   onOpenTask,
-  onConfigure,
   onAddTask,
 }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -56,8 +53,8 @@ export function BoardColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        // QL-36: `h-full min-h-0` para llenar el alto que le da el board; el encabezado y el
-        // botón "Añadir tarea" quedan fijos y solo scrollea la lista.
+        // QL-36: `h-full min-h-0` para llenar el alto que le da el board; el encabezado queda
+        // fijo y solo scrollea la lista de tarjetas.
         'flex h-full min-h-0 flex-col rounded-xl border p-3 transition-colors',
         // QL-117: en móvil cada columna ocupa medio ancho visible (menos medio gap) y se ancla
         // al snap para ver ~2 columnas por slide. En sm+ pasa a un ancho fijo (18rem) con
@@ -89,24 +86,21 @@ export function BoardColumn({
           </span>
         </span>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            aria-label="Acciones de la columna"
-          >
-            <MoreHorizontal className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => onAddTask(column.id)}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0 text-on-surface-variant hover:text-on-surface"
+              onClick={() => onAddTask(column.id)}
+              aria-label={`Añadir tarea en ${column.name}`}
+            >
               <Plus className="size-4" />
-              Añadir tarea
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onConfigure}>
-              <Settings2 className="size-4" />
-              Configurar tablero
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Añadir tarea</TooltipContent>
+        </Tooltip>
       </header>
 
       <SortableContext
@@ -132,17 +126,6 @@ export function BoardColumn({
           )}
         </div>
       </SortableContext>
-
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="mt-2 w-full shrink-0 justify-start text-on-surface-variant"
-        onClick={() => onAddTask(column.id)}
-      >
-        <Plus className="size-4" />
-        Añadir tarea
-      </Button>
     </div>
   );
 }
