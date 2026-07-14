@@ -33,6 +33,8 @@ interface MentionTextareaProps {
   /** Se llama al elegir a alguien del dropdown, para que el padre registre el userId. */
   onMention: (mention: CommentMention) => void;
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
+  /** Se llama al perder el foco el textarea (además del cierre interno del dropdown de menciones). */
+  onBlur?: () => void;
   placeholder?: string;
   rows?: number;
   disabled?: boolean;
@@ -48,7 +50,18 @@ interface MentionTextareaProps {
  */
 export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextareaProps>(
   function MentionTextarea(
-    { value, onChange, onMention, onKeyDown, placeholder, rows = 3, disabled, autoFocus, className },
+    {
+      value,
+      onChange,
+      onMention,
+      onKeyDown,
+      onBlur,
+      placeholder,
+      rows = 3,
+      disabled,
+      autoFocus,
+      className,
+    },
     ref,
   ) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -184,6 +197,7 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
           onBlur={() => {
             // Retraso para permitir el click en una opción antes de cerrar.
             window.setTimeout(() => setToken(null), 120);
+            onBlur?.();
           }}
           onKeyDown={handleKeyDown}
         />

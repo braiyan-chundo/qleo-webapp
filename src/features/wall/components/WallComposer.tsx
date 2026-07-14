@@ -43,6 +43,7 @@ import {
   type SendWallMessageInput,
 } from '../hooks/use-wall';
 import { useVoiceRecorder } from '../hooks/use-voice-recorder';
+import { useWallTyping } from '../hooks/use-wall-presence';
 import { formatVoiceDuration } from '../lib/wall-audio';
 import { notifyWallError } from '../lib/wall-errors';
 import type { WallReplyPreview } from '../types/wall.types';
@@ -123,10 +124,26 @@ export function WallComposer({
   const voice = useVoiceRecorder();
   const [sendingVoice, setSendingVoice] = useState(false);
 
+  // "Escribiendo…/grabando audio…" en vivo (QL-125): emite por el socket único del muro.
+  const { startTyping, stopTyping } = useWallTyping();
+
+  const isRecording = voice.status === 'recording';
+
   // Al iniciar/actualizar una respuesta, enfoca el editor para escribir de inmediato (QL-103).
   useEffect(() => {
     if (replyTo) editorRef.current?.focus();
   }, [replyTo]);
+
+  // (QL-125) Emite "grabando un audio…" mientras la grabación está activa; corta al soltar/cancelar
+  // o al enviar la nota (cuando `voice.status` vuelve a 'idle').
+  useEffect(() => {
+    if (isRecording) startTyping('audio');
+    else stopTyping();
+  }, [isRecording, startTyping, stopTyping]);
+
+  // (QL-125) Al desmontar el composer (p. ej. alternar el panel de info en móvil) corta el
+  // "escribiendo…" para no dejar el indicador colgado en el resto del equipo.
+  useEffect(() => () => stopTyping(), [stopTyping]);
   // Un input file oculto por opción del menú (§QL-100): archivo general, galería/foto·vídeo y
   // cámara. Solo cambian `accept`/`capture`; todos vuelcan en el mismo `handleFiles`.
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -204,7 +221,20 @@ export function WallComposer({
     setUploads([]);
     setValue('');
     mentionCandidates.current = [];
+    // (QL-125) Al enviar/vaciar deja de "escribir…": corta el heartbeat y emite `wall:typing:stop`.
+    stopTyping();
   };
+
+  // (QL-125) Cambio de texto: refleja el valor y emite/corta el "escribiendo…" según haya contenido.
+  const handleTextChange = useCallback(
+    (next: string) => {
+      const clipped = next.slice(0, MAX_LENGTH);
+      setValue(clipped);
+      if (clipped.trim().length > 0) startTyping('text');
+      else stopTyping();
+    },
+    [startTyping, stopTyping],
+  );
 
   const submit = () => {
     if (!canSend) return;
@@ -282,8 +312,6 @@ export function WallComposer({
       },
     );
   };
-
-  const isRecording = voice.status === 'recording';
 
   return (
     <div className="flex flex-col gap-1.5 border-t border-outline-variant/40 bg-surface px-3 py-3 md:px-6">
@@ -427,9 +455,10 @@ export function WallComposer({
           <MentionTextarea
             ref={editorRef}
             value={value}
-            onChange={(next) => setValue(next.slice(0, MAX_LENGTH))}
+            onChange={handleTextChange}
             onMention={registerMention}
             onKeyDown={handleKeyDown}
+            onBlur={stopTyping}
             rows={1}
             placeholder="Escribe un mensaje al Muro Corporativo…"
             className="max-h-40 min-h-9 w-full resize-none border-0 bg-transparent px-1 py-1.5 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"

@@ -21,6 +21,7 @@ import type { WallReplyPreview, WallSearchResult } from '../types/wall.types';
 import { WallComposer } from './WallComposer';
 import { WallMessageItem } from './WallMessageItem';
 import { WallSearch } from './WallSearch';
+import { WallTypingIndicator } from './WallTypingIndicator';
 
 /**
  * Columna de chat del Muro Corporativo (QL-89/QL-90, rediseño QL-95, §3.25): tablón/chat
@@ -236,6 +237,10 @@ export function WallView({ infoOpen = false, onToggleInfo }: WallViewProps) {
           </div>
         )}
       </div>
+
+      {/* Indicador efímero "escribiendo…/grabando audio…" (QL-125), sobre el composer estilo chat.
+          Se pinta solo cuando hay typers; si no, no ocupa espacio. */}
+      <WallTypingIndicator />
 
       {/* Barra de escritura fija */}
       <WallComposer

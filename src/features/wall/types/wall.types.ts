@@ -181,3 +181,34 @@ export interface PresenceCountEvent {
 export interface PresenceErrorEvent {
   message: 'UNAUTHORIZED';
 }
+
+/** Modo de actividad en el composer del muro: teclear texto o grabar audio (QL-125). */
+export type WallTypingKind = 'text' | 'audio';
+
+/**
+ * Un usuario que está **escribiendo/grabando** ahora mismo en el muro (QL-125, §3.26). El
+ * servidor ya **excluye al propio usuario** del conjunto que envía.
+ */
+export interface WallTyper {
+  userId: string;
+  name: string;
+  kind: WallTypingKind;
+}
+
+/**
+ * Payload del evento WS `wall:typing` (**servidor→cliente**) del namespace `/presence`
+ * (QL-125): el conjunto ACTUAL de quienes escriben/graban. Se re-emite ante cada cambio;
+ * llega `{ typers: [] }` cuando nadie escribe.
+ */
+export interface WallTypingEvent {
+  typers: WallTyper[];
+}
+
+/**
+ * Payload del emit `wall:typing` (**cliente→servidor**) del namespace `/presence` (QL-125):
+ * un heartbeat (~2 s) mientras el usuario teclea (`'text'`) o graba un audio (`'audio'`). El
+ * cese se señala con `wall:typing:stop` (sin payload).
+ */
+export interface WallTypingSignal {
+  kind: WallTypingKind;
+}

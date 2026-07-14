@@ -4,6 +4,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 import { WallAside } from '../components/WallAside';
 import { WallView } from '../components/WallView';
+import { WallPresenceProvider } from '../context/WallPresenceProvider';
 
 /**
  * Ruta propia del Muro Corporativo (QL-95, `/muro`). Vive tras `SessionGate` como el resto del
@@ -51,22 +52,20 @@ export function WallPage() {
   const closeInfo = () => persistToggle(false);
 
   // En móvil, cuando la info está abierta, SUSTITUYE al chat por completo.
-  if (isMobile) {
-    return (
-      <div className="flex h-full w-full overflow-hidden">
-        {showInfo ? (
-          <WallAside variant="mobile" onClose={closeInfo} />
-        ) : (
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <WallView infoOpen={false} onToggleInfo={toggleInfo} />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Desktop: chat + columna lateral opcional (se muestra/oculta con el trigger del header).
-  return (
+  // Un solo `WallPresenceProvider` envuelve ambos layouts para mantener el mismo (y único) socket
+  // `/presence` vivo mientras se está en `/muro`, sin reconectar al alternar el panel de info.
+  const content = isMobile ? (
+    <div className="flex h-full w-full overflow-hidden">
+      {showInfo ? (
+        <WallAside variant="mobile" onClose={closeInfo} />
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <WallView infoOpen={false} onToggleInfo={toggleInfo} />
+        </div>
+      )}
+    </div>
+  ) : (
+    // Desktop: chat + columna lateral opcional (se muestra/oculta con el trigger del header).
     <div className="flex h-full w-full overflow-hidden">
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <WallView infoOpen={showInfo} onToggleInfo={toggleInfo} />
@@ -74,4 +73,6 @@ export function WallPage() {
       {showInfo && <WallAside variant="desktop" />}
     </div>
   );
+
+  return <WallPresenceProvider>{content}</WallPresenceProvider>;
 }
