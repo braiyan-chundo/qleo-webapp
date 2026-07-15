@@ -21,6 +21,13 @@ import {
  * a mano. Sigue el patrón de `features/columns/hooks/use-columns.ts`.
  */
 
+/**
+ * (P8) Intervalo de sondeo de las vistas de trabajo (tablero/lista/detalle). El MVP usa
+ * **polling** (no WebSocket), así que tareas movidas/editadas desde otra sesión se reflejan
+ * en vivo. TanStack pausa el timer con la pestaña en segundo plano (no satura la API).
+ */
+const WORK_POLL_MS = 15_000;
+
 /** Claves de query del feature. Centralizadas para invalidación consistente. */
 export const taskKeys = {
   all: ['tasks'] as const,
@@ -71,12 +78,14 @@ function reorderTasksOptimistic(
   });
 }
 
-/** Lista de tareas del proyecto (ordenadas por `order` asc). No pagina. */
+/** Lista de tareas del proyecto (ordenadas por `order` asc). No pagina. Sondea en vivo (P8). */
 export function useTasks(projectId: string | undefined) {
   return useQuery({
     queryKey: taskKeys.list(projectId ?? ''),
     queryFn: () => tasksService.list({ projectId: projectId as string }),
     enabled: !!projectId,
+    refetchInterval: WORK_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -88,15 +97,19 @@ export function useMyTasks() {
   return useQuery({
     queryKey: taskKeys.mine(),
     queryFn: () => tasksService.listMine(),
+    refetchInterval: WORK_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 }
 
-/** Detalle de una tarea con `assignments[].user` poblado y `currentUserRole`. */
+/** Detalle de una tarea con `assignments[].user` poblado y `currentUserRole`. Sondea en vivo (P8). */
 export function useTask(id: string | undefined) {
   return useQuery({
     queryKey: taskKeys.detail(id ?? ''),
     queryFn: () => tasksService.getById(id as string),
     enabled: !!id,
+    refetchInterval: WORK_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -262,10 +275,9 @@ export function useRequestDeadlineExtension(taskId: string) {
 }
 
 /**
- * Estado de tiempo de la tarea (cronómetro, QL-17, §3.13). Refetch al montar (`always`)
- * para que el contador arranque al día; como el MVP usa polling, quien quiera ver el tiempo
- * de otros al día puede invalidar esta query periódicamente. Los mutadores del cronómetro la
- * invalidan tras start/stop/complete.
+ * Estado de tiempo **automático** de la tarea (P4/§3.13). El tiempo hábil se fija solo al mover
+ * la tarea entre las columnas `isStart`/`isEnd` (QL-62); no hay cronómetro manual. Sondea cada
+ * ~15 s + al reenfocar (MVP = polling) para refrescar `workedMs` mientras está en curso.
  */
 export function useTaskTime(taskId: string | undefined) {
   return useQuery({
@@ -273,40 +285,8 @@ export function useTaskTime(taskId: string | undefined) {
     queryFn: () => tasksService.getTime(taskId as string),
     enabled: !!taskId,
     refetchOnMount: 'always',
-  });
-}
-
-/**
- * Inicia el cronómetro del usuario en la tarea (QL-17, §3.13). Invalida el estado de tiempo
- * y el detalle. Puede rechazar con `ApiError` (`TIMER_ALREADY_RUNNING` 409, `READ_ONLY_ROLE`
- * 403); el componente decide el mensaje.
- */
-export function useStartTimer(taskId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () => tasksService.startTimer(taskId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.time(taskId) });
-      queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
-    },
-  });
-}
-
-/**
- * Detiene el cronómetro del usuario en la tarea (QL-17, §3.13). Invalida el estado de tiempo
- * y el detalle. Puede rechazar con `ApiError` (`NO_RUNNING_TIMER` 409, `READ_ONLY_ROLE` 403);
- * el componente decide el mensaje.
- */
-export function useStopTimer(taskId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () => tasksService.stopTimer(taskId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.time(taskId) });
-      queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
-    },
+    refetchInterval: WORK_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 }
 

@@ -23,11 +23,19 @@ export const notificationKeys = {
 /** Intervalo de sondeo del badge (§3.10 sugiere 30–60 s). */
 const UNREAD_POLL_MS = 45_000;
 
-/** Bandeja paginada. `keepPreviousData`-like via `placeholderData` evita parpadeo al paginar. */
+/** Intervalo de sondeo de la LISTA/bandeja (§3.10 = polling; el badge no basta para verlas llegar). */
+const LIST_POLL_MS = 30_000;
+
+/**
+ * Bandeja paginada. Sondea cada ~30 s (§3.10, MVP = polling) y al reenfocar la ventana para
+ * que las nuevas notificaciones aparezcan en vivo, no solo el contador del badge.
+ */
 export function useNotifications(params: NotificationListParams) {
   return useQuery({
     queryKey: notificationKeys.list(params),
     queryFn: () => notificationsService.list(params),
+    refetchInterval: LIST_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 }
 

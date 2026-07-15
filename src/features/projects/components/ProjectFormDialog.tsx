@@ -32,7 +32,10 @@ import {
 import { ProjectColorPicker } from './ProjectColorPicker';
 import { MemberMultiSelect } from './MemberMultiSelect';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
-import type { ProjectPayload } from '../services/projects.service';
+import type {
+  ProjectPayload,
+  UpdateProjectPayload,
+} from '../services/projects.service';
 import type { Project } from '../types/project';
 import {
   dateInputToDate,
@@ -56,6 +59,8 @@ const emptyValues: ProjectFormValues = {
   startDate: '',
   endDate: '',
   color: '',
+  // (P7) Solo se muestra/edita en edición; en el alta el backend aplica el default (24 h).
+  deadlineWarningHours: '',
 };
 
 /** Convierte los valores del formulario al payload que espera el backend. */
@@ -112,6 +117,7 @@ export function ProjectFormDialog({
         startDate: isoToDateInput(project.startDate),
         endDate: isoToDateInput(project.endDate),
         color: project.color ?? '',
+        deadlineWarningHours: String(project.deadlineWarningHours ?? 24),
       });
     } else {
       reset(emptyValues);
@@ -127,8 +133,14 @@ export function ProjectFormDialog({
     const payload = toPayload(values);
 
     if (isEdit && project) {
+      const updateData: UpdateProjectPayload = { ...payload };
+      // (P7) Antelación del aviso de deadline; solo se envía si es un entero válido 1–720.
+      const warnHours = Number(values.deadlineWarningHours);
+      if (Number.isInteger(warnHours) && warnHours >= 1 && warnHours <= 720) {
+        updateData.deadlineWarningHours = warnHours;
+      }
       updateMutation.mutate(
-        { id: project.id, data: payload },
+        { id: project.id, data: updateData },
         { onSuccess: () => onOpenChange(false) },
       );
       return;
@@ -289,6 +301,34 @@ export function ProjectFormDialog({
               )}
             />
           </div>
+
+          {/* (P7, §3.4) Antelación del aviso de deadline al Responsable. Solo en edición
+              (en el alta el backend aplica el default de 24 h). */}
+          {isEdit && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="deadlineWarningHours" className="text-on-surface">
+                Avisar al responsable X horas antes del vencimiento
+              </Label>
+              <Input
+                id="deadlineWarningHours"
+                type="number"
+                min={1}
+                max={720}
+                step={1}
+                placeholder="24"
+                className="h-10 w-32"
+                {...register('deadlineWarningHours')}
+              />
+              <p className="text-xs text-on-surface-variant">
+                Entre 1 y 720 horas. Por defecto 24 h.
+              </p>
+              {errors.deadlineWarningHours && (
+                <span className="text-xs font-medium text-error">
+                  {errors.deadlineWarningHours.message}
+                </span>
+              )}
+            </div>
+          )}
         </form>
 
         {/* Miembros: pre-selección en creación; gestión en vivo en edición (gate canManage). */}
@@ -298,6 +338,7 @@ export function ProjectFormDialog({
               <ProjectMembersPanel
                 projectId={project.id}
                 createdBy={project.createdBy}
+                managerIds={project.managerIds}
                 canManage={canManage}
               />
             ) : null

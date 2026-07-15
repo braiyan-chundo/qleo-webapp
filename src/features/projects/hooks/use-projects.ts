@@ -43,12 +43,17 @@ export function useProjects(
   });
 }
 
+/** (P8) Intervalo de sondeo del detalle de proyecto (membresía/managers de otras sesiones en vivo). */
+const PROJECT_POLL_MS = 15_000;
+
 /** Detalle de un proyecto por id. Solo corre si hay id. Registra la visita en "recientes". */
 export function useProject(id: string | undefined) {
   const query = useQuery({
     queryKey: projectKeys.detail(id ?? ''),
     queryFn: () => projectsService.getById(id as string),
     enabled: !!id,
+    refetchInterval: PROJECT_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 
   useTrackRecentProject(query.data);
@@ -190,6 +195,32 @@ export function useAddProjectMember(projectId: string) {
   return useMutation({
     mutationFn: (userId: string) =>
       projectsService.addMember(projectId, userId),
+    onSuccess: () => invalidateProjectMembership(queryClient, projectId),
+  });
+}
+
+/**
+ * Otorga permiso de gestión (manager) a un miembro (§3.20, P2). Solo ADMIN o creador. Invalida
+ * membresía/detalle/listados para refrescar `managerIds` (y el gate `canManageProject`).
+ */
+export function useAddManager(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) => projectsService.addManager(projectId, userId),
+    onSuccess: () => invalidateProjectMembership(queryClient, projectId),
+  });
+}
+
+/**
+ * Revoca el permiso de gestión (manager) de un miembro (§3.20, P2). Solo ADMIN o creador.
+ * Invalida membresía/detalle/listados para refrescar `managerIds`.
+ */
+export function useRemoveManager(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) => projectsService.removeManager(projectId, userId),
     onSuccess: () => invalidateProjectMembership(queryClient, projectId),
   });
 }

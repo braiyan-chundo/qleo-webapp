@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { useAuthStore } from '@/store/auth.store';
 
 import { useStages } from '@/features/stages/hooks/use-stages';
 import { useColumns } from '@/features/columns/hooks/use-columns';
@@ -14,6 +15,7 @@ import { useTask } from '../hooks/use-tasks';
 import { CompletionSection } from '../components/CompletionSection';
 import { DeadlineSection } from '../components/DeadlineSection';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
+import { TaskAnalyticsSection } from '../components/TaskAnalyticsSection';
 import { RoleManager } from '../components/RoleManager';
 import { TaskDetailHeader } from '../components/detail/TaskDetailHeader';
 import { TaskDescription } from '../components/detail/TaskDescription';
@@ -29,6 +31,7 @@ import { TaskCreatorActions } from '../components/detail/TaskCreatorActions';
 export function TaskDetailPage() {
   const { id: projectId = '', taskId } = useParams<{ id: string; taskId: string }>();
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
 
   const { data: task, isLoading, isError, error } = useTask(taskId);
   const { data: stages } = useStages(projectId || undefined);
@@ -82,6 +85,7 @@ export function TaskDetailPage() {
   }
 
   const isCreator = task.currentUserRole === 'CREATOR';
+  const isAdmin = user?.role === 'ADMIN';
   const stageName = stages?.find((s) => s.id === task.stageId)?.name;
   const columnName = columns?.find((c) => c.id === task.columnId)?.name;
 
@@ -138,6 +142,13 @@ export function TaskDetailPage() {
           )}
         </aside>
       </div>
+
+      {/* Análisis de la tarea (P5): solo ADMIN de plataforma. Full width bajo el detalle. */}
+      {isAdmin && (
+        <div className="mt-8">
+          <TaskAnalyticsSection taskId={task.id} />
+        </div>
+      )}
     </div>
   );
 }

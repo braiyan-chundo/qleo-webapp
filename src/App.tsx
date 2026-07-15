@@ -6,6 +6,7 @@ import { ProjectsPage } from '@/features/projects/pages/ProjectsPage';
 import { ProjectDetailPage } from '@/features/projects/pages/ProjectDetailPage';
 import { MyTasksPage } from '@/features/tasks/pages/MyTasksPage';
 import { TaskDetailPage } from '@/features/tasks/pages/TaskDetailPage';
+import { TaskRedirectPage } from '@/features/tasks/pages/TaskRedirectPage';
 import { ProfilePage } from '@/features/profile/pages/ProfilePage';
 import { HelpPage } from '@/features/help/pages/HelpPage';
 import { NotificationsPage } from '@/features/notifications/pages/NotificationsPage';
@@ -53,6 +54,9 @@ function App() {
                   element={<TaskDetailPage />}
                 />
                 <Route path="/tasks" element={<MyTasksPage />} />
+                {/* Resolutor de push `/tasks/:taskId` → ruta anidada real (§3.10/§3.17).
+                    Va antes del comodín `*`; distinto segmento que `/tasks`, no colisiona. */}
+                <Route path="/tasks/:taskId" element={<TaskRedirectPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/help" element={<HelpPage />} />
                 {/* Analíticas (QL-66): autenticada; overview solo ADMIN, por-proyecto

@@ -21,12 +21,20 @@ export const checklistKeys = {
   list: (taskId: string) => [...checklistKeys.lists(), taskId] as const,
 };
 
-/** Lista de ítems del checklist de una tarea (ordenada por `order` asc). Solo corre si hay taskId. */
+/** (P8) Intervalo de sondeo del checklist (MVP = polling; cambios de colaboradores en vivo). */
+const CHECKLIST_POLL_MS = 15_000;
+
+/**
+ * Lista de ítems del checklist de una tarea (ordenada por `order` asc). Solo corre si hay taskId.
+ * Sondea cada ~15 s y al reenfocar la ventana para ver cambios de otras sesiones (P8).
+ */
 export function useChecklist(taskId: string | undefined) {
   return useQuery({
     queryKey: checklistKeys.list(taskId ?? ''),
     queryFn: () => checklistsService.list(taskId as string),
     enabled: !!taskId,
+    refetchInterval: CHECKLIST_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 }
 

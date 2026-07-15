@@ -89,6 +89,7 @@ export function ProjectDetailsDialog({
           <ProjectMembersPanel
             projectId={project.id}
             createdBy={project.createdBy}
+            managerIds={project.managerIds}
             canManage={canManage}
           />
         </div>

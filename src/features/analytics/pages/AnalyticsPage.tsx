@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Users } from 'lucide-react';
 
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { useAuthStore } from '@/store/auth.store';
 import { useProjects } from '@/features/projects/hooks/use-projects';
 
-import { useAnalyticsOverview, useProjectAnalytics } from '../hooks/use-analytics';
+import {
+  useAnalyticsOverview,
+  useProjectAnalytics,
+  useUsersPerformance,
+} from '../hooks/use-analytics';
 import {
   ChartState,
   StatTile,
@@ -15,6 +19,7 @@ import { TasksByMemberCard } from '../components/TasksByMemberCard';
 import { ThroughputChart } from '../components/ThroughputChart';
 import { TimePerColumnChart } from '../components/TimePerColumnChart';
 import { AttachmentsCard } from '../components/AttachmentsCard';
+import { UserPerformanceCard } from '../components/UserPerformanceCard';
 
 /**
  * Vista de Analíticas (QL-66, §3.24). Dos bloques:
@@ -29,6 +34,7 @@ export function AnalyticsPage() {
   const userId = useAuthStore((s) => s.user?.id);
 
   const overview = useAnalyticsOverview();
+  const usersPerformance = useUsersPerformance();
 
   // Proyectos para el selector: ADMIN ve todos; un creador ve solo los suyos (evita 403).
   const projectsQuery = useProjects({ limit: 100 });
@@ -93,6 +99,21 @@ export function AnalyticsPage() {
               </>
             )}
           </ChartState>
+        </section>
+      )}
+
+      {/* ── Rendimiento por usuario (solo ADMIN) ── */}
+      {isAdmin && (
+        <section className="space-y-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-on-surface">
+            <Users className="size-5 text-on-surface-variant" />
+            Rendimiento por usuario
+          </h2>
+          <UserPerformanceCard
+            users={usersPerformance.data}
+            isLoading={usersPerformance.isLoading}
+            isError={usersPerformance.isError}
+          />
         </section>
       )}
 

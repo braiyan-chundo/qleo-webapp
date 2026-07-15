@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 
-import { tasksService } from '@/features/tasks/services/tasks.service';
-import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -22,6 +20,8 @@ import {
 } from '../hooks/use-notifications';
 import type { Notification } from '../services/notifications.service';
 import { notificationText, timeAgo } from '../lib/notification-text';
+import { resolveNotificationHref } from '../lib/notification-nav';
+import { NotificationAvatar } from './NotificationAvatar';
 
 /**
  * Campana de notificaciones del topbar (QL-13/QL-23). Muestra un badge numérico de no leídas
@@ -171,8 +171,9 @@ interface NotificationPopoverRowProps {
 }
 
 /**
- * Fila del popover. Al clicar: marca leída (optimista) y navega a la tarea resolviendo su
- * proyecto con `tasksService.getById`, cerrando el popover. Si la tarea no se resuelve, la
+ * Fila del popover. Al clicar: marca leída (optimista) y navega según el tipo (§3.10):
+ * `PROJECT_MEMBER_ADDED` va directo al proyecto; las notis de tarea resuelven su proyecto con
+ * `tasksService.getById` y abren la tarea. Cierra el popover. Si no se resuelve, la
  * notificación igual queda marcada como leída.
  */
 function NotificationPopoverRow({
@@ -182,18 +183,17 @@ function NotificationPopoverRow({
   const navigate = useNavigate();
   const markRead = useMarkRead();
   const [resolving, setResolving] = useState(false);
-  const actorName = notification.actor.name;
 
   const handleClick = async () => {
     if (resolving) return;
     if (!notification.read) markRead.mutate(notification.id);
     setResolving(true);
     try {
-      const task = await tasksService.getById(notification.taskId);
-      navigate(`/projects/${task.projectId}`);
+      const href = await resolveNotificationHref(notification);
+      if (href) navigate(href);
       onNavigated();
     } catch {
-      toast.error('No se pudo abrir la tarea (puede haber sido eliminada)');
+      toast.error('No se pudo abrir la notificación (puede haber sido eliminada)');
     } finally {
       setResolving(false);
     }
@@ -211,12 +211,9 @@ function NotificationPopoverRow({
             : 'bg-surface-container-low/60 hover:bg-surface-container-low',
         )}
       >
-        <AuthedAvatar
-          size="sm"
+        <NotificationAvatar
+          actor={notification.actor}
           className="mt-0.5 shrink-0"
-          avatarDownloadUrl={notification.actor.avatarDownloadUrl}
-          avatarUrl={notification.actor.avatarUrl}
-          name={actorName}
         />
 
         <div className="min-w-0 flex-1">

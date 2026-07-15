@@ -81,7 +81,7 @@ export function TimePerColumnChart({
 
   return (
     <ChartCard
-      title="Tiempo promedio por etapa"
+      title="Tiempo promedio por columna"
       description="Cuánto permanecen las tareas en cada columna del tablero."
     >
       <ChartState

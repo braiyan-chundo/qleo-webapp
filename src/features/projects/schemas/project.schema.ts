@@ -25,6 +25,16 @@ export const projectFormSchema = z
     endDate: z.string().optional(),
     /** `''` = sin color; el form lo mapea a `null` en el payload. */
     color: z.union([projectColorEnum, z.literal('')]).optional(),
+    /**
+     * (P7, §3.4) Antelación en horas del aviso de deadline próximo (1–720). Se maneja como
+     * texto del `<input type="number">`; `''`/ausente = no tocar. Solo se usa en edición.
+     */
+    deadlineWarningHours: z
+      .string()
+      .optional()
+      .refine((v) => !v || (/^\d+$/.test(v) && +v >= 1 && +v <= 720), {
+        message: 'Ingresa un número de horas entre 1 y 720',
+      }),
   })
   .refine(
     (data) =>

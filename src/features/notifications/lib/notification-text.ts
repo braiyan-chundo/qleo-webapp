@@ -2,10 +2,11 @@ import type { Notification } from '../services/notifications.service';
 
 /**
  * Compone el texto de una notificación en el front (§3.10: el backend NO manda texto
- * redactado). Extensible por `type`; hoy solo `MENTION`.
+ * redactado). Extensible por `type`. **El `actor` puede ser `null`** (notis del sistema como
+ * `DEADLINE_APPROACHING`), así que siempre se usa con fallback.
  */
 export function notificationText(notification: Notification): string {
-  const actor = notification.actor.name;
+  const actor = notification.actor?.name ?? 'Alguien';
   switch (notification.type) {
     case 'MENTION':
       return `${actor} te mencionó en una tarea`;
@@ -17,6 +18,15 @@ export function notificationText(notification: Notification): string {
       const base = `${actor} solicita mover la fecha límite al ${date}`;
       return reason ? `${base}: ${reason}` : base;
     }
+    case 'TASK_ASSIGNED':
+      return `${actor} te asignó una tarea`;
+    case 'PROJECT_MEMBER_ADDED':
+      return `${actor} te agregó a un proyecto`;
+    case 'TASK_MOVED':
+      return `${actor} cambió el estado de una tarea`;
+    case 'DEADLINE_APPROACHING':
+      // Noti del sistema (sin actor): se compone sin nombre.
+      return 'Una de tus tareas está por vencer';
     default:
       return `${actor} generó una notificación`;
   }

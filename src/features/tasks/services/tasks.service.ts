@@ -87,16 +87,26 @@ export interface TimeBreakdownEntry {
 }
 
 /**
- * Estado de tiempo de una tarea (QL-17, §3.13). `totalSeconds`/`breakdown` NO incluyen el
- * tramo en marcha (aún no cerrado); `running`/`runningSince` son del **usuario del token**.
+ * Estado de tiempo **automático** de una tarea (P4/§3.13). Ya NO es cronómetro manual: el
+ * backend calcula el **tiempo hábil** (horario laboral, §3.23) entre `startedAt` (1ª entrada a
+ * la columna `isStart`, QL-62) y `finishedAt` (entrada a la columna `isEnd`) o "ahora" si sigue
+ * en curso. `breakdown` queda **siempre vacío** (ya no hay desglose por usuario).
  */
 export interface TimeStatus {
   taskId: string;
+  /** Tiempo HÁBIL en ms (`startedAt`→`finishedAt ?? ahora`); `0` si no hay `startedAt`. */
+  workedMs: number;
+  /** Compat: `round(workedMs/1000)`. Ya NO es la suma del cronómetro manual. */
   totalSeconds: number;
+  /** ISO8601 — inicio del trabajo (entrada a la columna `isStart`); `null` si no ha empezado. */
+  startedAt: string | null;
+  /** ISO8601 — fin del trabajo (entrada a la columna `isEnd`); `null` si en curso. */
+  finishedAt: string | null;
+  /** **Siempre vacío** en P4 (sin desglose por usuario). */
   breakdown: TimeBreakdownEntry[];
-  /** ¿El usuario del token tiene un cronómetro en marcha ahora? */
+  /** ¿En curso? Hay `startedAt` pero aún no `finishedAt`/cierre. */
   running: boolean;
-  /** ISO8601 del inicio del tramo en marcha del usuario, o `null`. */
+  /** Alias de `startedAt` (compat); `null` si no ha empezado. */
   runningSince: string | null;
 }
 
@@ -123,6 +133,17 @@ export interface CreateTaskPayload {
   label?: string;
   /** Fecha de inicio ISO opcional. */
   startDate?: string | null;
+  /**
+   * (P1/§3.6) Fecha límite ISO opcional fijada YA en el alta (QL-09, RF-2.1). Antes solo se
+   * fijaba tras crear con `PATCH /tasks/:id/deadline`; ahora puede ir en el POST. Si se omite,
+   * la tarea nace sin deadline.
+   */
+  dueDate?: string;
+  /**
+   * (P1/§3.6) Bloquea la edición del deadline por no-Creadores (RF-2.1). Default `false`.
+   * Solo tiene sentido junto con `dueDate` (bloquear un deadline nulo no aporta nada).
+   */
+  deadlineLocked?: boolean;
   /**
    * (QL-123) Responsable (`ASSIGNEE`) desde el alta. Debe ser **miembro del proyecto**
    * (si no → 400 `USER_NOT_PROJECT_MEMBER` y la tarea NO se crea). Responsable **único**
@@ -249,19 +270,13 @@ export const tasksService = {
     return api.post<{ success: true }>(`/tasks/${id}/deadline/extension-request`, data);
   },
 
-  /** Estado de tiempo de la tarea (QL-17, §3.13). Cualquier participante (incl. OBSERVER). */
+  /**
+   * Estado de tiempo **automático** de la tarea (P4/§3.13). Cualquier participante (incl.
+   * OBSERVER). Los endpoints legacy `timer/start`/`timer/stop` siguen existiendo en el backend
+   * por compat, pero el front ya no los usa (el tiempo se fija solo al mover entre columnas).
+   */
   getTime: (id: string) => {
     return api.get<TimeStatus>(`/tasks/${id}/time`);
-  },
-
-  /** Inicia el cronómetro del usuario en la tarea (QL-17, §3.13). Devuelve el `TimeStatus`. */
-  startTimer: (id: string) => {
-    return api.post<TimeStatus>(`/tasks/${id}/timer/start`);
-  },
-
-  /** Detiene el cronómetro del usuario en la tarea (QL-17, §3.13). Devuelve el `TimeStatus`. */
-  stopTimer: (id: string) => {
-    return api.post<TimeStatus>(`/tasks/${id}/timer/stop`);
   },
 
   /** Cierra la tarea con resumen opcional (QL-17, RF-2.5, §3.13). Devuelve el `Task`. */

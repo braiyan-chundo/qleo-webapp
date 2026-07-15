@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   NativeSelect,
   NativeSelectOption,
@@ -57,6 +58,8 @@ const emptyValues: TaskFormValues = {
   columnId: '',
   label: '',
   startDate: '',
+  dueDate: '',
+  deadlineLocked: false,
   assigneeId: '',
   collaboratorIds: [],
 };
@@ -117,6 +120,8 @@ export function TaskFormDialog({
 
   const assigneeId = watch('assigneeId') ?? '';
   const collaboratorIds = watch('collaboratorIds') ?? [];
+  // (P1) El toggle de bloqueo solo aplica cuando ya se eligió una fecha límite.
+  const dueDateValue = watch('dueDate') ?? '';
 
   useEffect(() => {
     if (!open) return;
@@ -128,6 +133,9 @@ export function TaskFormDialog({
         columnId: task.columnId,
         label: task.label ?? '',
         startDate: isoToDateInput(task.startDate),
+        // En edición el deadline lo gestiona la DeadlineSection del detalle (no aquí).
+        dueDate: '',
+        deadlineLocked: false,
         // En edición los roles NO se tocan aquí (los gestiona el RoleManager del detalle).
         assigneeId: '',
         collaboratorIds: [],
@@ -182,6 +190,11 @@ export function TaskFormDialog({
         (id) => id !== nextAssigneeId,
       );
 
+      // (P1/§3.6) Fecha límite opcional en el alta. `deadlineLocked` solo tiene sentido con
+      // una fecha (bloquear un deadline nulo no aporta nada), así que se envía solo si la hay.
+      const dueDate = dateInputToIso(values.dueDate ?? '') ?? undefined;
+      const deadlineLocked = dueDate && values.deadlineLocked ? true : undefined;
+
       createTask.mutate(
         {
           projectId,
@@ -191,6 +204,8 @@ export function TaskFormDialog({
           columnId: values.columnId || undefined,
           label,
           startDate,
+          dueDate,
+          deadlineLocked,
           assigneeId: nextAssigneeId,
           collaboratorIds: nextCollaboratorIds.length
             ? nextCollaboratorIds
@@ -353,6 +368,46 @@ export function TaskFormDialog({
               />
             </div>
           </div>
+
+          {/* (P1/§3.6) Fecha límite solo en el ALTA: en edición se gestiona con la
+              DeadlineSection del detalle (bloqueo, prórroga, calendario laboral). */}
+          {!isEdit && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="dueDate" className="text-on-surface">
+                Fecha límite
+              </Label>
+              <Controller
+                control={control}
+                name="dueDate"
+                render={({ field }) => (
+                  <DatePicker
+                    id="dueDate"
+                    className="w-full"
+                    value={dateInputToDate(field.value ?? '')}
+                    onChange={(date) => field.onChange(dateToDateInput(date))}
+                    placeholder="Sin fecha límite"
+                  />
+                )}
+              />
+              {dueDateValue && (
+                <Controller
+                  control={control}
+                  name="deadlineLocked"
+                  render={({ field }) => (
+                    <label className="mt-1 flex items-center gap-2 text-sm text-on-surface">
+                      <Switch
+                        checked={!!field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                      <span className="text-on-surface-variant">
+                        Bloquear edición de la fecha para Responsable y Colaboradores
+                      </span>
+                    </label>
+                  )}
+                />
+              )}
+            </div>
+          )}
 
           {/* (QL-123) Responsable y Colaboradores solo en el ALTA: en edición los roles se
               gestionan con el RoleManager de la vista de detalle (no se duplica aquí). */}

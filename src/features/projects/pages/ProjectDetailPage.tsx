@@ -177,8 +177,17 @@ export function ProjectDetailPage() {
     );
   }
 
-  const canManage =
-    !!user && (user.role === 'ADMIN' || project.createdBy === user.id);
+  // (P2/§3.20) Dos niveles de permiso sobre el proyecto:
+  // - `canManageProject`: editar/archivar/configurar tablero → ADMIN, creador o manager.
+  // - `canManageMembership`: gestionar miembros y otorgar/revocar managers → ADMIN o creador.
+  const isAdmin = user?.role === 'ADMIN';
+  const canManageProject =
+    !!user &&
+    (isAdmin ||
+      project.createdBy === user.id ||
+      project.managerIds.includes(user.id));
+  const canManageMembership =
+    !!user && (isAdmin || project.createdBy === user.id);
 
   const dotClass = projectDot(project.color);
   // Membresía real del detalle (QL-51): se muestran hasta 4 avatares y el resto como "+N".
@@ -321,8 +330,9 @@ export function ProjectDetailPage() {
           </Popover>
 
           {/* Configurar tablero: acción primaria del Kanban (antes escondida en una fila
-              propia del board y en el `···` de cada columna). Solo aplica a esta vista. */}
-          {view === 'kanban' && (
+              propia del board y en el `···` de cada columna). Solo aplica a esta vista y a
+              quien puede gestionar el proyecto (§3.20). */}
+          {view === 'kanban' && canManageProject && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -360,11 +370,15 @@ export function ProjectDetailPage() {
                 <Info className="size-4" />
                 Detalles del proyecto
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setEditOpen(true)}>
-                <Pencil className="size-4" />
-                Editar proyecto
-              </DropdownMenuItem>
-              {!project.archived && (
+              {/* Editar/archivar: solo ADMIN, creador o manager (§3.20). Un miembro normal
+                  no ve estas acciones (sí puede crear tareas). */}
+              {canManageProject && (
+                <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+                  <Pencil className="size-4" />
+                  Editar proyecto
+                </DropdownMenuItem>
+              )}
+              {canManageProject && !project.archived && (
                 <DropdownMenuItem
                   variant="destructive"
                   onSelect={() => setArchiveOpen(true)}
@@ -451,7 +465,7 @@ export function ProjectDetailPage() {
         project={project}
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
-        canManage={canManage}
+        canManage={canManageMembership}
         focusMembers={detailsFocusMembers}
       />
       <ProjectFormDialog

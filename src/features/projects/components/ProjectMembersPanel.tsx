@@ -16,12 +16,15 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from '@/components/ui/native-select';
+import { Switch } from '@/components/ui/switch';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 import type { UserDirectoryEntry } from '@/features/users/services/users.service';
 
 import {
+  useAddManager,
   useAddProjectMember,
   useProjectMembers,
+  useRemoveManager,
   useRemoveProjectMember,
 } from '../hooks/use-projects';
 import type { ProjectMember } from '../types/project';
@@ -29,9 +32,14 @@ import { MemberPicker } from './MemberPicker';
 
 interface ProjectMembersPanelProps {
   projectId: string;
-  /** Id del creador: siempre miembro, no se puede quitar (§3.20). */
+  /** Id del creador: siempre miembro, no se puede quitar; gestor implícito (§3.20). */
   createdBy: string;
-  /** Gate cosmético (`ADMIN || createdBy === user.id`); el backend igual valida. */
+  /** IDs de miembros con permiso de gestión otorgado (§3.20, P2). */
+  managerIds: string[];
+  /**
+   * Gate cosmético de **membresía y permisos** (`ADMIN || createdBy === user.id`); habilita
+   * añadir/quitar miembros y otorgar/revocar managers. El backend igual valida.
+   */
   canManage: boolean;
 }
 
@@ -58,11 +66,30 @@ function memberErrorMessage(err: unknown): string {
 export function ProjectMembersPanel({
   projectId,
   createdBy,
+  managerIds,
   canManage,
 }: ProjectMembersPanelProps) {
   const { data: members, isLoading } = useProjectMembers(projectId);
   const addMember = useAddProjectMember(projectId);
   const removeMember = useRemoveProjectMember(projectId);
+  const addManager = useAddManager(projectId);
+  const removeManager = useRemoveManager(projectId);
+  const managerPending = addManager.isPending || removeManager.isPending;
+
+  const managerSet = useMemo(() => new Set(managerIds), [managerIds]);
+
+  const handleManagerToggle = (member: ProjectMember, next: boolean) => {
+    const mutation = next ? addManager : removeManager;
+    mutation.mutate(member.id, {
+      onSuccess: () =>
+        toast.success(
+          next
+            ? `${member.name} ahora puede editar y configurar el proyecto`
+            : `${member.name} ya no puede editar ni configurar el proyecto`,
+        ),
+      onError: (err) => toast.error(memberErrorMessage(err)),
+    });
+  };
 
   // Miembro pendiente de traspaso (tras un 409) + destinatario elegido.
   const [pendingRemoval, setPendingRemoval] = useState<ProjectMember | null>(
@@ -164,25 +191,26 @@ export function ProjectMembersPanel({
         <ul className="space-y-2">
           {(members ?? []).map((member) => {
             const isCreator = member.id === createdBy;
+            const isManager = managerSet.has(member.id);
             return (
               <li
                 key={member.id}
-                className="flex items-center gap-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2"
+                className="rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2"
               >
-                <AuthedAvatar
-                  size="sm"
-                  avatarDownloadUrl={member.avatarDownloadUrl}
-                  name={member.name}
-                />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-on-surface">
-                  {member.name}
-                </span>
-                {isCreator ? (
-                  <span className="shrink-0 text-xs font-medium text-on-surface-variant">
-                    Creador
+                <div className="flex items-center gap-3">
+                  <AuthedAvatar
+                    size="sm"
+                    avatarDownloadUrl={member.avatarDownloadUrl}
+                    name={member.name}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-on-surface">
+                    {member.name}
                   </span>
-                ) : (
-                  canManage && (
+                  {isCreator ? (
+                    <span className="shrink-0 text-xs font-medium text-on-surface-variant">
+                      Creador
+                    </span>
+                  ) : canManage ? (
                     <Button
                       type="button"
                       variant="ghost"
@@ -194,7 +222,29 @@ export function ProjectMembersPanel({
                     >
                       <Trash2 className="size-4" />
                     </Button>
-                  )
+                  ) : (
+                    isManager && (
+                      <span className="shrink-0 text-xs font-medium text-primary">
+                        Gestor
+                      </span>
+                    )
+                  )}
+                </div>
+
+                {/* Permiso de gestión por miembro (§3.20, P2): solo el creador/ADMIN lo
+                    otorga/revoca; el creador es gestor implícito (sin toggle). */}
+                {!isCreator && canManage && (
+                  <label className="mt-2 flex items-center justify-between gap-3 rounded-md bg-surface-container-low px-2.5 py-1.5">
+                    <span className="text-xs text-on-surface-variant">
+                      Puede editar y configurar el proyecto
+                    </span>
+                    <Switch
+                      checked={isManager}
+                      disabled={managerPending}
+                      onCheckedChange={(next) => handleManagerToggle(member, next)}
+                      aria-label={`Permitir a ${member.name} editar y configurar el proyecto`}
+                    />
+                  </label>
                 )}
               </li>
             );

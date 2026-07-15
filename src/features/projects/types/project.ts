@@ -55,8 +55,20 @@ export interface Project {
    * son el creador ni ADMIN. Default `true`. Editable vía `PATCH /projects/:id`.
    */
   showBacklogToMembers: boolean;
+  /**
+   * (P7, §3.4) Antelación en **horas** del aviso "deadline próximo" al Responsable de una
+   * tarea abierta. Default `24`. Editable con `PATCH /projects/:id` (rango 1–720).
+   */
+  deadlineWarningHours: number;
   createdBy: string;
   createdAt: string;
+  /**
+   * (P2/§3.20) IDs de miembros con **permiso de gestión otorgado** (managers): pueden
+   * editar/archivar/configurar el proyecto y subir documentos, pero NO gestionar la
+   * membresía ni otorgar/revocar managers. El **creador** y los **ADMIN** siempre pueden
+   * gestionar aunque no aparezcan aquí. Presente en todas las respuestas de `Project`.
+   */
+  managerIds: string[];
   /** (QL-37) Tareas del proyecto; `done` = completadas (`completedAt != null`). */
   taskCounts: { total: number; done: number };
   /** (QL-37) `round(done/total*100)`, `0` si `total=0`. Rango 0–100. */

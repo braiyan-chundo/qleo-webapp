@@ -21,6 +21,8 @@ export interface ProjectPayload {
 export type UpdateProjectPayload = Partial<ProjectPayload> & {
   /** (QL-61) togglea la visibilidad del Backlog para los miembros no-creador/no-ADMIN. */
   showBacklogToMembers?: boolean;
+  /** (P7, §3.4) antelación en horas del aviso de deadline próximo (rango 1–720). */
+  deadlineWarningHours?: number;
 };
 
 /** Filtros de listado de proyectos. */
@@ -87,5 +89,22 @@ export const projectsService = {
   removeMember: (id: string, userId: string, reassignTo?: string) => {
     const qs = reassignTo ? `?reassignTo=${encodeURIComponent(reassignTo)}` : '';
     return api.delete<Project>(`/projects/${id}/members/${userId}${qs}`);
+  },
+
+  /**
+   * Otorga permiso de gestión (manager) a un miembro del proyecto (§3.20, P2). Solo ADMIN o
+   * creador (403 si no). El `userId` debe ya ser miembro (si no → 400 `USER_NOT_PROJECT_MEMBER`).
+   * Idempotente. Devuelve el `Project` con `managerIds` actualizado.
+   */
+  addManager: (id: string, userId: string) => {
+    return api.put<Project>(`/projects/${id}/managers/${userId}`);
+  },
+
+  /**
+   * Revoca el permiso de gestión (manager) de un miembro (§3.20, P2). Solo ADMIN o creador
+   * (403 si no). Idempotente. Devuelve el `Project` con `managerIds` actualizado.
+   */
+  removeManager: (id: string, userId: string) => {
+    return api.delete<Project>(`/projects/${id}/managers/${userId}`);
   },
 };

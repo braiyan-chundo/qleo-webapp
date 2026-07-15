@@ -14,6 +14,14 @@ export const taskFormSchema = z.object({
   /** Fecha de inicio opcional (valor de `<input type="date">`, `YYYY-MM-DD`). */
   startDate: z.string().optional(),
   /**
+   * (P1) Fecha límite opcional elegida en el **alta** (valor `<input type="date">`,
+   * `YYYY-MM-DD`). Solo se usa al crear: en edición el deadline se gestiona con la
+   * `DeadlineSection` del detalle (incl. bloqueo, prórroga y calendario laboral).
+   */
+  dueDate: z.string().optional(),
+  /** (P1) Bloquear la edición del deadline por no-Creadores desde el alta. */
+  deadlineLocked: z.boolean().optional(),
+  /**
    * (QL-123) Responsable (ASSIGNEE) elegido en el **alta**; `''` = sin responsable.
    * Solo se usa al crear: en edición los roles se gestionan con el `RoleManager` del detalle.
    */

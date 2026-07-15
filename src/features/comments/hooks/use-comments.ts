@@ -20,12 +20,20 @@ export const commentKeys = {
   list: (taskId: string) => [...commentKeys.lists(), taskId] as const,
 };
 
-/** Hilo de comentarios de una tarea (createdAt asc, `author` poblado). Solo corre si hay taskId. */
+/** (P8) Intervalo de sondeo del hilo (MVP = polling; comentarios de otras sesiones en vivo). */
+const COMMENTS_POLL_MS = 15_000;
+
+/**
+ * Hilo de comentarios de una tarea (createdAt asc, `author` poblado). Solo corre si hay taskId.
+ * Sondea cada ~15 s y al reenfocar la ventana para ver comentarios nuevos de otras sesiones (P8).
+ */
 export function useComments(taskId: string | undefined) {
   return useQuery({
     queryKey: commentKeys.list(taskId ?? ''),
     queryFn: () => commentsService.list(taskId as string),
     enabled: !!taskId,
+    refetchInterval: COMMENTS_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 }
 

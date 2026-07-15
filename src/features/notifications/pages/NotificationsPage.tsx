@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Bell, CheckCheck, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
-import { tasksService } from '@/features/tasks/services/tasks.service';
-import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -20,6 +18,8 @@ import {
 } from '../hooks/use-notifications';
 import type { Notification } from '../services/notifications.service';
 import { notificationText, timeAgo } from '../lib/notification-text';
+import { resolveNotificationHref } from '../lib/notification-nav';
+import { NotificationAvatar } from '../components/NotificationAvatar';
 
 const PAGE_SIZE = 12;
 
@@ -213,24 +213,23 @@ interface NotificationRowProps {
 
 /**
  * Fila de la bandeja. Al hacer clic: marca leída (optimista, vía el mutation del padre) y
- * navega a la tarea resolviendo su proyecto con `tasksService.getById`. Si la resolución
- * falla, igual queda marcada como leída.
+ * navega según el tipo (§3.10): `PROJECT_MEMBER_ADDED` va directo al proyecto; las notis de
+ * tarea resuelven su proyecto con `tasksService.getById`. Si la resolución falla, igual queda
+ * marcada como leída.
  */
 function NotificationRow({ notification, onMarkRead }: NotificationRowProps) {
   const navigate = useNavigate();
   const [resolving, setResolving] = useState(false);
-
-  const actorName = notification.actor.name;
 
   const handleClick = async () => {
     if (resolving) return;
     if (!notification.read) onMarkRead(notification.id);
     setResolving(true);
     try {
-      const task = await tasksService.getById(notification.taskId);
-      navigate(`/projects/${task.projectId}`);
+      const href = await resolveNotificationHref(notification);
+      if (href) navigate(href);
     } catch {
-      toast.error('No se pudo abrir la tarea (puede haber sido eliminada)');
+      toast.error('No se pudo abrir la notificación (puede haber sido eliminada)');
     } finally {
       setResolving(false);
     }
@@ -248,12 +247,9 @@ function NotificationRow({ notification, onMarkRead }: NotificationRowProps) {
             : 'border-primary/20 bg-surface-container-low hover:bg-surface-container',
         )}
       >
-        <AuthedAvatar
-          size="sm"
+        <NotificationAvatar
+          actor={notification.actor}
           className="mt-0.5 shrink-0"
-          avatarDownloadUrl={notification.actor.avatarDownloadUrl}
-          avatarUrl={notification.actor.avatarUrl}
-          name={actorName}
         />
 
         <div className="min-w-0 flex-1">

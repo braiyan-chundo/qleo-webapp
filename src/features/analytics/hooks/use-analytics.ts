@@ -15,6 +15,8 @@ export const analyticsKeys = {
   all: ['analytics'] as const,
   overview: () => [...analyticsKeys.all, 'overview'] as const,
   project: (id: string) => [...analyticsKeys.all, 'project', id] as const,
+  task: (id: string) => [...analyticsKeys.all, 'task', id] as const,
+  users: () => [...analyticsKeys.all, 'users'] as const,
 };
 
 /**
@@ -44,6 +46,39 @@ export function useProjectAnalytics(projectId: string | undefined) {
     queryKey: analyticsKeys.project(projectId ?? ''),
     queryFn: () => analyticsService.getProject(projectId as string),
     enabled: !!token && !!projectId,
+    staleTime: STALE_TIME,
+  });
+}
+
+/**
+ * Análisis de una tarea (`GET /analytics/tasks/:id`, §3.24 P5). **Solo ADMIN** (el backend es
+ * estricto: ni el creador). Solo corre con sesión ADMIN **y** `taskId`, para no llamar (403)
+ * a un MEMBER.
+ */
+export function useTaskAnalytics(taskId: string | undefined) {
+  const token = useAuthStore((s) => s.accessToken);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+
+  return useQuery({
+    queryKey: analyticsKeys.task(taskId ?? ''),
+    queryFn: () => analyticsService.getTaskAnalytics(taskId as string),
+    enabled: !!token && isAdmin && !!taskId,
+    staleTime: STALE_TIME,
+  });
+}
+
+/**
+ * Rendimiento por usuario (`GET /analytics/users`, §3.24 P6). **Solo ADMIN**; ya viene ordenado
+ * por eficiencia desc. Solo corre con sesión ADMIN (evita la llamada 403 para un MEMBER).
+ */
+export function useUsersPerformance() {
+  const token = useAuthStore((s) => s.accessToken);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+
+  return useQuery({
+    queryKey: analyticsKeys.users(),
+    queryFn: () => analyticsService.getUsersPerformance(),
+    enabled: !!token && isAdmin,
     staleTime: STALE_TIME,
   });
 }
