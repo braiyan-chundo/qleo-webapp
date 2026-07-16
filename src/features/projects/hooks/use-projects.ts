@@ -85,18 +85,6 @@ function useTrackRecentProject(project: Project | undefined) {
   }, [userId, projectId, name, code, color, trackVisit]);
 }
 
-/** Crea un proyecto e invalida los listados. */
-export function useCreateProject() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: ProjectPayload) => projectsService.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
-    },
-  });
-}
-
 /**
  * Crea un proyecto y, a continuación, añade sus miembros iniciales (QL-52). El backend no
  * acepta `members[]` en `POST /projects`: primero crea (el creador queda como miembro solo)
