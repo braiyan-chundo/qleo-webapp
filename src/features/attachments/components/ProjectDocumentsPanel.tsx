@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { FileText, Loader2, Upload } from 'lucide-react';
 
 import type { Project } from '@/features/projects/types/project';
+import { canManageProject } from '@/features/projects/utils/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,7 +23,7 @@ import {
 import { AttachmentListItem } from './AttachmentListItem';
 
 interface ProjectDocumentsPanelProps {
-  project: Pick<Project, 'id' | 'createdBy'>;
+  project: Pick<Project, 'id' | 'createdBy' | 'managerIds'>;
 }
 
 /**
@@ -31,12 +32,15 @@ interface ProjectDocumentsPanelProps {
  * visual (`AttachmentListItem`) y la descarga con token que los adjuntos de tarea.
  *
  * Gate de UI (cosmético; el backend valida igual):
- * - `canManage = user.role === 'ADMIN' || project.createdBy === user.id` → muestra la zona de subida.
- * - Botón "Borrar" por doc → `canManage || doc.uploadedBy.id === user.id`.
+ * - `canManageProject` (ADMIN, creador o **gestor** otorgado) → muestra la zona de subida.
+ *   Es la regla que aplica el backend: `attachments.service` llama a `assertCanManageProject`
+ *   tanto al subir como al borrar, así que un gestor está autorizado en ambas (QL-131).
+ * - Botón "Borrar" por doc → `canManage || doc.uploadedBy.id === user.id` (el autor siempre
+ *   puede borrar el suyo).
  */
 export function ProjectDocumentsPanel({ project }: ProjectDocumentsPanelProps) {
   const user = useAuthStore((s) => s.user);
-  const canManage = user?.role === 'ADMIN' || project.createdBy === user?.id;
+  const canManage = canManageProject(project, user);
 
   const { data: docs, isLoading, isError, error } = useProjectAttachments(project.id);
   const uploadDoc = useUploadProjectAttachment(project.id);

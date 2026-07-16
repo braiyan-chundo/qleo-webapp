@@ -2,6 +2,13 @@ import type { User } from '@/store/auth.store';
 import type { Project } from '../types/project';
 
 /**
+ * Forma mínima de proyecto que necesitan estas reglas. Se pide solo lo que se usa (y no el
+ * `Project` entero) para que también sirvan a los componentes que reciben una proyección
+ * parcial, como `ProjectDocumentsPanel`.
+ */
+type ProjectPermissionFields = Pick<Project, 'createdBy' | 'managerIds'>;
+
+/**
  * Reglas de permiso **sobre un proyecto** (P2/§3.20). Espejan los `assert*` del backend, que
  * es la autoridad real: la UI solo decide qué mostrar, el backend responde 403 igualmente.
  *
@@ -22,7 +29,7 @@ import type { Project } from '../types/project';
  * Ojo: NO habilita gestionar la membresía ni otorgar/revocar gestores → `canManageMembership`.
  */
 export function canManageProject(
-  project: Project | null | undefined,
+  project: ProjectPermissionFields | null | undefined,
   user: User | null | undefined,
 ): boolean {
   if (!project || !user) return false;
@@ -41,7 +48,7 @@ export function canManageProject(
  * configurar el proyecto pero no repartir permisos. Espeja `assertCanManageMembership`.
  */
 export function canManageMembership(
-  project: Project | null | undefined,
+  project: Pick<Project, 'createdBy'> | null | undefined,
   user: User | null | undefined,
 ): boolean {
   if (!project || !user) return false;
