@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Rocket } from 'lucide-react';
+import { Rocket, ShieldCheck } from 'lucide-react';
 
-import { Section } from './HelpPrimitives';
+import { AdminOnly, AdminOnlyBadge, Section } from './HelpPrimitives';
 
 /** Pasos de arranque (QL-126). Cada uno enlaza a la ruta real cuando aplica. */
 const QUICK_STEPS: { title: string; body: ReactNode }[] = [
@@ -15,17 +15,18 @@ const QUICK_STEPS: { title: string; body: ReactNode }[] = [
           Proyectos
         </Link>{' '}
         y pulsa «Nuevo proyecto». Ponle nombre (obligatorio) y, si quieres, código,
-        cliente/grupo y un color para reconocerlo.
+        cliente/grupo y un color para reconocerlo. Si no ves el botón, es que aún no tienes
+        el permiso para crear proyectos: pídeselo a un administrador.
       </>
     ),
   },
   {
     title: 'Añade miembros',
-    body: 'Abre el proyecto, entra en «Detalles del proyecto» e invita a quienes participarán. Solo los miembros ven el proyecto y pueden recibir roles en sus tareas.',
+    body: 'Abre el proyecto, entra en «Detalles del proyecto» e invita a quienes participarán. Como creador puedes hacerlo tú. Solo los miembros ven el proyecto y pueden recibir roles en sus tareas.',
   },
   {
     title: 'Configura el tablero',
-    body: 'Desde «Configurar tablero» crea las etapas (agrupan el trabajo) y las columnas del Kanban (p. ej. Por hacer → En curso → Hecho). La columna Backlog es la de por defecto.',
+    body: 'Desde «Configurar tablero» (en la vista Kanban) crea las etapas (agrupan el trabajo) y las columnas del Kanban (p. ej. Por hacer → En curso → Hecho). La columna Backlog es la de por defecto.',
   },
   {
     title: 'Crea tareas',
@@ -61,6 +62,24 @@ export function QuickStartSection() {
           </li>
         ))}
       </ol>
+
+      {/* QL-127/QL-128: dónde se concede el permiso solo le sirve a quien puede concederlo. */}
+      <AdminOnly>
+        <div className="mt-5 rounded-lg border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+          <p className="mb-1 flex flex-wrap items-center gap-2 font-medium text-on-surface">
+            <ShieldCheck className="size-4 text-primary" />
+            Tú siempre puedes crear proyectos
+            <AdminOnlyBadge />
+          </p>
+          <p>
+            Un miembro solo puede si se lo concedes en{' '}
+            <Link to="/admin" className="font-medium text-primary hover:underline">
+              Administración
+            </Link>{' '}
+            → «Editar» el usuario → «Puede crear proyectos». Por defecto no puede.
+          </p>
+        </div>
+      </AdminOnly>
 
       <p className="mt-5 rounded-lg border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
         ¿Quieres más detalle? Revisa las pestañas{' '}

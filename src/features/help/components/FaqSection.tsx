@@ -9,12 +9,50 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 
-import { Section } from './HelpPrimitives';
+import { useIsAdmin } from '../hooks/use-is-admin';
+import { AdminOnlyBadge, Section } from './HelpPrimitives';
 
-const FAQS: { q: string; a: ReactNode }[] = [
+/**
+ * Preguntas frecuentes. `adminOnly` sigue la misma regla que las primitivas (QL-128): la
+ * pregunta se le oculta a un MEMBER y se le marca con el badge a un ADMIN.
+ */
+const FAQS: { q: string; a: ReactNode; adminOnly?: boolean }[] = [
   {
     q: '¿Puedo tener varios responsables en una tarea?',
     a: 'No. Cada tarea tiene un único Responsable para dejar clara la rendición de cuentas. Sí puedes añadir varios Colaboradores.',
+  },
+  {
+    q: '¿Por qué no veo el botón «Nuevo proyecto»?',
+    a: (
+      <>
+        Porque crear proyectos requiere permiso y aún no lo tienes. Pídeselo a un
+        administrador: él lo activa en un momento desde la administración de usuarios. Los
+        administradores siempre pueden crear proyectos.
+      </>
+    ),
+  },
+  {
+    q: '¿Cómo dejo que un miembro cree proyectos?',
+    adminOnly: true,
+    a: (
+      <>
+        En{' '}
+        <Link to="/admin" className="font-medium text-primary hover:underline">
+          Administración
+        </Link>
+        , pulsa «Editar» en el usuario y activa «Puede crear proyectos». Por defecto los
+        miembros no pueden; a un administrador no le hace falta (siempre puede).
+      </>
+    ),
+  },
+  {
+    q: '¿Puedo cambiar el correo de soporte que ve el equipo?',
+    adminOnly: true,
+    a: 'Sí. Está en la pestaña «Soporte» de esta misma Ayuda: pulsa «Editar» junto a la dirección, escribe la nueva y guarda. El cambio lo ve todo el equipo al instante.',
+  },
+  {
+    q: '¿Por qué no puedo configurar el tablero de un proyecto?',
+    a: 'Configurar el tablero (etapas y columnas) está reservado al creador del proyecto, a sus Gestores y a los administradores. Además, el botón solo aparece en la vista Kanban.',
   },
   {
     q: '¿Por qué no me llegan los push con la app cerrada (Android)?',
@@ -83,6 +121,9 @@ const FAQS: { q: string; a: ReactNode }[] = [
 ];
 
 export function FaqSection() {
+  const isAdmin = useIsAdmin();
+  const visible = FAQS.filter((faq) => !faq.adminOnly || isAdmin);
+
   return (
     <Section
       icon={<LifeBuoy className="size-5" />}
@@ -90,10 +131,13 @@ export function FaqSection() {
       description="Las dudas más habituales."
     >
       <Accordion type="single" collapsible className="w-full">
-        {FAQS.map((faq, i) => (
-          <AccordionItem key={i} value={`faq-${i}`}>
+        {visible.map((faq) => (
+          <AccordionItem key={faq.q} value={faq.q}>
             <AccordionTrigger className="text-left text-on-surface hover:no-underline">
-              {faq.q}
+              <span className="flex flex-wrap items-center gap-2">
+                {faq.q}
+                {faq.adminOnly && <AdminOnlyBadge />}
+              </span>
             </AccordionTrigger>
             <AccordionContent className="text-on-surface-variant">
               {faq.a}

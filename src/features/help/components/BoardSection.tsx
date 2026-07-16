@@ -49,7 +49,7 @@ const BOARD_TOOLS: HelpFeature[] = [
   {
     icon: <Settings2 className="size-4 text-primary" />,
     term: 'Configurar tablero',
-    desc: 'Gestiona las etapas y las columnas del proyecto. Disponible desde la cabecera cuando estás en la vista Kanban.',
+    desc: 'Gestiona las etapas y las columnas del proyecto. Aparece en la cabecera cuando estás en la vista Kanban, y solo si eres el creador del proyecto, un Gestor o un administrador.',
   },
   {
     icon: <KanbanSquare className="size-4 text-primary" />,

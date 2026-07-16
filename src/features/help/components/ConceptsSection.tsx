@@ -1,12 +1,14 @@
 import {
   CalendarClock,
   CalendarDays,
+  FolderPlus,
   Info,
   KanbanSquare,
   Layers,
   Lock,
   Tag,
   Timer,
+  UserCog,
   Users,
 } from 'lucide-react';
 
@@ -57,6 +59,16 @@ const CONCEPTS: HelpConcept[] = [
     term: 'Membresía y visibilidad',
     icon: <Users className="size-4 text-primary" />,
     desc: 'Solo los miembros de un proyecto lo ven y trabajan en él. Los roles de una tarea se eligen entre esa membresía.',
+  },
+  {
+    term: 'Permiso para crear proyectos',
+    icon: <FolderPlus className="size-4 text-primary" />,
+    desc: 'Crear proyectos no lo puede todo el mundo: un administrador siempre puede, y un miembro solo si un administrador se lo concede. Sin el permiso, el botón «Nuevo proyecto» no aparece.',
+  },
+  {
+    term: 'Creador y Gestor del proyecto',
+    icon: <UserCog className="size-4 text-primary" />,
+    desc: 'El Creador es quien dio de alta el proyecto: gestiona sus miembros y puede nombrar Gestores, que le ayudan a configurar el tablero y a editar el proyecto.',
   },
 ];
 
