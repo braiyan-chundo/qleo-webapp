@@ -21,7 +21,7 @@ export function ProfilePage() {
   const { data: user, isLoading, isError, error } = useMyProfile();
 
   return (
-    <div className="mx-auto max-w-5xl p-4 md:p-8">
+    <div className="p-4 md:p-8">
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-on-surface">Mi cuenta</h1>
         <p className="mt-1 text-on-surface-variant">

@@ -37,7 +37,9 @@ export function AnalyticsPage() {
   const usersPerformance = useUsersPerformance();
 
   // Proyectos para el selector: ADMIN ve todos; un creador ve solo los suyos (evita 403).
-  const projectsQuery = useProjects({ limit: 100 });
+  // `limit: 50` es el máximo que admite el DTO de paginación del backend (@Max(50)); pedir
+  // más devolvía 400 y la sección "Por proyecto" no cargaba.
+  const projectsQuery = useProjects({ limit: 50 });
   const selectableProjects = useMemo(() => {
     const all = projectsQuery.data?.data ?? [];
     return isAdmin ? all : all.filter((p) => p.createdBy === userId);
@@ -48,7 +50,7 @@ export function AnalyticsPage() {
   const projectData = projectAnalytics.data;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-4 md:p-8">
+    <div className="space-y-8 p-4 md:p-8">
       <header>
         <h1 className="text-3xl font-bold text-on-surface">Analíticas</h1>
         <p className="mt-1 text-sm text-on-surface-variant">

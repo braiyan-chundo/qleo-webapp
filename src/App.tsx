@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
+import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { WallPage } from '@/features/wall/pages/WallPage';
 import { ProjectsPage } from '@/features/projects/pages/ProjectsPage';
@@ -39,6 +40,7 @@ function App() {
             <Route element={<PublicOnlyRoute />}>
               <Route element={<AuthLayout />}>
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               </Route>
             </Route>
 

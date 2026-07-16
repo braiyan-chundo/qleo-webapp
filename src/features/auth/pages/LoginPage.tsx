@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -210,9 +211,9 @@ export const LoginPage = () => {
 
             {/* Forgot Password Link */}
             <div className="flex items-center justify-end">
-              <a href="#" className="text-xs font-medium text-primary hover:text-on-primary-fixed-variant transition-colors hover:underline underline-offset-2">
+              <Link to="/forgot-password" className="text-xs font-medium text-primary hover:text-on-primary-fixed-variant transition-colors hover:underline underline-offset-2">
                 ¿Olvidaste tu contraseña?
-              </a>
+              </Link>
             </div>
 
             {/* Submit Button */}
