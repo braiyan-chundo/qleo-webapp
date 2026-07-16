@@ -11,7 +11,6 @@ const UTF8_BOM = '﻿';
 export const CSV_HEADERS = [
   'Título',
   'Estado',
-  'Etapa',
   'Responsable',
   'Email responsable',
   'Fecha límite',
@@ -23,7 +22,6 @@ export const CSV_HEADERS = [
 export interface TaskCsvRow {
   title: string;
   status: string;
-  stage: string;
   assignee: string;
   assigneeEmail: string;
   dueDate: string;
@@ -60,7 +58,6 @@ export function buildTasksCsv(rows: TaskCsvRow[]): string {
       toCsvLine([
         row.title,
         row.status,
-        row.stage,
         row.assignee,
         row.assigneeEmail,
         row.dueDate,

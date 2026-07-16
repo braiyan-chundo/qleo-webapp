@@ -71,7 +71,7 @@ export interface AuditSummary {
   action: string;
   /**
    * Tipo de entidad afectada en **MAYÚSCULA singular** (§3.14): `TASK`, `PROJECT`,
-   * `USER`, `COLUMN`, `STAGE`, `ATTACHMENT`, `WALL`, `PUSH`… (⚠️ no es `Task`/`Project`).
+   * `USER`, `COLUMN`, `ATTACHMENT`, `WALL`, `PUSH`… (⚠️ no es `Task`/`Project`).
    */
   entityType: string;
   /**

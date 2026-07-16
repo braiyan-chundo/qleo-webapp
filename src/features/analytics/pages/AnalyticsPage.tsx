@@ -24,7 +24,7 @@ import { UserPerformanceCard } from '../components/UserPerformanceCard';
 /**
  * Vista de Analíticas (QL-66, §3.24). Dos bloques:
  *  - **Resumen global** (solo ADMIN): totales, throughput y tareas por miembro del sistema.
- *  - **Por proyecto** (ADMIN o creador): selector de proyecto → tiempo por etapa, tareas por
+ *  - **Por proyecto** (ADMIN o creador): selector de proyecto → tiempo por columna, tareas por
  *    miembro, adjuntos y throughput del proyecto.
  * La ruta es autenticada (no solo-ADMIN) para que un creador consulte sus proyectos; el
  * backend autoriza cada endpoint. El acceso desde el menú es `adminOnly` (ver nav).

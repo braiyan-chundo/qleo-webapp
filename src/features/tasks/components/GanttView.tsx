@@ -4,7 +4,6 @@ import { CalendarClock, CheckCircle2, GanttChartSquare, Lock } from 'lucide-reac
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-import { useStages } from '@/features/stages/hooks/use-stages';
 import { useColumns } from '@/features/columns/hooks/use-columns';
 
 import { useTasks } from '../hooks/use-tasks';
@@ -33,7 +32,7 @@ const NAME_COL = 'w-56 min-w-56 md:w-64 md:min-w-64';
 
 /**
  * Vista Gantt (cronograma) del proyecto. Reutiliza `useTasks` (mismo dato que el board) y
- * agrupa las tareas por **etapa** (`useStages`). Cada tarea es una fila con una **barra**
+ * agrupa las tareas por **columna** (`useColumns`). Cada tarea es una fila con una **barra**
  * posicionada por porcentaje entre `startDate` y `dueDate` (ver `lib/gantt.ts`); las tareas
  * con una sola fecha se dibujan como **hito** (rombo) y las que no tienen fecha caen en la
  * sección "Sin programar". La barra se colorea con el color de su columna (`columnColor`).
@@ -46,7 +45,6 @@ export function GanttView({ projectId, filterTasks }: GanttViewProps) {
     isError: tasksError,
     error: tasksErrorObj,
   } = useTasks(projectId);
-  const { data: stages, isLoading: stagesLoading } = useStages(projectId);
   const { data: columns, isLoading: columnsLoading } = useColumns(projectId);
 
   const tasks = useMemo(
@@ -65,11 +63,11 @@ export function GanttView({ projectId, filterTasks }: GanttViewProps) {
 
   const range = useMemo(() => computeRange(tasks ?? []), [tasks]);
   const sections = useMemo(
-    () => buildSections(tasks ?? [], stages ?? []),
-    [tasks, stages],
+    () => buildSections(tasks ?? [], columns ?? []),
+    [tasks, columns],
   );
 
-  const isLoading = tasksLoading || stagesLoading || columnsLoading;
+  const isLoading = tasksLoading || columnsLoading;
 
   if (isLoading) {
     return (
@@ -165,7 +163,7 @@ export function GanttView({ projectId, filterTasks }: GanttViewProps) {
             </div>
           </div>
 
-          {/* Cuerpo: secciones por etapa. La línea de "Hoy" se dibuja por fila dentro de
+          {/* Cuerpo: secciones por columna. La línea de "Hoy" se dibuja por fila dentro de
               cada pista temporal (ver GanttRow), de modo que queda alineada con las barras. */}
           <div>
             {sections.map((section) => (

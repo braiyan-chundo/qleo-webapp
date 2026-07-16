@@ -22,7 +22,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-import { useStages } from '@/features/stages/hooks/use-stages';
 import { useColumns } from '@/features/columns/hooks/use-columns';
 import { useProjectMembers } from '@/features/projects/hooks/use-projects';
 import { ApiError } from '@/core/api/fetch-client';
@@ -54,7 +53,6 @@ interface TaskFormDialogProps {
 const emptyValues: TaskFormValues = {
   title: '',
   description: '',
-  stageId: '',
   columnId: '',
   label: '',
   startDate: '',
@@ -72,7 +70,7 @@ function createErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : 'No se pudo crear la tarea';
 }
 
-/** Crear/editar una tarea (QL-07). Selectores de etapa (obligatorio) y columna (opcional). */
+/** Crear/editar una tarea (QL-07). Solo requiere título + columna (opcional; default Backlog). */
 export function TaskFormDialog({
   open,
   onOpenChange,
@@ -82,9 +80,6 @@ export function TaskFormDialog({
 }: TaskFormDialogProps) {
   const isEdit = !!task;
 
-  const { data: stages, isLoading: stagesLoading } = useStages(
-    open ? projectId : undefined,
-  );
   const { data: columns, isLoading: columnsLoading } = useColumns(
     open ? projectId : undefined,
   );
@@ -129,7 +124,6 @@ export function TaskFormDialog({
       reset({
         title: task.title,
         description: task.description ?? '',
-        stageId: task.stageId,
         columnId: task.columnId,
         label: task.label ?? '',
         startDate: isoToDateInput(task.startDate),
@@ -143,13 +137,12 @@ export function TaskFormDialog({
     } else {
       reset({
         ...emptyValues,
-        stageId: stages?.[0]?.id ?? '',
         // Preselección explícita: la columna concreta si se abrió desde "+ Añadir tarea" de
         // una columna; si no, la Backlog. '' solo si aún no cargaron las columnas.
         columnId: presetColumnId ?? backlogColumnId ?? '',
       });
     }
-  }, [open, task, stages, presetColumnId, backlogColumnId, reset]);
+  }, [open, task, presetColumnId, backlogColumnId, reset]);
 
   const onSubmit = (values: TaskFormValues) => {
     const description = values.description?.trim() || undefined;
@@ -163,7 +156,6 @@ export function TaskFormDialog({
           data: {
             title: values.title.trim(),
             description,
-            stageId: values.stageId,
             columnId: values.columnId || undefined,
             // `null` limpia la etiqueta/fecha si el usuario las borró.
             label: label ?? null,
@@ -198,7 +190,6 @@ export function TaskFormDialog({
       createTask.mutate(
         {
           projectId,
-          stageId: values.stageId,
           title: values.title.trim(),
           description,
           columnId: values.columnId || undefined,
@@ -224,7 +215,6 @@ export function TaskFormDialog({
     }
   };
 
-  const noStages = !stagesLoading && (!stages || stages.length === 0);
   const noColumns = !columnsLoading && (!columns || columns.length === 0);
 
   return (
@@ -233,16 +223,14 @@ export function TaskFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Editar tarea' : 'Nueva tarea'}</DialogTitle>
           <DialogDescription>
-            Cada tarea pertenece a una etapa y a una columna de estado. El título es
-            obligatorio.
+            Cada tarea pertenece a una columna de estado. El título es obligatorio.
           </DialogDescription>
         </DialogHeader>
 
-        {(noStages || noColumns) && (
+        {noColumns && (
           <div className="rounded-lg border border-error/20 bg-error-container px-4 py-3 text-sm font-medium text-on-error-container">
-            {noColumns
-              ? 'El proyecto no tiene columnas. Crea al menos una columna de estado antes de añadir tareas.'
-              : 'El proyecto no tiene etapas. Crea al menos una etapa antes de añadir tareas.'}
+            El proyecto no tiene columnas. Crea al menos una columna de estado antes de
+            añadir tareas.
           </div>
         )}
 
@@ -268,72 +256,36 @@ export function TaskFormDialog({
             )}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="stageId" className="text-on-surface">
-                Etapa <span className="text-error">*</span>
-              </Label>
-              <Controller
-                control={control}
-                name="stageId"
-                render={({ field }) => (
-                  <NativeSelect
-                    id="stageId"
-                    className="w-full [&>select]:h-10"
-                    disabled={stagesLoading || noStages}
-                    value={field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                  >
-                    <NativeSelectOption value="" disabled>
-                      {stagesLoading ? 'Cargando…' : 'Selecciona una etapa'}
+          <div className="grid gap-1.5">
+            <Label htmlFor="columnId" className="text-on-surface">
+              Columna
+            </Label>
+            <Controller
+              control={control}
+              name="columnId"
+              render={({ field }) => (
+                <NativeSelect
+                  id="columnId"
+                  className="w-full [&>select]:h-10"
+                  disabled={columnsLoading || noColumns}
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                >
+                  <NativeSelectOption value="">
+                    {defaultColumn
+                      ? `Por defecto (${defaultColumn.name})`
+                      : 'Columna por defecto'}
+                  </NativeSelectOption>
+                  {columns?.map((column) => (
+                    <NativeSelectOption key={column.id} value={column.id}>
+                      {column.name}
+                      {column.isDefault ? ' (por defecto)' : ''}
                     </NativeSelectOption>
-                    {stages?.map((stage) => (
-                      <NativeSelectOption key={stage.id} value={stage.id}>
-                        {stage.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                )}
-              />
-              {errors.stageId && (
-                <span className="text-xs font-medium text-error">
-                  {errors.stageId.message}
-                </span>
+                  ))}
+                </NativeSelect>
               )}
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label htmlFor="columnId" className="text-on-surface">
-                Columna
-              </Label>
-              <Controller
-                control={control}
-                name="columnId"
-                render={({ field }) => (
-                  <NativeSelect
-                    id="columnId"
-                    className="w-full [&>select]:h-10"
-                    disabled={columnsLoading || noColumns}
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                  >
-                    <NativeSelectOption value="">
-                      {defaultColumn
-                        ? `Por defecto (${defaultColumn.name})`
-                        : 'Columna por defecto'}
-                    </NativeSelectOption>
-                    {columns?.map((column) => (
-                      <NativeSelectOption key={column.id} value={column.id}>
-                        {column.name}
-                        {column.isDefault ? ' (por defecto)' : ''}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                )}
-              />
-            </div>
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -449,7 +401,7 @@ export function TaskFormDialog({
           <Button
             type="submit"
             form="task-form"
-            disabled={isPending || noStages || noColumns}
+            disabled={isPending || noColumns}
           >
             {isPending && <Loader2 className="animate-spin" />}
             {isEdit ? 'Guardar cambios' : 'Crear tarea'}

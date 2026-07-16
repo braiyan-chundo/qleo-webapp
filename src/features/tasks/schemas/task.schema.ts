@@ -1,13 +1,12 @@
 import * as z from 'zod';
 
 /**
- * Esquema del formulario de tarea (crear/editar). `title` y `stageId` son obligatorios;
- * `columnId` es opcional (si se omite el backend usa la columna default del proyecto).
+ * Esquema del formulario de tarea (crear/editar). `title` es obligatorio; `columnId` es
+ * opcional (si se omite el backend usa la columna default del proyecto, el Backlog).
  */
 export const taskFormSchema = z.object({
   title: z.string().trim().min(1, 'El título es obligatorio'),
   description: z.string().trim().optional(),
-  stageId: z.string().min(1, 'Selecciona una etapa'),
   columnId: z.string().optional(),
   /** Categoría corta opcional (p.ej. "VUELOS"). */
   label: z.string().trim().optional(),

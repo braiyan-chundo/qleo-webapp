@@ -30,7 +30,6 @@ const ENTITY_LABEL: Record<string, { text: string; named: boolean }> = {
   PROJECT: { text: 'el proyecto', named: true },
   USER: { text: 'el usuario', named: true },
   COLUMN: { text: 'la columna', named: true },
-  STAGE: { text: 'la etapa', named: true },
   ATTACHMENT: { text: 'el adjunto', named: true },
   WALL: { text: 'un mensaje del muro', named: false },
   PUSH: { text: 'una notificación', named: false },

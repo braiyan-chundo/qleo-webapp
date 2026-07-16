@@ -1,4 +1,4 @@
-import { CheckCircle2, Layers, Square } from 'lucide-react';
+import { CheckCircle2, Square } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -8,8 +8,6 @@ import { TASK_ROLE_BADGE_CLASS, TASK_ROLE_LABEL } from '../../lib/roles';
 
 interface TaskDetailHeaderProps {
   task: Task;
-  /** Nombre de la etapa resuelto por el llamador (de `useStages`). */
-  stageName?: string;
   /** Nombre de la columna resuelto por el llamador (de `useColumns`). */
   columnName?: string;
   /**
@@ -22,12 +20,11 @@ interface TaskDetailHeaderProps {
 
 /**
  * Cabecera compartida del detalle de una tarea (QL-25): título, badges (completada / mi rol)
- * y la línea etapa · columna. La usan tanto la página dedicada (`TaskDetailPage`) como el
- * modal de vistazo rápido (`TaskDetailDialog`), evitando duplicar el markup del encabezado.
+ * y la línea de columna. La usan tanto la página dedicada (`TaskDetailPage`) como el modal de
+ * vistazo rápido (`TaskDetailDialog`), evitando duplicar el markup del encabezado.
  */
 export function TaskDetailHeader({
   task,
-  stageName,
   columnName,
   titleAs = 'h2',
   className,
@@ -55,20 +52,12 @@ export function TaskDetailHeader({
         </div>
       </div>
 
-      {(stageName || columnName) && (
+      {columnName && (
         <p className="mt-1 flex flex-wrap items-center gap-3 text-sm text-on-surface-variant">
-          {stageName && (
-            <span className="inline-flex items-center gap-1">
-              <Layers className="size-3.5" />
-              {stageName}
-            </span>
-          )}
-          {columnName && (
-            <span className="inline-flex items-center gap-1">
-              <Square className="size-3.5" />
-              {columnName}
-            </span>
-          )}
+          <span className="inline-flex items-center gap-1">
+            <Square className="size-3.5" />
+            {columnName}
+          </span>
         </p>
       )}
     </div>

@@ -20,7 +20,7 @@ type ProjectPermissionFields = Pick<Project, 'createdBy' | 'managerIds'>;
 
 /**
  * ¿El usuario puede **gestionar** el proyecto? → editar, archivar, configurar el tablero
- * (etapas/columnas/plantilla) y subir documentos de proyecto.
+ * (columnas/plantilla) y subir documentos de proyecto.
  *
  * Autoriza a `ADMIN`, al **creador** y a un miembro con **permiso de gestión otorgado**
  * (`managerIds`). Espeja `ProjectsService.assertCanManageProject` del backend (y su gemelo

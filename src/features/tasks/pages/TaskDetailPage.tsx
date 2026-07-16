@@ -5,7 +5,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '@/store/auth.store';
 
-import { useStages } from '@/features/stages/hooks/use-stages';
 import { useColumns } from '@/features/columns/hooks/use-columns';
 import { ChecklistPanel } from '@/features/checklists/components/ChecklistPanel';
 import { CommentsPanel } from '@/features/comments/components/CommentsPanel';
@@ -24,7 +23,7 @@ import { TaskCreatorActions } from '../components/detail/TaskCreatorActions';
 /**
  * Vista dedicada y deep-linkable de una tarea (QL-25): `/projects/:id/tasks/:taskId`. Layout
  * de dos columnas — la principal reúne descripción, checklist, adjuntos y comentarios; la
- * lateral, el estado (etapa/columna), completar/reabrir, fecha límite, cronómetro, roles y
+ * lateral, el estado (columna), completar/reabrir, fecha límite, cronómetro, roles y
  * (para el Creador) editar/eliminar. En móvil las columnas se apilan. Todo el dato del
  * servidor vive en la caché de TanStack Query; los paneles se reutilizan tal cual del modal.
  */
@@ -34,7 +33,6 @@ export function TaskDetailPage() {
   const user = useAuthStore((s) => s.user);
 
   const { data: task, isLoading, isError, error } = useTask(taskId);
-  const { data: stages } = useStages(projectId || undefined);
   const { data: columns } = useColumns(projectId || undefined);
 
   const backToProject = (
@@ -86,7 +84,6 @@ export function TaskDetailPage() {
 
   const isCreator = task.currentUserRole === 'CREATOR';
   const isAdmin = user?.role === 'ADMIN';
-  const stageName = stages?.find((s) => s.id === task.stageId)?.name;
   const columnName = columns?.find((c) => c.id === task.columnId)?.name;
 
   return (
@@ -95,7 +92,6 @@ export function TaskDetailPage() {
 
       <TaskDetailHeader
         task={task}
-        stageName={stageName}
         columnName={columnName}
         titleAs="h1"
         className="mb-6"

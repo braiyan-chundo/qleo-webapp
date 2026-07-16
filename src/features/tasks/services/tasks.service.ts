@@ -30,7 +30,6 @@ export interface TaskCompletedBy {
 export interface Task {
   id: string;
   projectId: string;
-  stageId: string;
   columnId: string;
   title: string;
   description?: string;
@@ -118,14 +117,12 @@ export interface CompleteTaskPayload {
 /** Filtros del listado del tablero (§3.7). El endpoint **no pagina**. */
 export interface TaskListParams {
   projectId?: string;
-  stageId?: string;
   columnId?: string;
 }
 
 /** Body para crear una tarea (§3.7). Si falta `columnId` cae en la columna default. */
 export interface CreateTaskPayload {
   projectId: string;
-  stageId: string;
   title: string;
   description?: string;
   columnId?: string;
@@ -163,7 +160,6 @@ export interface CreateTaskPayload {
  * `columnId` = columna destino; `order` = índice 0-based en esa columna destino.
  * El server reindexa para mantener `order` denso 0..n-1 por columna y **solo devuelve la
  * tarea movida**, así que tras el move hay que reconsultar el listado del proyecto.
- * `stageId` NO cambia (las columnas son estados; la etapa es otra dimensión).
  */
 export interface MoveTaskPayload {
   columnId: string;
@@ -174,7 +170,6 @@ export interface MoveTaskPayload {
 export interface UpdateTaskPayload {
   title?: string;
   description?: string;
-  stageId?: string;
   columnId?: string;
   /** Categoría corta; `null` la limpia. */
   label?: string | null;
@@ -209,7 +204,6 @@ export interface RequestDeadlineExtensionPayload {
 function buildQuery(params: TaskListParams): string {
   const search = new URLSearchParams();
   if (params.projectId) search.set('projectId', params.projectId);
-  if (params.stageId) search.set('stageId', params.stageId);
   if (params.columnId) search.set('columnId', params.columnId);
   const qs = search.toString();
   return qs ? `?${qs}` : '';

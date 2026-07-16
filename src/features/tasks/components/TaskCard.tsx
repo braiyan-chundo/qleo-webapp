@@ -53,8 +53,8 @@ function assigneeFirst(assignments: TaskAssignment[]): TaskAssignment[] {
  * token que su badge de rol), la descripción se anuncia con un icono, y el estado de plazo
  * distingue *vencida* (error + triángulo) de *vence hoy* (warning). Todo sale del objeto
  * `Task` que ya sirve el board (`GET /tasks?projectId=…`): **cero peticiones por tarjeta**.
- * El detalle largo (descripción completa, rol propio, etapa, checklist, comentarios,
- * adjuntos, cronómetro) vive en la vista de tarea, a un click de distancia.
+ * El detalle largo (descripción completa, rol propio, checklist, comentarios, adjuntos,
+ * cronómetro) vive en la vista de tarea, a un click de distancia.
  */
 export function TaskCard({ task, onClick }: TaskCardProps) {
   const participants = assigneeFirst(task.assignments);

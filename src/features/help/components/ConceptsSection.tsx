@@ -16,9 +16,9 @@ import { Section, ConceptGrid, type HelpConcept } from './HelpPrimitives';
 
 const CONCEPTS: HelpConcept[] = [
   {
-    term: 'Proyecto · Etapa · Columna',
+    term: 'Proyecto · Columna',
     icon: <Layers className="size-4 text-primary" />,
-    desc: 'El proyecto es el contenedor. Dentro, las etapas agrupan tareas por bloques y las columnas representan el flujo del Kanban.',
+    desc: 'El proyecto es el contenedor. Dentro, las columnas representan el flujo del Kanban.',
   },
   {
     term: 'Backlog',

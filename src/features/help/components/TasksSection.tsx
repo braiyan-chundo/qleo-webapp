@@ -20,7 +20,7 @@ import { Section, FeatureList, type HelpFeature } from './HelpPrimitives';
 const TASK_STEPS: { title: string; body: ReactNode }[] = [
   {
     title: 'Se crea',
-    body: 'Con un título (obligatorio), una etapa y una columna. Puedes fijar Responsable, Colaboradores, etiqueta y fecha de inicio desde el primer momento.',
+    body: 'Con un título (obligatorio) y una columna. Puedes fijar Responsable, Colaboradores, etiqueta y fecha de inicio desde el primer momento.',
   },
   {
     title: 'Se trabaja',

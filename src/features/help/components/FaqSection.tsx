@@ -52,7 +52,7 @@ const FAQS: { q: string; a: ReactNode; adminOnly?: boolean }[] = [
   },
   {
     q: '¿Por qué no puedo configurar el tablero de un proyecto?',
-    a: 'Configurar el tablero (etapas y columnas) está reservado al creador del proyecto, a sus Gestores y a los administradores. Además, el botón solo aparece en la vista Kanban.',
+    a: 'Configurar el tablero (las columnas) está reservado al creador del proyecto, a sus Gestores y a los administradores. Además, el botón solo aparece en la vista Kanban.',
   },
   {
     q: '¿Por qué no me llegan los push con la app cerrada (Android)?',

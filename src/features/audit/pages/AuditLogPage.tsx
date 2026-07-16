@@ -45,7 +45,7 @@ const PAGE_SIZE = 15;
 
 const ALL = 'ALL';
 
-const ENTITY_TYPES = ['PROJECT', 'TASK', 'USER', 'STAGE', 'COLUMN'] as const;
+const ENTITY_TYPES = ['PROJECT', 'TASK', 'USER', 'COLUMN'] as const;
 
 type BadgeVariant =
   | 'default'

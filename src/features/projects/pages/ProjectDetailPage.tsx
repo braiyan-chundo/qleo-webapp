@@ -48,7 +48,6 @@ import { ProjectDocumentsPanel } from '@/features/attachments/components/Project
 import { BoardFilterPanel } from '@/features/tasks/components/BoardFilterPanel';
 import { useTasks } from '@/features/tasks/hooks/use-tasks';
 import { useTaskFilters } from '@/features/tasks/hooks/use-task-filters';
-import { useStages } from '@/features/stages/hooks/use-stages';
 import { projectDot } from '@/features/tasks/lib/palette';
 
 import { useAuthStore } from '@/store/auth.store';
@@ -93,9 +92,8 @@ export function ProjectDetailPage() {
   const { data: project, isLoading, isError, error } = useProject(id);
 
   // Datos compartidos por las vistas del board (misma caché de Query que consumen dentro).
-  // Se usan aquí para derivar opciones de filtro (responsables) y poblar el select de etapa.
+  // Se usan aquí para derivar las opciones de filtro (responsables).
   const { data: tasks } = useTasks(id);
-  const { data: stages } = useStages(id);
   const filters = useTaskFilters(tasks);
 
   const [editOpen, setEditOpen] = useState(false);
@@ -321,7 +319,7 @@ export function ProjectDetailPage() {
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-72">
-              <BoardFilterPanel filters={filters} stages={stages} />
+              <BoardFilterPanel filters={filters} />
             </PopoverContent>
           </Popover>
 

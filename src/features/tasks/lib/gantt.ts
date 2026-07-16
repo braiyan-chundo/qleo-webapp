@@ -1,5 +1,5 @@
 import type { Task } from '../services/tasks.service';
-import type { Stage } from '@/features/stages/services/stages.service';
+import type { Column } from '@/features/columns/services/columns.service';
 
 /**
  * Utilidades de posicionamiento temporal del Gantt (QL — vista cronograma). Todo el cálculo
@@ -215,9 +215,9 @@ export function buildHeaderCells(range: GanttRange, unit: HeaderUnit): HeaderCel
   return cells;
 }
 
-/** Una sección del Gantt: una etapa (o "Sin programar") con sus tareas ya repartidas. */
+/** Una sección del Gantt: una columna (o "Sin programar") con sus tareas ya repartidas. */
 export interface GanttSection {
-  /** `id` de la etapa, o `'__unscheduled__'` para la sección final. */
+  /** `id` de la columna, o `'__unscheduled__'` para la sección final. */
   id: string;
   /** Nombre a mostrar. */
   name: string;
@@ -227,18 +227,19 @@ export interface GanttSection {
   unscheduled: Task[];
 }
 
-/** Id sentinela de la sección "Sin programar" (tareas sin fecha ni etapa reconocida). */
+/** Id sentinela de la sección "Sin programar" (tareas sin fecha ni columna reconocida). */
 export const UNSCHEDULED_SECTION_ID = '__unscheduled__';
 
 /**
- * Agrupa las tareas por etapa (en el `order` de `stages`). Las tareas **sin fecha** van a una
- * sección final "Sin programar". Dentro de cada etapa, las tareas con fecha se ordenan por su
- * fecha de inicio efectiva (`start||due`) ascendente. Solo se devuelven secciones no vacías.
+ * Agrupa las tareas por columna (en el `order` de `columns`). Las tareas **sin fecha** van a
+ * una sección final "Sin programar". Dentro de cada columna, las tareas con fecha se ordenan
+ * por su fecha de inicio efectiva (`start||due`) ascendente. Solo se devuelven secciones no
+ * vacías.
  */
-export function buildSections(tasks: Task[], stages: Stage[]): GanttSection[] {
-  const stageOrder = [...stages].sort((a, b) => a.order - b.order);
+export function buildSections(tasks: Task[], columns: Column[]): GanttSection[] {
+  const columnOrder = [...columns].sort((a, b) => a.order - b.order);
 
-  const scheduledByStage = new Map<string, Task[]>();
+  const scheduledByColumn = new Map<string, Task[]>();
   const unscheduled: Task[] = [];
 
   for (const task of tasks) {
@@ -246,9 +247,9 @@ export function buildSections(tasks: Task[], stages: Stage[]): GanttSection[] {
       unscheduled.push(task);
       continue;
     }
-    const list = scheduledByStage.get(task.stageId) ?? [];
+    const list = scheduledByColumn.get(task.columnId) ?? [];
     list.push(task);
-    scheduledByStage.set(task.stageId, list);
+    scheduledByColumn.set(task.columnId, list);
   }
 
   const effectiveStart = (t: Task): number => {
@@ -259,21 +260,21 @@ export function buildSections(tasks: Task[], stages: Stage[]): GanttSection[] {
 
   const sections: GanttSection[] = [];
 
-  for (const stage of stageOrder) {
-    const scheduled = (scheduledByStage.get(stage.id) ?? []).sort(
+  for (const column of columnOrder) {
+    const scheduled = (scheduledByColumn.get(column.id) ?? []).sort(
       (a, b) => effectiveStart(a) - effectiveStart(b),
     );
     if (scheduled.length > 0) {
-      sections.push({ id: stage.id, name: stage.name, scheduled, unscheduled: [] });
+      sections.push({ id: column.id, name: column.name, scheduled, unscheduled: [] });
     }
   }
 
-  // Tareas programadas cuya etapa no está en `stages` (borde raro): sección propia al final
-  // de las etapas conocidas, para no perderlas del cronograma.
-  const knownStageIds = new Set(stageOrder.map((s) => s.id));
+  // Tareas programadas cuya columna no está en `columns` (borde raro): sección propia al final
+  // de las columnas conocidas, para no perderlas del cronograma.
+  const knownColumnIds = new Set(columnOrder.map((c) => c.id));
   const orphanScheduled: Task[] = [];
-  for (const [stageId, list] of scheduledByStage) {
-    if (!knownStageIds.has(stageId)) orphanScheduled.push(...list);
+  for (const [columnId, list] of scheduledByColumn) {
+    if (!knownColumnIds.has(columnId)) orphanScheduled.push(...list);
   }
   if (orphanScheduled.length > 0) {
     sections.push({

@@ -26,7 +26,7 @@ const QUICK_STEPS: { title: string; body: ReactNode }[] = [
   },
   {
     title: 'Configura el tablero',
-    body: 'Desde «Configurar tablero» (en la vista Kanban) crea las etapas (agrupan el trabajo) y las columnas del Kanban (p. ej. Por hacer → En curso → Hecho). La columna Backlog es la de por defecto.',
+    body: 'Desde «Configurar tablero» (en la vista Kanban) crea las columnas del Kanban (p. ej. Por hacer → En curso → Hecho). La columna Backlog es la de por defecto.',
   },
   {
     title: 'Crea tareas',

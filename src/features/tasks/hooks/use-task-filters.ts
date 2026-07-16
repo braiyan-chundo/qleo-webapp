@@ -24,9 +24,6 @@ export interface TaskFiltersState {
   searchValue: string;
   /** Setter del texto en vivo de búsqueda. */
   setSearchValue: (value: string) => void;
-  /** Etapa seleccionada (id) o `''` para todas. */
-  stageId: string;
-  setStageId: (value: string) => void;
   /** Responsable seleccionado (userId) o `''` para todos. */
   assigneeId: string;
   setAssigneeId: (value: string) => void;
@@ -59,16 +56,15 @@ export interface UseTaskFiltersResult extends TaskFiltersState {
  * (Kanban/List/Gantt/Planner). El estado vive en **query params** (persistente al recargar
  * y compartible) vía {@link useQueryParamState}; no es dato de servidor.
  *
- * Filtra por: búsqueda de título, etapa, responsable (ASSIGNEE) y estado de cierre.
+ * Filtra por: búsqueda de título, responsable (ASSIGNEE) y estado de cierre.
  * `tasks` se usa solo para derivar las opciones de responsable; el filtrado se aplica con
  * `filter(tasks)` en el punto que corresponda para no duplicar lógica.
  *
- * Nombres de param (cortos y consistentes): `q`, `etapa`, `resp`, `estado`.
+ * Nombres de param (cortos y consistentes): `q`, `resp`, `estado`.
  */
 export function useTaskFilters(tasks: Task[] | undefined): UseTaskFiltersResult {
   const { value: searchValue, setValue: setSearchValue, committed } =
     useQueryParamSearch('q', 300);
-  const [stageId, setStageId] = useQueryParamState<string>('etapa', ALL);
   const [assigneeId, setAssigneeId] = useQueryParamState<string>('resp', ALL);
   const [status, setStatus] = useQueryParamState<TaskStatusFilter>('estado', 'all');
 
@@ -91,33 +87,28 @@ export function useTaskFilters(tasks: Task[] | undefined): UseTaskFiltersResult 
     (input: Task[]): Task[] =>
       input.filter((task) => {
         if (search && !task.title.toLowerCase().includes(search)) return false;
-        if (stageId && task.stageId !== stageId) return false;
         if (assigneeId && assigneeOf(task)?.userId !== assigneeId) return false;
         if (status === 'active' && task.isCompleted) return false;
         if (status === 'completed' && !task.isCompleted) return false;
         return true;
       }),
-    [search, stageId, assigneeId, status],
+    [search, assigneeId, status],
   );
 
   const activeCount =
     (search ? 1 : 0) +
-    (stageId ? 1 : 0) +
     (assigneeId ? 1 : 0) +
     (status !== 'all' ? 1 : 0);
 
   const clear = useCallback(() => {
     setSearchValue('');
-    setStageId(ALL);
     setAssigneeId(ALL);
     setStatus('all');
-  }, [setSearchValue, setStageId, setAssigneeId, setStatus]);
+  }, [setSearchValue, setAssigneeId, setStatus]);
 
   return {
     searchValue,
     setSearchValue,
-    stageId,
-    setStageId,
     assigneeId,
     setAssigneeId,
     status,

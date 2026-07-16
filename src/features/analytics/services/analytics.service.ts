@@ -88,19 +88,6 @@ export interface ProjectAnalytics {
 }
 
 /**
- * P5 — tiempo agregado en una **etapa** de una tarea (reloj de pared). Mismo patrón que
- * `TimePerColumnEntry` pero por etapa (sin `isStart`/`isEnd`).
- */
-export interface StageTimeStats {
-  stageId: string;
-  /** null si la etapa fue eliminada (histórico de transiciones). */
-  name: string | null;
-  totalMs: number;
-  avgMs: number;
-  visits: number;
-}
-
-/**
  * P5 — estado de tiempo **actual** de una tarea. `workedMs` es tiempo **hábil** (horario
  * laboral); `wallMs` es **reloj de pared** crudo del mismo tramo.
  */
@@ -113,13 +100,11 @@ export interface TaskCurrentStats {
   running: boolean;
   columnId: string;
   columnName: string | null;
-  stageId: string;
-  stageName: string | null;
 }
 
 /**
- * P5 (§3.24) — análisis detallado de UNA tarea. `timePerColumn`/`timePerStage` usan **reloj de
- * pared** (tiempo de estancia); el **tiempo hábil** solo aparece en `current.workedMs`.
+ * P5 (§3.24) — análisis detallado de UNA tarea. `timePerColumn` usa **reloj de pared** (tiempo
+ * de estancia); el **tiempo hábil** solo aparece en `current.workedMs`.
  */
 export interface TaskAnalytics {
   taskId: string;
@@ -127,7 +112,6 @@ export interface TaskAnalytics {
   title: string;
   /** Reutiliza el shape de 2.4 (columnas con 0 incluidas; orden = `order` de columna). */
   timePerColumn: TimePerColumnEntry[];
-  timePerStage: StageTimeStats[];
   current: TaskCurrentStats;
 }
 

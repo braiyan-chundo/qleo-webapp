@@ -59,7 +59,7 @@ interface TaskBoardProps {
  * intermedio de más. El modal se mantiene en las otras vistas (List/Gantt/Planner). El click
  * no se roba al drag porque el `PointerSensor` exige mover 6px antes de iniciar el arrastre.
  *
- * La configuración del tablero (etapas/columnas) vive en un diálogo aparte, abierto desde la
+ * La configuración del tablero (columnas) vive en un diálogo aparte, abierto desde la
  * cabecera de la página, para dejar el board como contenido primario y no gastar alto
  * vertical con una fila de acciones.
  */
@@ -214,13 +214,13 @@ export function TaskBoard({
           if (destColumn.isStart) {
             toast.info(
               <span>
-                Al mover a esta etapa se considera el <strong>inicio</strong> de la tarea.
+                Al mover a esta columna se considera el <strong>inicio</strong> de la tarea.
               </span>,
             );
           } else if (destColumn.isEnd) {
             toast.info(
               <span>
-                Al mover a esta etapa se considera que <strong>terminaste</strong> la tarea.
+                Al mover a esta columna se considera que <strong>terminaste</strong> la tarea.
               </span>,
             );
           }

@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
-import { useStages } from '@/features/stages/hooks/use-stages';
 import { useColumns } from '@/features/columns/hooks/use-columns';
 
 import { useTask } from '../hooks/use-tasks';
@@ -41,10 +40,8 @@ export function TaskDetailDialog({
   const navigate = useNavigate();
   const { data: task, isLoading, isError, error } = useTask(taskId ?? undefined);
 
-  const { data: stages } = useStages(open ? projectId : undefined);
   const { data: columns } = useColumns(open ? projectId : undefined);
 
-  const stageName = stages?.find((s) => s.id === task?.stageId)?.name;
   const columnName = columns?.find((c) => c.id === task?.columnId)?.name;
 
   const assignee = task?.assignments.find((a) => a.role === 'ASSIGNEE')?.user;
@@ -75,11 +72,7 @@ export function TaskDetailDialog({
 
         {task && (
           <>
-            <TaskDetailHeader
-              task={task}
-              stageName={stageName}
-              columnName={columnName}
-            />
+            <TaskDetailHeader task={task} columnName={columnName} />
 
             <TaskDescription description={task.description} clamp />
 

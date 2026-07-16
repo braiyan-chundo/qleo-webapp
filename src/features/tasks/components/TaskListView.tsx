@@ -24,7 +24,6 @@ import {
 } from '@/shared/components/data-table';
 import { cn } from '@/lib/utils';
 
-import { useStages } from '@/features/stages/hooks/use-stages';
 import { useColumns } from '@/features/columns/hooks/use-columns';
 import {
   useQueryParamSearch,
@@ -73,15 +72,13 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
     error: tasksErrorObj,
   } = useTasks(projectId);
   const { data: columns, isLoading: columnsLoading } = useColumns(projectId);
-  const { data: stages } = useStages(projectId);
 
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   // Filtros persistidos en la URL. Namespaced (`l*`) para no colisionar con los filtros
-  // del board (`q`/`etapa`/`resp`/`estado`) que viven en la misma URL de la página.
+  // del board (`q`/`resp`/`estado`) que viven en la misma URL de la página.
   const { value: search, setValue: setSearch, committed } = useQueryParamSearch('lq', 300);
   const [columnFilter, setColumnFilter] = useQueryParamState<string>('lcol', '');
-  const [stageFilter, setStageFilter] = useQueryParamState<string>('letapa', '');
   const [assigneeFilter, setAssigneeFilter] = useQueryParamState<string>('lresp', '');
   const debouncedSearch = committed.toLowerCase();
 
@@ -100,12 +97,6 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
     columns?.forEach((c, i) => map.set(c.id, i));
     return map;
   }, [columns]);
-
-  const stageName = useMemo(() => {
-    const map = new Map<string, string>();
-    stages?.forEach((s) => map.set(s.id, s.name));
-    return map;
-  }, [stages]);
 
   // Responsables que aparecen como ASSIGNEE en alguna tarea (deriva de `assignments`).
   const assigneeOptions = useMemo(() => {
@@ -128,7 +119,6 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
         return false;
       }
       if (columnFilter && task.columnId !== columnFilter) return false;
-      if (stageFilter && task.stageId !== stageFilter) return false;
       if (assigneeFilter) {
         const assignee = assigneeOf(task);
         if (assigneeFilter === NO_ASSIGNEE) {
@@ -162,7 +152,6 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
     tasks,
     debouncedSearch,
     columnFilter,
-    stageFilter,
     assigneeFilter,
     sortKey,
     sortDir,
@@ -184,7 +173,6 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
       return {
         title: task.title,
         status: columnName.get(task.columnId) ?? '',
-        stage: stageName.get(task.stageId) ?? '',
         assignee: assignee?.user?.name ?? (assignee ? assignee.userId : ''),
         assigneeEmail: assignee?.user?.email ?? '',
         dueDate: formatDueDate(task.dueDate),
@@ -219,7 +207,7 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
   }
 
   const hasFilters =
-    !!debouncedSearch || !!columnFilter || !!stageFilter || !!assigneeFilter;
+    !!debouncedSearch || !!columnFilter || !!assigneeFilter;
 
   return (
     <div>
@@ -248,22 +236,6 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
             {columns?.map((c) => (
               <NativeSelectOption key={c.id} value={c.id}>
                 {c.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-on-surface-variant">Etapa</span>
-          <NativeSelect
-            value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
-            aria-label="Filtrar por etapa"
-          >
-            <NativeSelectOption value="">Todas</NativeSelectOption>
-            {stages?.map((s) => (
-              <NativeSelectOption key={s.id} value={s.id}>
-                {s.name}
               </NativeSelectOption>
             ))}
           </NativeSelect>
@@ -345,9 +317,6 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
                     '—'
                   )}
                 </DataCardRow>
-                <DataCardRow label="Etapa">
-                  {stageName.get(task.stageId) ?? '—'}
-                </DataCardRow>
                 <DataCardRow label="Responsable">
                   {assignee ? (
                     <span className="inline-flex items-center gap-2">
@@ -402,7 +371,6 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
                     onClick={() => toggleSort('status')}
                   />
                 </TableHead>
-                <TableHead>Etapa</TableHead>
                 <TableHead>Responsable</TableHead>
                 <TableHead>
                   <SortButton
@@ -420,7 +388,6 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
                   key={task.id}
                   task={task}
                   statusName={columnName.get(task.columnId)}
-                  stageLabel={stageName.get(task.stageId)}
                   onOpen={() => setOpenTaskId(task.id)}
                 />
               ))}
@@ -467,12 +434,11 @@ function SortButton({ label, active, dir, onClick }: SortButtonProps) {
 interface TaskRowProps {
   task: Task;
   statusName?: string;
-  stageLabel?: string;
   onOpen: () => void;
 }
 
 /** Fila de tarea: click en cualquier parte abre el detalle. */
-function TaskRow({ task, statusName, stageLabel, onOpen }: TaskRowProps) {
+function TaskRow({ task, statusName, onOpen }: TaskRowProps) {
   const assignee = assigneeOf(task);
   const overdue = isOverdue(task.dueDate);
 
@@ -517,7 +483,6 @@ function TaskRow({ task, statusName, stageLabel, onOpen }: TaskRowProps) {
           <span className="text-on-surface-variant">—</span>
         )}
       </TableCell>
-      <TableCell className="text-on-surface-variant">{stageLabel ?? '—'}</TableCell>
       <TableCell>
         {assignee ? (
           <span className="inline-flex items-center gap-2">
