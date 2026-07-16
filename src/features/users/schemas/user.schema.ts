@@ -15,6 +15,8 @@ export const createUserSchema = z.object({
   password: z.string().min(6, 'Mínimo 6 caracteres'),
   role: roleEnum,
   jobTitle: z.string().trim().optional(),
+  // QL-127: por defecto un miembro nuevo NO puede crear proyectos (se otorga explícitamente).
+  canCreateProjects: z.boolean(),
 });
 
 export type CreateUserFormValues = z.infer<typeof createUserSchema>;
@@ -25,6 +27,8 @@ export const updateUserSchema = z.object({
   role: roleEnum,
   status: statusEnum,
   jobTitle: z.string().trim().optional(),
+  // QL-127: permiso de crear proyectos (solo aplica a MEMBER; el ADMIN siempre puede).
+  canCreateProjects: z.boolean(),
   // Vacío = no cambiar la contraseña; si viene, debe cumplir el mínimo.
   password: z
     .string()

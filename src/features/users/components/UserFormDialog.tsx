@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { ApiError } from '@/core/api/fetch-client';
 
 import { useCreateUser, useUpdateUser } from '../hooks/use-users';
@@ -50,7 +51,46 @@ const createDefaults: CreateUserFormValues = {
   password: '',
   role: 'MEMBER',
   jobTitle: '',
+  // QL-127: por defecto los miembros NO pueden crear proyectos.
+  canCreateProjects: false,
 };
+
+interface CanCreateProjectsFieldProps {
+  /** Valor real del flag en el formulario (el que se envía al backend). */
+  value: boolean;
+  onChange: (next: boolean) => void;
+  /** Rol **seleccionado ahora mismo** en el formulario, no el guardado. */
+  role: 'ADMIN' | 'MEMBER';
+}
+
+/**
+ * Control del permiso de crear proyectos (QL-127). Compartido por el alta y la edición.
+ *
+ * Con rol ADMIN se fuerza a "marcado + deshabilitado": el flag no le aplica (un ADMIN
+ * siempre puede) y mostrarlo apagado sería mentir. Solo se pinta el valor forzado; el valor
+ * real del formulario no se toca, así que al volver a MEMBER reaparece tal cual estaba.
+ */
+function CanCreateProjectsField({ value, onChange, role }: CanCreateProjectsFieldProps) {
+  const isAdmin = role === 'ADMIN';
+
+  return (
+    <div className="grid gap-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low px-4 py-3">
+      <label className="flex items-center gap-2.5 text-sm font-medium text-on-surface">
+        <Switch
+          checked={isAdmin || value}
+          disabled={isAdmin}
+          onCheckedChange={onChange}
+        />
+        Puede crear proyectos
+      </label>
+      <p className="text-xs text-on-surface-variant">
+        {isAdmin
+          ? 'Los administradores siempre pueden crear proyectos.'
+          : 'Si está desactivado, solo trabajará en los proyectos a los que se le agregue.'}
+      </p>
+    </div>
+  );
+}
 
 /** Traduce un fallo de la API a un toast (409 = email duplicado). */
 function reportError(err: unknown) {
@@ -80,6 +120,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       status: 'ACTIVE',
       jobTitle: '',
       password: '',
+      canCreateProjects: false,
     },
   });
 
@@ -94,6 +135,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
         status: user.status,
         jobTitle: user.jobTitle ?? '',
         password: '',
+        canCreateProjects: user.canCreateProjects ?? false,
       });
     } else {
       createForm.reset(createDefaults);
@@ -103,6 +145,10 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  // QL-127: el control del permiso reacciona al rol elegido en vivo (no al guardado).
+  const createRole = createForm.watch('role');
+  const editRole = editForm.watch('role');
+
   const onCreate = (values: CreateUserFormValues) => {
     const dto: CreateUserDto = {
       name: values.name.trim(),
@@ -110,6 +156,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       password: values.password,
       role: values.role,
       jobTitle: values.jobTitle?.trim() || undefined,
+      canCreateProjects: values.canCreateProjects,
     };
     createMutation.mutate(dto, {
       onSuccess: () => {
@@ -128,6 +175,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       role: values.role,
       status: values.status,
       jobTitle: values.jobTitle?.trim() || undefined,
+      canCreateProjects: values.canCreateProjects,
       ...(values.password ? { password: values.password } : {}),
     };
     updateMutation.mutate(
@@ -240,6 +288,18 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
               />
             </div>
 
+            <Controller
+              control={editForm.control}
+              name="canCreateProjects"
+              render={({ field }) => (
+                <CanCreateProjectsField
+                  value={!!field.value}
+                  onChange={field.onChange}
+                  role={editRole}
+                />
+              )}
+            />
+
             <div className="grid gap-1.5">
               <Label htmlFor="password" className="text-on-surface">
                 Nueva contraseña
@@ -343,6 +403,18 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                 {...createForm.register('jobTitle')}
               />
             </div>
+
+            <Controller
+              control={createForm.control}
+              name="canCreateProjects"
+              render={({ field }) => (
+                <CanCreateProjectsField
+                  value={!!field.value}
+                  onChange={field.onChange}
+                  role={createRole}
+                />
+              )}
+            />
           </form>
         )}
 

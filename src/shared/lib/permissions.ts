@@ -1,0 +1,24 @@
+import type { User } from '@/store/auth.store';
+
+/**
+ * Reglas de permiso de **plataforma** derivadas del usuario en sesión. Utilidad compartida
+ * (sin lógica de negocio de ningún feature): centraliza expresiones que si no se repetirían
+ * en cada consumidor y se desincronizarían al cambiar la regla.
+ */
+
+/**
+ * ¿El usuario puede crear proyectos? (QL-127)
+ *
+ * El permiso efectivo es `role === 'ADMIN' || canCreateProjects === true`:
+ * - **ADMIN siempre puede**, independientemente del flag. El flag es el permiso que un
+ *   administrador concede a un MEMBER, así que a un ADMIN no le aplica y el backend ni lo
+ *   consulta para él. Sin esta rama, un ADMIN con el flag en `false` (el default) se
+ *   quedaría sin el botón de crear aunque `POST /projects` sí le respondería 201.
+ * - Un MEMBER solo puede si un ADMIN se lo otorgó (default `false`).
+ *
+ * Es la **única fuente** de esta regla en el front; refleja el gate del backend, que
+ * responde 403 `PROJECT_CREATE_FORBIDDEN` si no se cumple.
+ */
+export function canCreateProjects(user: User | null | undefined): boolean {
+  return user?.role === 'ADMIN' || !!user?.canCreateProjects;
+}

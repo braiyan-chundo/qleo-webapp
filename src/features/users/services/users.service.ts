@@ -12,6 +12,12 @@ export interface UserSummary {
   /** QL-32: proxy privado del avatar subido, o `null` si no hay. */
   avatarDownloadUrl?: string | null;
   jobTitle?: string;
+  /**
+   * QL-127: permiso otorgado al MEMBER para crear proyectos (default `false`). Un ADMIN
+   * siempre puede, sea cual sea el flag → resolver con `canCreateProjects()` de
+   * `@/shared/lib/permissions`. No viene en `GET /users/directory` (superficie mínima).
+   */
+  canCreateProjects?: boolean;
   createdAt: string;
 }
 
@@ -33,6 +39,8 @@ export interface CreateUserDto {
   password: string;
   role?: 'ADMIN' | 'MEMBER';
   jobTitle?: string;
+  /** QL-127: otorga el permiso de crear proyectos al alta (default `false` en el backend). */
+  canCreateProjects?: boolean;
 }
 
 /** DTO de actualización de usuario (§3.2, `PATCH /users/:id`). Todos opcionales. */
@@ -43,6 +51,8 @@ export interface UpdateUserDto {
   role?: 'ADMIN' | 'MEMBER';
   jobTitle?: string;
   status?: 'ACTIVE' | 'INACTIVE';
+  /** QL-127: otorga o revoca el permiso de crear proyectos. */
+  canCreateProjects?: boolean;
 }
 
 /** Filtros de listado de usuarios (§3.2). Solo `ADMIN` puede consultarlo. */

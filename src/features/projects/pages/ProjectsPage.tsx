@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  Folder,
   FolderPlus,
   LayoutGrid,
   Plus,
@@ -18,6 +19,8 @@ import {
   useQueryParamSearch,
   useQueryParamState,
 } from '@/shared/hooks/use-query-param-state';
+import { canCreateProjects } from '@/shared/lib/permissions';
+import { useAuthStore } from '@/store/auth.store';
 
 import { useProjects } from '../hooks/use-projects';
 import { ProjectCard } from '../components/ProjectCard';
@@ -41,6 +44,12 @@ function readStoredLayout(): ProjectsLayout {
 }
 
 export function ProjectsPage() {
+  // QL-127: gate de creación. ADMIN siempre; MEMBER solo con el permiso otorgado. El
+  // backend responde 403 PROJECT_CREATE_FORBIDDEN igualmente: esto solo evita ofrecer
+  // una acción que fallaría.
+  const user = useAuthStore((s) => s.user);
+  const canCreate = canCreateProjects(user);
+
   // Filtros + paginación persistidos en la URL (params: `q`, `arch`, `page`).
   const { value: search, setValue: setSearch, committed } = useQueryParamSearch('q', 350);
   const [archivedParam, setArchivedParam] = useQueryParamState<'0' | '1'>('arch', '0');
@@ -89,6 +98,8 @@ export function ProjectsPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const openCreate = () => {
+    // Barrera defensiva: sin permiso no hay modo alta, aunque se colara un disparador.
+    if (!canCreate) return;
     setEditing(undefined);
     setFormOpen(true);
   };
@@ -105,13 +116,17 @@ export function ProjectsPage() {
         <div>
           <h1 className="text-3xl font-bold text-on-surface">Proyectos</h1>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Crea, edita y organiza tus proyectos.
+            {canCreate
+              ? 'Crea, edita y organiza tus proyectos.'
+              : 'Consulta y organiza los proyectos en los que participas.'}
           </p>
         </div>
-        <Button onClick={openCreate} className="h-10">
-          <Plus />
-          Nuevo proyecto
-        </Button>
+        {canCreate && (
+          <Button onClick={openCreate} className="h-10">
+            <Plus />
+            Nuevo proyecto
+          </Button>
+        )}
       </div>
 
       {/* Barra de filtros */}
@@ -210,23 +225,31 @@ export function ProjectsPage() {
       ) : projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant/60 bg-surface-container-low px-6 py-16 text-center">
           <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-primary-container text-primary">
-            <FolderPlus className="size-7" />
+            {canCreate ? (
+              <FolderPlus className="size-7" />
+            ) : (
+              <Folder className="size-7" />
+            )}
           </div>
           <h2 className="text-lg font-semibold text-on-surface">
             {debouncedSearch
               ? 'Sin resultados'
               : archived
                 ? 'No hay proyectos archivados'
-                : 'Aún no tienes proyectos'}
+                : canCreate
+                  ? 'Aún no tienes proyectos'
+                  : 'Aún no eres miembro de ningún proyecto'}
           </h2>
           <p className="mt-1 max-w-sm text-sm text-on-surface-variant">
             {debouncedSearch
               ? 'Prueba con otros términos de búsqueda.'
               : archived
                 ? 'Los proyectos que archives aparecerán aquí.'
-                : 'Crea tu primer proyecto para empezar a trabajar.'}
+                : canCreate
+                  ? 'Crea tu primer proyecto para empezar a trabajar.'
+                  : 'Un administrador puede agregarte a un proyecto; cuando lo haga, aparecerá aquí.'}
           </p>
-          {!archived && !debouncedSearch && (
+          {canCreate && !archived && !debouncedSearch && (
             <Button onClick={openCreate} className="mt-5 h-10">
               <Plus />
               Nuevo proyecto

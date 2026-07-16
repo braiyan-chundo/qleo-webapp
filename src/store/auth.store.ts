@@ -17,6 +17,15 @@ export interface User {
    * Las @menciones del muro siguen llegando. Se togglea desde `/profile`.
    */
   wallPushMuted?: boolean;
+  /**
+   * QL-127: permiso **otorgado a un MEMBER** para crear proyectos (default `false`). Solo
+   * un ADMIN lo concede desde la administración de usuarios (`PATCH /users/:id`).
+   *
+   * Ojo: **no** es el permiso efectivo. Un ADMIN siempre puede crear proyectos aunque este
+   * flag sea `false`. Para decidir en la UI usa `canCreateProjects()` de
+   * `@/shared/lib/permissions`, nunca este campo suelto.
+   */
+  canCreateProjects?: boolean;
 }
 
 interface AuthState {
