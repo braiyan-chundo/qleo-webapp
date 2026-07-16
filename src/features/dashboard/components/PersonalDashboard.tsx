@@ -7,7 +7,6 @@ import { useMyDashboard } from '../hooks/use-my-dashboard';
 import { DashboardSkeleton } from './DashboardSkeleton';
 import { MyTasksCard } from './MyTasksCard';
 import { FocusProjectCard } from './FocusProjectCard';
-import { ActiveTimerCard } from './ActiveTimerCard';
 import { RecentMentionsCard } from './RecentMentionsCard';
 import { QuickActions } from './QuickActions';
 
@@ -73,8 +72,9 @@ export function PersonalDashboard() {
         <div className="lg:col-span-2">
           <MyTasksCard tasks={tasks} />
         </div>
-        <div className="space-y-6">
-          <ActiveTimerCard timer={data.activeTimer} />
+        {/* (QL-130) Envoltorio a propósito: como celda de la rejilla se estira a lo alto de la
+            fila y deja que la tarjeta conserve su altura natural. */}
+        <div>
           <FocusProjectCard project={data.focusProject} />
         </div>
         <div className="lg:col-span-2">

@@ -9,10 +9,13 @@ export function DashboardSkeleton() {
         <Skeleton className="h-4 w-72 rounded-md" />
       </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Mis tareas */}
         <Skeleton className="h-64 rounded-xl lg:col-span-2" />
-        <Skeleton className="h-64 rounded-xl" />
+        {/* Foco principal (QL-130: ya sin la tarjeta del ciclo activo encima) */}
         <Skeleton className="h-48 rounded-xl" />
-        <Skeleton className="h-48 rounded-xl" />
+        {/* Menciones recientes */}
+        <Skeleton className="h-48 rounded-xl lg:col-span-2" />
+        {/* Acciones rápidas */}
         <Skeleton className="h-48 rounded-xl" />
       </div>
     </div>

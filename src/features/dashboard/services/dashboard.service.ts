@@ -2,8 +2,12 @@ import { api } from '@/core/api/fetch-client';
 
 /**
  * DTOs del endpoint de agregación del dashboard personal (QL-18/QL-19, §3.14).
- * Todo es **solo lectura**: agrega tareas, cronómetro, proyecto foco y menciones del
- * usuario autenticado en una sola llamada. La forma refleja fielmente `MyDashboard`.
+ * Todo es **solo lectura**: agrega tareas, proyecto foco y menciones del usuario
+ * autenticado en una sola llamada.
+ *
+ * (QL-130) El backend sigue enviando `activeTimer`, pero el front ya no lo tipa ni lo
+ * pinta: el ciclo activo se calcula solo, no se activa a mano, y la tarjeta confundía.
+ * Los campos de más en la respuesta se ignoran sin problema.
  */
 
 /** Una tarea próxima del bloque "Mis tareas" (`tasks.upcoming`). */
@@ -14,15 +18,6 @@ export interface TaskSummary {
   projectId: string;
   projectName: string | null;
   columnName: string | null;
-}
-
-/** Cronómetro en marcha del usuario (o `null` si no hay ninguno). */
-export interface ActiveTimer {
-  taskId: string;
-  taskTitle: string | null;
-  projectId: string | null;
-  /** ISO de inicio; el cliente calcula el transcurrido en vivo desde aquí. */
-  startedAt: string;
 }
 
 /** Proyecto foco (mayor actividad reciente donde participo). */
@@ -50,7 +45,6 @@ export interface MyDashboard {
     upcoming: TaskSummary[];
   };
   completedToday: number;
-  activeTimer: ActiveTimer | null;
   focusProject: FocusProject | null;
   recentMentions: MentionSummary[];
 }
