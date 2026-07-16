@@ -54,6 +54,7 @@ import { projectDot } from '@/features/tasks/lib/palette';
 import { useAuthStore } from '@/store/auth.store';
 
 import { useProject } from '../hooks/use-projects';
+import { canManageProject, canManageMembership } from '../utils/permissions';
 import { ProjectFormDialog } from '../components/ProjectFormDialog';
 import { ArchiveProjectDialog } from '../components/ArchiveProjectDialog';
 import { ProjectDetailsDialog } from '../components/ProjectDetailsDialog';
@@ -177,17 +178,12 @@ export function ProjectDetailPage() {
     );
   }
 
-  // (P2/§3.20) Dos niveles de permiso sobre el proyecto:
+  // (P2/§3.20) Dos niveles de permiso sobre el proyecto (reglas en `projects/utils/permissions`,
+  // fuente única compartida con los consumidores — p. ej. `BoardSettingsDialog`):
   // - `canManageProject`: editar/archivar/configurar tablero → ADMIN, creador o manager.
   // - `canManageMembership`: gestionar miembros y otorgar/revocar managers → ADMIN o creador.
-  const isAdmin = user?.role === 'ADMIN';
-  const canManageProject =
-    !!user &&
-    (isAdmin ||
-      project.createdBy === user.id ||
-      project.managerIds.includes(user.id));
-  const canManageMembership =
-    !!user && (isAdmin || project.createdBy === user.id);
+  const canManage = canManageProject(project, user);
+  const canManageMembers = canManageMembership(project, user);
 
   const dotClass = projectDot(project.color);
   // Membresía real del detalle (QL-51): se muestran hasta 4 avatares y el resto como "+N".
@@ -332,7 +328,7 @@ export function ProjectDetailPage() {
           {/* Configurar tablero: acción primaria del Kanban (antes escondida en una fila
               propia del board y en el `···` de cada columna). Solo aplica a esta vista y a
               quien puede gestionar el proyecto (§3.20). */}
-          {view === 'kanban' && canManageProject && (
+          {view === 'kanban' && canManage && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -372,13 +368,13 @@ export function ProjectDetailPage() {
               </DropdownMenuItem>
               {/* Editar/archivar: solo ADMIN, creador o manager (§3.20). Un miembro normal
                   no ve estas acciones (sí puede crear tareas). */}
-              {canManageProject && (
+              {canManage && (
                 <DropdownMenuItem onSelect={() => setEditOpen(true)}>
                   <Pencil className="size-4" />
                   Editar proyecto
                 </DropdownMenuItem>
               )}
-              {canManageProject && !project.archived && (
+              {canManage && !project.archived && (
                 <DropdownMenuItem
                   variant="destructive"
                   onSelect={() => setArchiveOpen(true)}
@@ -465,7 +461,7 @@ export function ProjectDetailPage() {
         project={project}
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
-        canManage={canManageMembership}
+        canManage={canManageMembers}
         focusMembers={detailsFocusMembers}
       />
       <ProjectFormDialog

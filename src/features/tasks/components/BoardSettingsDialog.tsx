@@ -9,6 +9,7 @@ import {
 import { StagesPanel } from '@/features/stages/components/StagesPanel';
 import { ColumnsPanel } from '@/features/columns/components/ColumnsPanel';
 import { useProject } from '@/features/projects/hooks/use-projects';
+import { canManageProject } from '@/features/projects/utils/permissions';
 import { useAuthStore } from '@/store/auth.store';
 
 import { BoardConfigPanel } from './BoardConfigPanel';
@@ -22,8 +23,9 @@ interface BoardSettingsDialogProps {
 /**
  * Configuración del tablero fuera del flujo principal (board-first): un diálogo que agrupa
  * las etapas (QL-05) y las columnas de estado (QL-06) para no dominar la vista del board.
- * Añade (QL-63) un bloque de configuración (Backlog/inicio/fin/plantilla) visible solo para
- * el creador o ADMIN (`canManage`); el backend valida igual.
+ * Añade (QL-63) un bloque de configuración (Backlog/inicio/fin/plantilla) visible para quien
+ * puede gestionar el proyecto (`canManageProject`: ADMIN, creador o gestor otorgado) — la MISMA
+ * regla que gatea el botón que abre este diálogo; el backend valida igual.
  */
 export function BoardSettingsDialog({
   projectId,
@@ -34,10 +36,7 @@ export function BoardSettingsDialog({
   // Solo se consulta el proyecto con el diálogo abierto (evita fetch en cada render del board).
   const { data: project } = useProject(open ? projectId : undefined);
 
-  const canManage =
-    !!user &&
-    !!project &&
-    (user.role === 'ADMIN' || project.createdBy === user.id);
+  const canManage = canManageProject(project, user);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
