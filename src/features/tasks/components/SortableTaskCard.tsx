@@ -10,6 +10,12 @@ import { TaskCard } from './TaskCard';
 
 interface SortableTaskCardProps {
   task: Task;
+  /**
+   * (QL-135) `true` si la columna que la contiene no es un destino válido para el arrastre en
+   * curso: la card deja de aceptar el drop (pero se sigue pudiendo arrastrar, que es salir de
+   * la columna, no entrar). Lo decide el board; ver `lib/column-sequence`.
+   */
+  dropDisabled?: boolean;
   onClick: () => void;
 }
 
@@ -26,7 +32,11 @@ interface SortableTaskCardProps {
  * `pointerdown` (no en el prop `onPointerDown`, que pertenece a los `listeners` de dnd-kit y
  * no debemos pisar), así que el siguiente click legítimo siempre pasa.
  */
-export function SortableTaskCard({ task, onClick }: SortableTaskCardProps) {
+export function SortableTaskCard({
+  task,
+  dropDisabled,
+  onClick,
+}: SortableTaskCardProps) {
   const draggable = canMoveTask(task.currentUserRole);
   const draggedRef = useRef(false);
 
@@ -41,7 +51,10 @@ export function SortableTaskCard({ task, onClick }: SortableTaskCardProps) {
     id: task.id,
     // Guarda la columna en `data` para resolver el destino al soltar en zona vacía.
     data: { type: 'task', columnId: task.columnId },
-    disabled: !draggable,
+    // `draggable` y `droppable` se desactivan por separado: el rol decide si esta card se
+    // puede arrastrar (QL-15) y la regla secuencial (QL-135) si puede RECIBIR el arrastre en
+    // curso. Un OBSERVER, por ejemplo, no arrastra su card pero otras sí pueden soltarse ahí.
+    disabled: { draggable: !draggable, droppable: !!dropDisabled },
   });
 
   useEffect(() => {

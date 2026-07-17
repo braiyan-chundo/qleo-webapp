@@ -25,6 +25,13 @@ interface BoardColumnProps {
   /** Posición de la columna (para derivar un color estable si `color` es null). */
   index: number;
   tasks: Task[];
+  /**
+   * (QL-135) `true` mientras se arrastra una tarea para la que esta columna **no** es un
+   * destino válido (no contigua a la de origen). La columna se atenúa y deja de aceptar el
+   * drop —tanto en su zona libre como sobre sus tarjetas—, así que dnd-kit la ignora y el
+   * arrastre se ancla al destino válido más cercano.
+   */
+  dropDisabled?: boolean;
   /** Click en una tarjeta → abre la tarea (QL-123: navega a su vista completa, sin modal). */
   onOpenTask: (id: string) => void;
   /** Abre el formulario de nueva tarea preseteando esta columna. */
@@ -91,17 +98,20 @@ export function BoardColumn({
   column,
   index,
   tasks,
+  dropDisabled,
   onOpenTask,
   onAddTask,
 }: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
     data: { type: 'column', columnId: column.id },
+    disabled: dropDisabled,
   });
 
   return (
     <div
       ref={setNodeRef}
+      aria-disabled={dropDisabled || undefined}
       className={cn(
         // QL-36: `h-full min-h-0` para llenar el alto que le da el board; el encabezado queda
         // fijo y solo scrollea la lista de tarjetas.
@@ -111,9 +121,14 @@ export function BoardColumn({
         // `shrink-0`, de modo que en desktop entran varias y las sobrantes quedan accesibles con
         // scroll horizontal (sin wrap); cuanto más ancha la pantalla, más columnas visibles.
         'w-[calc(50%-0.5rem)] shrink-0 snap-start sm:w-72',
-        isOver
-          ? 'border-primary/60 bg-primary-container/30'
-          : cn('border-outline-variant/40', boundarySurface(column)),
+        // (QL-135) Destino no válido: se atenúa y el borde pasa a discontinuo (la señal no va
+        // solo en la opacidad) mientras dura el arrastre. `isOver` nunca es true aquí: con el
+        // droppable desactivado dnd-kit ni considera la columna.
+        dropDisabled
+          ? 'cursor-not-allowed border-dashed border-outline-variant/40 bg-surface-container-low opacity-40'
+          : isOver
+            ? 'border-primary/60 bg-primary-container/30'
+            : cn('border-outline-variant/40', boundarySurface(column)),
       )}
     >
       <header className="mb-3 flex shrink-0 items-center justify-between gap-2 px-1">
@@ -190,6 +205,10 @@ export function BoardColumn({
               <SortableTaskCard
                 key={task.id}
                 task={task}
+                // (QL-135) Sin esto, soltar sobre una TARJETA de una columna atenuada seguiría
+                // resolviendo el destino a esa columna: el carril estaría desactivado pero sus
+                // tarjetas no. Las cards siguen siendo arrastrables (salir de aquí sí vale).
+                dropDisabled={dropDisabled}
                 onClick={() => onOpenTask(task.id)}
               />
             ))

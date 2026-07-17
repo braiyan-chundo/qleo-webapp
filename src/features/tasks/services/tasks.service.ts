@@ -153,6 +153,14 @@ export interface CreateTaskPayload {
    * el creador se descarta. Omitir (o `undefined`) = solo el `CREATOR`, como siempre.
    */
   collaboratorIds?: string[];
+  /**
+   * (QL-138, §3.34) Observadores (`OBSERVER`, **solo lectura**) desde el alta. Simétrico a
+   * `collaboratorIds`: todos deben ser **miembros del proyecto** (si no → 400
+   * `USER_NOT_PROJECT_MEMBER` y la tarea NO se crea). El backend deduplica con precedencia
+   * `ASSIGNEE` > `COLLABORATOR` > `OBSERVER` y descarta al creador. Reciben la notificación
+   * `TASK_ASSIGNED` como el resto de roles iniciales.
+   */
+  observerIds?: string[];
 }
 
 /**

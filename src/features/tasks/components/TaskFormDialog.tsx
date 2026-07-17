@@ -60,6 +60,7 @@ const emptyValues: TaskFormValues = {
   deadlineLocked: false,
   assigneeId: '',
   collaboratorIds: [],
+  observerIds: [],
 };
 
 /** Traduce el `error.code` de negocio del alta a un mensaje claro (QL-123). */
@@ -115,6 +116,7 @@ export function TaskFormDialog({
 
   const assigneeId = watch('assigneeId') ?? '';
   const collaboratorIds = watch('collaboratorIds') ?? [];
+  const observerIds = watch('observerIds') ?? [];
   // (P1) El toggle de bloqueo solo aplica cuando ya se eligió una fecha límite.
   const dueDateValue = watch('dueDate') ?? '';
 
@@ -133,6 +135,7 @@ export function TaskFormDialog({
         // En edición los roles NO se tocan aquí (los gestiona el RoleManager del detalle).
         assigneeId: '',
         collaboratorIds: [],
+        observerIds: [],
       });
     } else {
       reset({
@@ -175,11 +178,15 @@ export function TaskFormDialog({
         },
       );
     } else {
-      // (QL-123) Roles iniciales: ambos opcionales. El Responsable elegido nunca viaja
-      // también como Colaborador (la UI ya lo filtra; esto lo garantiza en el payload).
+      // (QL-123/QL-138) Roles iniciales: los tres opcionales. La UI ya aplica la precedencia
+      // ASSIGNEE > COLLABORATOR > OBSERVER al elegir, pero se vuelve a imponer aquí para que
+      // el payload no dependa del orden en que el usuario tocó los controles.
       const nextAssigneeId = values.assigneeId || undefined;
       const nextCollaboratorIds = (values.collaboratorIds ?? []).filter(
         (id) => id !== nextAssigneeId,
+      );
+      const nextObserverIds = (values.observerIds ?? []).filter(
+        (id) => id !== nextAssigneeId && !nextCollaboratorIds.includes(id),
       );
 
       // (P1/§3.6) Fecha límite opcional en el alta. `deadlineLocked` solo tiene sentido con
@@ -201,6 +208,7 @@ export function TaskFormDialog({
           collaboratorIds: nextCollaboratorIds.length
             ? nextCollaboratorIds
             : undefined,
+          observerIds: nextObserverIds.length ? nextObserverIds : undefined,
         },
         {
           onSuccess: () => {
@@ -361,8 +369,9 @@ export function TaskFormDialog({
             </div>
           )}
 
-          {/* (QL-123) Responsable y Colaboradores solo en el ALTA: en edición los roles se
-              gestionan con el RoleManager de la vista de detalle (no se duplica aquí). */}
+          {/* (QL-123/QL-138) Responsable, Colaboradores y Observadores solo en el ALTA: en
+              edición los roles se gestionan con el RoleManager de la vista de detalle (no se
+              duplica aquí). */}
           {!isEdit && (
             <TaskParticipantsPicker
               members={members}
@@ -370,8 +379,10 @@ export function TaskFormDialog({
               currentUserId={currentUserId}
               assigneeId={assigneeId}
               collaboratorIds={collaboratorIds}
+              observerIds={observerIds}
               onAssigneeChange={(id) => setValue('assigneeId', id)}
               onCollaboratorsChange={(ids) => setValue('collaboratorIds', ids)}
+              onObserversChange={(ids) => setValue('observerIds', ids)}
               disabled={isPending}
             />
           )}

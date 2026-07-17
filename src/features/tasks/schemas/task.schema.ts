@@ -27,6 +27,11 @@ export const taskFormSchema = z.object({
   assigneeId: z.string().optional(),
   /** (QL-123) Colaboradores (COLLABORATOR) elegidos en el **alta**. Vacío = ninguno. */
   collaboratorIds: z.array(z.string()).optional(),
+  /**
+   * (QL-138) Observadores (OBSERVER, solo lectura) elegidos en el **alta**. Vacío = ninguno.
+   * Solo se usa al crear: en edición los roles se gestionan con el `RoleManager` del detalle.
+   */
+  observerIds: z.array(z.string()).optional(),
 });
 
 export type TaskFormValues = z.infer<typeof taskFormSchema>;

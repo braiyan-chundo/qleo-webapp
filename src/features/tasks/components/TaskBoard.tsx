@@ -19,10 +19,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { useColumns } from '@/features/columns/hooks/use-columns';
+import { useProject } from '@/features/projects/hooks/use-projects';
+import { canManageProject } from '@/features/projects/utils/permissions';
+import { useAuthStore } from '@/store/auth.store';
 
 import { useMoveTask, useTasks } from '../hooks/use-tasks';
 import type { Task } from '../services/tasks.service';
 import { canMoveTask } from '../lib/roles';
+import { isColumnDropAllowed } from '../lib/column-sequence';
 import { TaskCard } from './TaskCard';
 import { BoardColumn } from './BoardColumn';
 import { TaskFormDialog } from './TaskFormDialog';
@@ -62,6 +66,13 @@ interface TaskBoardProps {
  * La configuración del tablero (columnas) vive en un diálogo aparte, abierto desde la
  * cabecera de la página, para dejar el board como contenido primario y no gastar alto
  * vertical con una fila de acciones.
+ *
+ * (QL-135) El movimiento entre columnas es **secuencial**: mientras se arrastra, las columnas
+ * no contiguas a la de origen se marcan como destino no disponible y no aceptan el drop
+ * (`isColumnDropAllowed`). Quien puede gestionar el proyecto se salta la regla y ve el tablero
+ * como siempre. El backend sigue siendo la autoridad: si aun así llega un 409
+ * `COLUMN_SEQUENCE_VIOLATION` (p.ej. otra sesión reordenó las columnas a mitad del arrastre),
+ * `useMoveTask` revierte el optimista y muestra el mensaje del backend.
  */
 export function TaskBoard({
   projectId,
@@ -79,6 +90,13 @@ export function TaskBoard({
   } = useTasks(projectId);
   const { data: columns, isLoading: columnsLoading } = useColumns(projectId);
   const moveTask = useMoveTask(projectId);
+
+  // (QL-135) Quien gestiona el proyecto (ADMIN, creador o gestor otorgado) se salta la regla
+  // secuencial: para él no hay ninguna restricción visual. Misma fuente que el backend y que
+  // el resto de gates del proyecto — nunca recalcular la expresión a mano.
+  const user = useAuthStore((s) => s.user);
+  const { data: project } = useProject(projectId);
+  const bypassesSequence = canManageProject(project, user);
 
   // Aplica el filtro compartido del board (si lo hay) sobre las tareas cargadas.
   const tasks = useMemo(
@@ -124,6 +142,13 @@ export function TaskBoard({
   const activeTask = useMemo(
     () => tasks?.find((t) => t.id === activeId) ?? null,
     [tasks, activeId],
+  );
+
+  // (QL-135) Columna de origen del arrastre en curso: es la referencia contra la que se mide
+  // la contigüidad de cada destino. `null` fuera de un arrastre → el tablero no marca nada.
+  const activeColumn = useMemo(
+    () => (activeTask ? columns?.find((c) => c.id === activeTask.columnId) : undefined),
+    [activeTask, columns],
   );
 
   const isLoading = tasksLoading || columnsLoading;
@@ -172,6 +197,20 @@ export function TaskBoard({
         : overData?.type === 'column'
           ? (overData.columnId as string)
           : overId;
+
+    // (QL-135) Guard de la regla secuencial. Las columnas no contiguas ya tienen el drop
+    // desactivado, así que esto solo salta en una carrera (otra sesión movió la tarea o
+    // reordenó las columnas mientras se arrastraba): se descarta el movimiento sin llamar a
+    // la API en vez de provocar un 409 seguro. La misma expresión que atenúa las columnas.
+    if (
+      !isColumnDropAllowed(
+        columns?.find((c) => c.id === moved.columnId),
+        columns?.find((c) => c.id === destColumnId),
+        bypassesSequence,
+      )
+    ) {
+      return;
+    }
 
     // Tareas actuales de la columna destino, ordenadas y sin la que movemos.
     const destTasks = (tasksByColumn.get(destColumnId) ?? []).filter(
@@ -306,6 +345,12 @@ export function TaskBoard({
                 column={column}
                 index={index}
                 tasks={tasksByColumn.get(column.id) ?? []}
+                // (QL-135) Solo durante un arrastre y solo para quien no se salta la regla:
+                // fuera del arrastre `activeColumn` es undefined y ninguna columna se marca.
+                dropDisabled={
+                  !!activeColumn &&
+                  !isColumnDropAllowed(activeColumn, column, bypassesSequence)
+                }
                 onOpenTask={(taskId) =>
                   navigate(`/projects/${projectId}/tasks/${taskId}`)
                 }
