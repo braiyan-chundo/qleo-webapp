@@ -39,6 +39,7 @@ import { cn } from '@/lib/utils';
 
 import { wallMessageAnchorId, type WallFeedItem } from '../lib/wall-feed';
 import { formatWallTime } from '../lib/wall-dates';
+import { describeWallMessageDeletion } from '../lib/wall-attachments';
 import {
   useDeleteWallMessage,
   useEditWallMessage,
@@ -433,8 +434,7 @@ export function WallMessageItem({
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar mensaje</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Seguro que quieres eliminar este mensaje del muro? Esta acción no se puede
-              deshacer.
+              {describeWallMessageDeletion(attachments.length)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
