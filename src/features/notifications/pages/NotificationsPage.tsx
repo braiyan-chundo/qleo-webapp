@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
   useQueryParamNumber,
+  useQueryParams,
   useQueryParamState,
 } from '@/shared/hooks/use-query-param-state';
 
@@ -32,8 +33,9 @@ type Filter = 'all' | 'unread';
  */
 export function NotificationsPage() {
   // Filtro + paginación persistidos en la URL (params: `estado`, `page`).
-  const [filter, setFilter] = useQueryParamState<Filter>('estado', 'all');
+  const [filter] = useQueryParamState<Filter>('estado', 'all');
   const [page, setPage] = useQueryParamNumber('page', 1);
+  const setParams = useQueryParams();
 
   const params = useMemo(
     () => ({ page, limit: PAGE_SIZE, unread: filter === 'unread' }),
@@ -48,9 +50,18 @@ export function NotificationsPage() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  /**
+   * Cambia de pestaña y vuelve a la página 1 en **una sola** actualización de la URL (QL-139).
+   * Antes eran dos setters (`setFilter` + `setPage`) y el segundo pisaba al primero: ambos
+   * computaban desde la URL del render actual, así que `setPage(1)` navegaba con unos params
+   * que aún no tenían `estado` → la pestaña "No leídas" nunca se activaba. Ver `useQueryParams`.
+   */
   const changeFilter = (next: Filter) => {
-    setFilter(next);
-    setPage(1);
+    setParams({
+      // `null` = quitar el param, que es el default de cada uno ('all' y página 1).
+      estado: next === 'all' ? null : next,
+      page: null,
+    });
   };
 
   const handleMarkAll = () => {

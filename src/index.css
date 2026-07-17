@@ -123,6 +123,24 @@
   --palette-gray-surface: #e2e5ee;
   --palette-gray-on-surface: #3b4252;
 
+  /* ---- Columnas de inicio / fin del flujo (QL-134; marcan las columnas de QL-62) ----
+     Tinte + acento de las columnas que fijan `startedAt` (inicio) y `finishedAt` (fin).
+     Son **alias sobre la paleta**, no valores nuevos, por dos razones:
+     1) Tema automático: la paleta se redefine en `.dark` y `next-themes` pone la clase en
+        `<html>` (el mismo elemento que `:root`), así que el `var()` de aquí resuelve al valor
+        del tema activo. Por eso NO hace falta redeclararlos en el bloque `.dark`.
+     2) Sutileza real en ambos temas: los `-surface` de la paleta ya vienen calibrados por tema
+        (hex suave en claro, rgba ~0.16 en oscuro). Un `bg-*-container/25` NO valdría: en
+        oscuro los `-container` ya son rgba(…, 0.14) y el modificador los dejaría en ~0.035 de
+        alfa — invisibles.
+     Verde = "empezar" (Play), morado = "fin" (Flag): ese par se distingue también con visión
+     deficiente al rojo-verde (uno verde/naranja no). Aun así el color nunca va solo: cada
+     marca lleva su icono con `aria-label`. */
+  --column-start-surface: var(--palette-green-surface);
+  --column-start-accent: var(--palette-green-dot);
+  --column-end-surface: var(--palette-purple-surface);
+  --column-end-accent: var(--palette-purple-dot);
+
   /* Sombras de elevación (M3 suaves, solo modo claro) */
   --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
   --elevation-2: 0 4px 12px -2px rgba(11, 28, 48, 0.08), 0 2px 6px -2px rgba(11, 28, 48, 0.05);
@@ -387,6 +405,12 @@
   --color-palette-gray-dot: var(--palette-gray-dot);
   --color-palette-gray-surface: var(--palette-gray-surface);
   --color-palette-gray-on-surface: var(--palette-gray-on-surface);
+
+  /* ---- Columnas de inicio/fin (bg-column-start-surface, text-column-end-accent, …) ---- */
+  --color-column-start-surface: var(--column-start-surface);
+  --color-column-start-accent: var(--column-start-accent);
+  --color-column-end-surface: var(--column-end-surface);
+  --color-column-end-accent: var(--column-end-accent);
 
   --color-primary-fixed: var(--primary-fixed);
   --color-primary-fixed-dim: var(--primary-fixed-dim);

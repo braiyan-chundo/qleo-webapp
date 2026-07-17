@@ -3,7 +3,8 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Inbox, Plus, Star } from 'lucide-react';
+import { Flag, Inbox, Play, Plus, Star } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +29,54 @@ interface BoardColumnProps {
   onOpenTask: (id: string) => void;
   /** Abre el formulario de nueva tarea preseteando esta columna. */
   onAddTask: (columnId: string) => void;
+}
+
+interface BoundaryMarkProps {
+  icon: LucideIcon;
+  /** Etiqueta corta para lectores de pantalla ("Columna de inicio" / "Columna de fin"). */
+  label: string;
+  /** Clase de color del acento (token). */
+  className: string;
+  /** Texto del tooltip: explica qué implica la marca. */
+  children: React.ReactNode;
+}
+
+/**
+ * Marca de cabecera del papel de la columna en el flujo (QL-134). La información **no va solo
+ * en el color**: el icono lleva `aria-label` para quien no distinga los tintes, y el tooltip
+ * explica el significado a quien no reconozca el icono.
+ */
+function BoundaryMark({ icon: Icon, label, className, children }: BoundaryMarkProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Icon
+          className={cn('size-3.5 shrink-0 fill-current', className)}
+          aria-label={label}
+        />
+      </TooltipTrigger>
+      <TooltipContent>{children}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/**
+ * Tinte de fondo según el papel de la columna en el flujo (QL-134, sobre las marcas de QL-62).
+ * Intencionalmente **tenue**: la columna sigue siendo un contenedor de trabajo, no un cartel,
+ * así que el tinte no debe competir con el punto de color (configurable por el usuario) ni
+ * restarle contraste a las tarjetas. Los tokens ya resuelven claro/oscuro por sí solos.
+ *
+ * Caso borde: el backend permite como máximo una columna `isStart` y una `isEnd`, pero nada
+ * impide que sean la **misma** columna. Ahí se degrada de un tinte al otro (y la cabecera
+ * pinta las dos marcas), en vez de que un `if` gane arbitrariamente.
+ */
+function boundarySurface(column: Column): string {
+  if (column.isStart && column.isEnd) {
+    return 'bg-linear-to-b from-column-start-surface to-column-end-surface';
+  }
+  if (column.isStart) return 'bg-column-start-surface';
+  if (column.isEnd) return 'bg-column-end-surface';
+  return 'bg-surface-container-low';
 }
 
 /**
@@ -64,7 +113,7 @@ export function BoardColumn({
         'w-[calc(50%-0.5rem)] shrink-0 snap-start sm:w-72',
         isOver
           ? 'border-primary/60 bg-primary-container/30'
-          : 'border-outline-variant/40 bg-surface-container-low',
+          : cn('border-outline-variant/40', boundarySurface(column)),
       )}
     >
       <header className="mb-3 flex shrink-0 items-center justify-between gap-2 px-1">
@@ -81,6 +130,26 @@ export function BoardColumn({
               className="size-3.5 shrink-0 text-primary"
               aria-label="Columna por defecto"
             />
+          )}
+          {/* QL-134: si la columna es inicio Y fin a la vez, se pintan las dos marcas. */}
+          {column.isStart && (
+            <BoundaryMark
+              icon={Play}
+              label="Columna de inicio"
+              className="text-column-start-accent"
+            >
+              Columna de inicio — al mover una tarea aquí se registra cuándo empezó
+            </BoundaryMark>
+          )}
+          {column.isEnd && (
+            <BoundaryMark
+              icon={Flag}
+              label="Columna de fin"
+              className="text-column-end-accent"
+            >
+              Columna de fin — al mover una tarea aquí se registra cuándo terminó (no la
+              completa: eso es una acción aparte)
+            </BoundaryMark>
           )}
           <span className="shrink-0 text-xs font-medium text-on-surface-variant">
             {tasks.length}

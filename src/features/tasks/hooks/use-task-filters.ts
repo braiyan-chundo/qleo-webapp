@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 
 import {
+  useQueryParams,
   useQueryParamSearch,
   useQueryParamState,
 } from '@/shared/hooks/use-query-param-state';
@@ -12,6 +13,15 @@ export type TaskStatusFilter = 'all' | 'active' | 'completed';
 
 /** Valor sentinela para "todos" en un select (los ids reales nunca son vacíos). */
 const ALL = '';
+
+/**
+ * Claves de los query params de estos filtros. Constantes (y no literales sueltos) porque
+ * `clear()` las necesita para el parche por lotes: si el `useQueryParamState` y el `clear`
+ * se desincronizaran, "Limpiar filtros" dejaría de limpiar sin que nada fallara.
+ */
+const SEARCH_PARAM = 'q';
+const ASSIGNEE_PARAM = 'resp';
+const STATUS_PARAM = 'estado';
 
 /** El ASSIGNEE (Responsable único, RF-1.2) de una tarea, si existe. */
 function assigneeOf(task: Task): TaskAssignment | undefined {
@@ -64,9 +74,10 @@ export interface UseTaskFiltersResult extends TaskFiltersState {
  */
 export function useTaskFilters(tasks: Task[] | undefined): UseTaskFiltersResult {
   const { value: searchValue, setValue: setSearchValue, committed } =
-    useQueryParamSearch('q', 300);
-  const [assigneeId, setAssigneeId] = useQueryParamState<string>('resp', ALL);
-  const [status, setStatus] = useQueryParamState<TaskStatusFilter>('estado', 'all');
+    useQueryParamSearch(SEARCH_PARAM, 300);
+  const [assigneeId, setAssigneeId] = useQueryParamState<string>(ASSIGNEE_PARAM, ALL);
+  const [status, setStatus] = useQueryParamState<TaskStatusFilter>(STATUS_PARAM, 'all');
+  const setParams = useQueryParams();
 
   const search = committed.toLowerCase();
 
@@ -100,11 +111,20 @@ export function useTaskFilters(tasks: Task[] | undefined): UseTaskFiltersResult 
     (assigneeId ? 1 : 0) +
     (status !== 'all' ? 1 : 0);
 
+  /**
+   * Limpia todos los filtros. Los params de la URL se quitan en **un solo** `setParams`
+   * (QL-139): con setters encadenados el último ganaba y dejaba `resp` pegado, porque todos
+   * computaban desde la URL del render actual. Ver `useQueryParams`.
+   *
+   * `setSearchValue('')` sí va aparte a propósito: `useQueryParamSearch` solo toca estado
+   * local y escribe `q` más tarde, en su efecto con debounce (otro tick, ya con la URL
+   * actualizada), así que no compite con este parche.
+   */
   const clear = useCallback(() => {
     setSearchValue('');
-    setAssigneeId(ALL);
-    setStatus('all');
-  }, [setSearchValue, setAssigneeId, setStatus]);
+    // `null` = quitar el param; para estos dos, ausente == su valor por defecto.
+    setParams({ [ASSIGNEE_PARAM]: null, [STATUS_PARAM]: null });
+  }, [setSearchValue, setParams]);
 
   return {
     searchValue,
