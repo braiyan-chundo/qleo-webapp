@@ -17,6 +17,8 @@ import {
   bottomNavItems,
   allNavItems,
   isNavItemActive,
+  activeNavUrl,
+  flattenNavItems,
 } from '@/shared/config/nav';
 
 /**
@@ -35,7 +37,15 @@ export function BottomNav() {
   const { count: wallUnread } = useWallUnreadCount();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const menuItems = allNavItems.filter((item) => !item.adminOnly || isAdmin);
+  // "Más" es una lista plana: los grupos (p. ej. Administración, QL-149) se expanden en sus
+  // hijos con `flattenNavItems` para que cada sub-sección tenga su propia entrada.
+  const menuItems = flattenNavItems(allNavItems).filter(
+    (item) => !item.adminOnly || isAdmin,
+  );
+
+  // Un único ítem activo a la vez: el de `url` más específica que casa con la ruta (resuelve el
+  // solape `/admin` vs `/admin/configuracion`).
+  const activeMenuUrl = activeNavUrl(pathname, menuItems);
 
   // "Más" se marca activo cuando NINGÚN slot rápido está activo (incl. rutas hijas).
   const isMoreActive = !bottomNavItems.some((i) =>
@@ -121,11 +131,11 @@ export function BottomNav() {
               className="grid grid-cols-1 gap-1 px-4 pb-4"
             >
               {menuItems.map((item) => {
-                const isActive = isNavItemActive(pathname, item.url);
+                const isActive = item.url === activeMenuUrl;
                 const badgeCount = item.badge === 'wall' ? wallUnread : 0;
                 return (
                   <NavLink
-                    key={item.title}
+                    key={item.url + item.title}
                     to={item.url}
                     onClick={() => setMoreOpen(false)}
                     aria-current={isActive ? 'page' : undefined}

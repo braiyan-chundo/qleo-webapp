@@ -10,6 +10,8 @@ import {
   UserCircle,
   BarChart3,
   Megaphone,
+  Users,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 /**
@@ -34,6 +36,12 @@ export interface NavItem {
   adminOnly?: boolean;
   /** Si está, el consumidor pinta un badge numérico junto al ítem (QL-91). */
   badge?: NavBadgeKind;
+  /**
+   * Sub-ítems estáticos de un grupo expandible (QL-149). Cuando está presente, el consumidor
+   * (sidebar / bottom nav) pinta el ítem como grupo con hijos en vez de un link plano. El `url`
+   * del padre sigue siendo un destino válido (por defecto, el del primer hijo).
+   */
+  children?: NavItem[];
 }
 
 /**
@@ -51,7 +59,23 @@ export const primaryNavItems: NavItem[] = [
   { title: 'Notificaciones', url: '/notifications', icon: Bell },
   { title: 'Calendario', url: '/calendar', icon: CalendarDays, adminOnly: true },
   { title: 'Analíticas', url: '/analytics', icon: BarChart3, adminOnly: true },
-  { title: 'Administración', url: '/admin', icon: Settings, adminOnly: true },
+  {
+    // QL-149: "Administración" pasa a ser un grupo expandible. El padre navega a `/admin`
+    // (= Usuarios, la vista de siempre) y despliega sus sub-secciones.
+    title: 'Administración',
+    url: '/admin',
+    icon: Settings,
+    adminOnly: true,
+    children: [
+      { title: 'Usuarios', url: '/admin', icon: Users, adminOnly: true },
+      {
+        title: 'Configuración',
+        url: '/admin/configuracion',
+        icon: SlidersHorizontal,
+        adminOnly: true,
+      },
+    ],
+  },
 ];
 
 /** Ítems del pie del sidebar (desktop). */
@@ -100,4 +124,31 @@ export const allNavItems: NavItem[] = [...primaryNavItems, ...footerNavItems];
 export function isNavItemActive(pathname: string, url: string): boolean {
   if (url === '/') return pathname === '/';
   return pathname === url || pathname.startsWith(url + '/');
+}
+
+/**
+ * Devuelve el `url` del ítem que **mejor** casa con `pathname` entre los candidatos, o `null`
+ * si ninguno casa (QL-149).
+ *
+ * Resuelve el solapamiento de prefijos entre hermanos: p. ej. `/admin` (Usuarios) es prefijo de
+ * `/admin/configuracion`, así que en esa ruta ambos "casan" por `isNavItemActive`; gana el de
+ * `url` más largo (el más específico). Así solo un hijo se ilumina a la vez.
+ */
+export function activeNavUrl(pathname: string, items: NavItem[]): string | null {
+  let best: string | null = null;
+  for (const item of items) {
+    if (isNavItemActive(pathname, item.url)) {
+      if (best === null || item.url.length > best.length) best = item.url;
+    }
+  }
+  return best;
+}
+
+/**
+ * Aplana una lista de navegación expandiendo los grupos (`children`) en sus hojas (QL-149).
+ * El ítem padre-contenedor se descarta (su `url` ya lo cubre un hijo); los ítems sin hijos se
+ * mantienen tal cual. Lo usa el menú "Más" del bottom nav, que es una lista plana.
+ */
+export function flattenNavItems(items: NavItem[]): NavItem[] {
+  return items.flatMap((item) => item.children ?? [item]);
 }

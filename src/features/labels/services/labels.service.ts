@@ -44,6 +44,18 @@ export interface CreateLabelPayload {
   color?: LabelColor;
 }
 
+/**
+ * Body de `PATCH /labels/:id` (§3.38, **solo ADMIN**). Todos los campos opcionales (parche
+ * parcial). Renombrar a un nombre ya usado → **409 `LABEL_NAME_TAKEN`**. `archived` oculta la
+ * etiqueta del picker sin romper referencias.
+ */
+export interface UpdateLabelPayload {
+  name?: string;
+  icon?: string;
+  color?: LabelColor;
+  archived?: boolean;
+}
+
 function buildQuery(params: LabelListParams): string {
   const search = new URLSearchParams();
   if (params.search) search.set('search', params.search);
@@ -61,5 +73,18 @@ export const labelsService = {
   /** Crea (o recupera) una etiqueta por nombre normalizado. Devuelve la etiqueta resultante. */
   create: (data: CreateLabelPayload) => {
     return api.post<Label>('/labels', data);
+  },
+
+  /** Cura una etiqueta del catálogo (nombre/icono/color/archivado). Solo ADMIN (§3.38). */
+  update: (id: string, data: UpdateLabelPayload) => {
+    return api.patch<Label>(`/labels/${id}`, data);
+  },
+
+  /**
+   * Borra una etiqueta del catálogo en **cascada**: la quita de `project.labelIds` y
+   * `task.labelIds` de todo lo que la referenciaba. Solo ADMIN. Devuelve la etiqueta borrada.
+   */
+  remove: (id: string) => {
+    return api.delete<Label>(`/labels/${id}`);
   },
 };

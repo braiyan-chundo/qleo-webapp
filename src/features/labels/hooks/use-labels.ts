@@ -1,9 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { projectKeys } from '@/features/projects/hooks/use-projects';
+import { taskKeys } from '@/features/tasks/hooks/use-tasks';
+
 import {
   labelsService,
   type CreateLabelPayload,
   type LabelListParams,
+  type UpdateLabelPayload,
 } from '../services/labels.service';
 
 /**
@@ -57,5 +61,46 @@ export function useCreateLabel() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: labelKeys.lists() });
     },
+  });
+}
+
+/**
+ * Invalida todo lo que una etiqueta puede pintar (QL-149). Además del catálogo, refresca
+ * **proyectos y tareas** porque una etiqueta viene resuelta (`project.labels` / `task.labels`):
+ * al renombrar/recolorear cambia su render y al borrar desaparece **en cascada** de sus sets
+ * (`labelIds`), así que las vistas que la mostraban deben refetch (§3.38).
+ */
+function invalidateLabelCascade(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  queryClient.invalidateQueries({ queryKey: labelKeys.lists() });
+  queryClient.invalidateQueries({ queryKey: projectKeys.all });
+  queryClient.invalidateQueries({ queryKey: taskKeys.all });
+}
+
+/**
+ * Cura una etiqueta del catálogo (nombre/icono/color/archivado). Solo ADMIN (§3.38). El renombre
+ * puede fallar con **409 `LABEL_NAME_TAKEN`**; el llamador lo traduce a un mensaje claro.
+ */
+export function useUpdateLabel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateLabelPayload }) =>
+      labelsService.update(id, data),
+    onSuccess: () => invalidateLabelCascade(queryClient),
+  });
+}
+
+/**
+ * Borra una etiqueta del catálogo (solo ADMIN, §3.38). El backend la quita **en cascada** de
+ * proyectos y tareas, por eso se invalidan también sus queries.
+ */
+export function useDeleteLabel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => labelsService.remove(id),
+    onSuccess: () => invalidateLabelCascade(queryClient),
   });
 }

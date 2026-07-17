@@ -12,6 +12,7 @@ import { ProfilePage } from '@/features/profile/pages/ProfilePage';
 import { HelpPage } from '@/features/help/pages/HelpPage';
 import { NotificationsPage } from '@/features/notifications/pages/NotificationsPage';
 import { UsersAdminPage } from '@/features/users/pages/UsersAdminPage';
+import { AdminSettingsPage } from '@/features/admin/pages/AdminSettingsPage';
 import { AuditLogPage } from '@/features/audit/pages/AuditLogPage';
 import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
 import { HolidaysAdminPage } from '@/features/work-calendar/pages/HolidaysAdminPage';
@@ -69,6 +70,11 @@ function App() {
                 {/* Área de administración (solo ADMIN) */}
                 <Route element={<AdminRoute />}>
                   <Route path="/admin" element={<UsersAdminPage />} />
+                  {/* QL-149: Configuración (tabs; hoy solo el catálogo de Etiquetas). */}
+                  <Route
+                    path="/admin/configuracion"
+                    element={<AdminSettingsPage />}
+                  />
                   <Route path="/audit" element={<AuditLogPage />} />
                   <Route path="/calendar" element={<HolidaysAdminPage />} />
                 </Route>
