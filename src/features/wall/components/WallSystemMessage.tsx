@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { Check, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { isOutdated } from '@/features/app-version/lib/semver';
 import { applyAppUpdate } from '@/features/app-version/lib/app-update';
 
-import { wallMessageAnchorId, type WallFeedItem } from '../lib/wall-feed';
-
-/** Versión del bundle, inyectada por Vite (`define`, QL-116). Base de la comparación SemVer. */
-const APP_VERSION = __APP_VERSION__;
+import {
+  isSystemMessageVisible,
+  wallMessageAnchorId,
+  type WallFeedItem,
+} from '../lib/wall-feed';
 
 interface WallSystemMessageProps {
   /** El mensaje de sistema (`type:'system'`) a pintar. Para `version_release`, `meta.version` es la clave. */
@@ -22,24 +22,26 @@ interface WallSystemMessageProps {
 }
 
 /**
- * Tarjeta de **mensaje de sistema** del muro (QL-148, §3.43): el aviso "Hay una nueva versión de
- * Qleo vX.Y.Z". Se distingue visualmente (centrada, marcada "Mensaje de sistema", con estilo
- * propio) de la burbuja de usuario: sin avatar, autor ni acciones (editar/borrar/responder/
- * reaccionar) — el backend ya las bloquea (mensaje inmutable), y aquí tampoco se muestran.
+ * Tarjeta **compacta** de mensaje de sistema del muro (QL-148, rediseño QL-150, §3.43): el aviso
+ * "Hay una nueva versión de Qleo vX.Y.Z". Una sola fila —icono + sello "Mensaje de sistema" + texto
+ * + botón "Actualizar"— alineada con el lenguaje visual del muro (tokens M3). No es una burbuja de
+ * usuario: sin avatar, autor ni acciones (el backend la deja inmutable).
  *
- * El botón "Actualizar" es **lógica pura de cliente**: habilitado solo si este cliente está
- * desactualizado (`__APP_VERSION__ < meta.version`, comparación SemVer numérica). Si ya está al
- * día, se muestra atenuado con un check ("Ya estás en la última versión"). Al pulsarlo se purga la
- * caché del cliente, se fuerza el service worker nuevo y se recarga **sin cerrar sesión**.
+ * **Solo se muestra al cliente desactualizado** (`isSystemMessageVisible`). Si ya está en la última
+ * versión, el componente **no renderiza nada** (`null`) — antes se mostraba atenuado con un check,
+ * ahora se oculta. El botón "Actualizar" es lógica pura de cliente: purga la caché, fuerza el
+ * service worker nuevo y recarga **sin cerrar sesión**.
  */
 export function WallSystemMessage({ message, highlighted = false }: WallSystemMessageProps) {
-  const targetVersion = message.meta?.version ?? null;
-  // Habilitado solo si hay versión objetivo y este build es anterior a ella.
-  const outdated = targetVersion != null && isOutdated(APP_VERSION, targetVersion);
   const [updating, setUpdating] = useState(false);
+  const targetVersion = message.meta?.version ?? null;
+
+  // (QL-150) Cliente al día → nada que mostrar. `WallView` ya omite el separador de este item, así
+  // que el `null` no deja hueco. El `useState` de arriba mantiene el orden de hooks estable.
+  if (!isSystemMessageVisible(message)) return null;
 
   const handleUpdate = () => {
-    if (!targetVersion || !outdated) return;
+    if (!targetVersion) return;
     setUpdating(true);
     // Purga caché + SW nuevo + recarga (sin cerrar sesión). No hay continuación: la página recarga.
     void applyAppUpdate(targetVersion);
@@ -53,27 +55,33 @@ export function WallSystemMessage({ message, highlighted = false }: WallSystemMe
         highlighted && 'rounded-2xl bg-primary/15',
       )}
     >
-      <div className="flex w-full max-w-md flex-col items-center gap-2.5 rounded-2xl border border-primary/30 bg-primary-container/40 px-4 py-3.5 text-center">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
-          <Sparkles className="size-3.5" />
-          Mensaje de sistema
+      <div className="flex w-full max-w-md items-center gap-3 rounded-xl border border-primary/20 bg-primary-container/30 px-3 py-2">
+        <span
+          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+          aria-hidden
+        >
+          <Sparkles className="size-4" />
         </span>
 
-        <p className="text-sm font-medium text-on-surface [overflow-wrap:anywhere]">
-          {message.body}
-        </p>
-
-        {outdated ? (
-          <Button type="button" size="sm" onClick={handleUpdate} disabled={updating}>
-            {updating ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-            Actualizar
-          </Button>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
-            <Check className="size-4 text-primary" />
-            Ya estás en la última versión
+        <div className="min-w-0 flex-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">
+            Mensaje de sistema
           </span>
-        )}
+          <p className="text-xs font-medium text-on-surface [overflow-wrap:anywhere]">
+            {message.body}
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleUpdate}
+          disabled={updating}
+          className="shrink-0"
+        >
+          {updating ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+          Actualizar
+        </Button>
       </div>
     </div>
   );

@@ -17,7 +17,12 @@ import { useWallPresence } from '../hooks/use-wall-presence';
 import { dateSeparatorLabel, isSameDay, withinGroupWindow } from '../lib/wall-dates';
 import { buildReplyPreview } from '../lib/wall-reply';
 import { notifyWallError } from '../lib/wall-errors';
-import { wallMessageAnchorId, type WallFeedItem, type WallUserFeedItem } from '../lib/wall-feed';
+import {
+  isSystemMessageVisible,
+  wallMessageAnchorId,
+  type WallFeedItem,
+  type WallUserFeedItem,
+} from '../lib/wall-feed';
 import type { WallReplyPreview, WallSearchResult } from '../types/wall.types';
 import { WallComposer } from './WallComposer';
 import { WallMessageItem } from './WallMessageItem';
@@ -219,6 +224,10 @@ export function WallView({ infoOpen = false, onToggleInfo }: WallViewProps) {
               // (QL-148) Mensaje de sistema (sin autor, p.ej. aviso de nueva versión): tarjeta
               // propia centrada, no una burbuja de usuario ni agrupable.
               if (message.type === 'system') {
+                // (QL-150) Solo se muestra a clientes desactualizados. Si este ya está al día se
+                // omite el item **entero** (también su separador de día) para no dejar un separador
+                // huérfano ni un hueco en el feed.
+                if (!isSystemMessageVisible(message)) return null;
                 return (
                   <Fragment key={message.id}>
                     {showSeparator && <DateSeparator iso={message.createdAt} />}

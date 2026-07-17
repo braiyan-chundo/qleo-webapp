@@ -1,6 +1,10 @@
 import type { Attachment } from '@/features/attachments/services/attachments.service';
+import { isOutdated } from '@/features/app-version/lib/semver';
 
 import type { WallAuthor, WallMessage, WallReplyPreview } from '../types/wall.types';
+
+/** Versión del bundle inyectada por Vite (`define`, QL-116); base de la comparación SemVer. */
+const APP_VERSION = __APP_VERSION__;
 
 /**
  * Utilidades del feed del muro en la caché de TanStack Query.
@@ -43,6 +47,18 @@ export function optimisticId(): string {
 /** ¿Es un mensaje ya confirmado por el servidor (id real, no optimista)? */
 export function isConfirmed(item: WallFeedItem): boolean {
   return !item.pending && !item.id.startsWith(OPTIMISTIC_PREFIX);
+}
+
+/**
+ * (QL-150) ¿Debe verse este mensaje de sistema? Solo cuando anuncia una versión (`meta.version`)
+ * **posterior** a la de este bundle: entonces el cliente está desactualizado y hay algo accionable
+ * ("Actualizar"). Si ya está al día, la tarjeta no aporta nada y se oculta por completo — `WallView`
+ * usa este predicado para no pintar tampoco el separador de día huérfano, y `WallSystemMessage`
+ * retorna `null`.
+ */
+export function isSystemMessageVisible(message: WallFeedItem): boolean {
+  const targetVersion = message.meta?.version ?? null;
+  return targetVersion != null && isOutdated(APP_VERSION, targetVersion);
 }
 
 /** Datos con los que se pinta un mensaje optimista al instante (antes de confirmar el POST). */
