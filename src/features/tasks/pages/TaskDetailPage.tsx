@@ -38,19 +38,22 @@ export function TaskDetailPage() {
   const { data: task, isLoading, isError, error } = useTask(taskId);
   const { data: columns } = useColumns(projectId || undefined);
 
-  const backToProject = (
-    <BackButton
-      fallback={{ to: `/projects/${projectId}`, label: 'Proyecto' }}
-      className="mb-6"
-    />
+  // (QL-151) Botón "Volver" en línea a la izquierda del título (patrón de QL-140). El margen
+  // inferior lo aporta la fila contenedora, no el propio botón, para no duplicar espacio.
+  const backButton = (
+    <BackButton fallback={{ to: `/projects/${projectId}`, label: 'Proyecto' }} />
   );
 
   if (isLoading) {
     return (
       <div className="p-4 md:p-8">
-        {backToProject}
-        <Skeleton className="mb-3 h-8 w-2/3" />
-        <Skeleton className="mb-6 h-4 w-1/3" />
+        <div className="mb-6 flex items-start gap-3">
+          {backButton}
+          <div className="min-w-0 flex-1 space-y-3">
+            <Skeleton className="h-8 w-2/3" />
+            <Skeleton className="h-4 w-1/3" />
+          </div>
+        </div>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="space-y-4">
             <Skeleton className="h-24 w-full rounded-lg" />
@@ -69,14 +72,16 @@ export function TaskDetailPage() {
   if (isError || !task) {
     return (
       <div className="p-4 md:p-8">
-        {backToProject}
-        <div className="rounded-xl border border-error/20 bg-error-container px-6 py-10 text-center">
-          <p className="text-sm font-medium text-on-error-container">
-            No se pudo cargar la tarea
-          </p>
-          <p className="mt-1 text-xs text-on-error-container/80">
-            {error instanceof Error ? error.message : 'Tarea no encontrada'}
-          </p>
+        <div className="flex items-start gap-3">
+          {backButton}
+          <div className="min-w-0 flex-1 rounded-xl border border-error/20 bg-error-container px-6 py-10 text-center">
+            <p className="text-sm font-medium text-on-error-container">
+              No se pudo cargar la tarea
+            </p>
+            <p className="mt-1 text-xs text-on-error-container/80">
+              {error instanceof Error ? error.message : 'Tarea no encontrada'}
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -90,24 +95,28 @@ export function TaskDetailPage() {
 
   return (
     <div className="p-4 md:p-8">
-      {backToProject}
-
-      <TaskDetailHeader
-        task={task}
-        column={column}
-        columnIndex={columnIndex}
-        titleAs="h1"
-        className="mb-6"
-        actions={
-          // (QL-142/143) Menú solo-ADMIN: descartar/restaurar y eliminar (con cascada).
-          // Se renderiza `null` internamente para no-ADMIN.
-          <TaskAdminMenu
-            task={task}
-            projectId={projectId}
-            onDeleted={() => navigate(`/projects/${projectId}`)}
-          />
-        }
-      />
+      {/* (QL-151) Fila "Volver + título": el botón `size=icon` `shrink-0` a la izquierda y el
+          header ocupando el resto (`min-w-0 flex-1`); `items-start` alinea el botón con la línea
+          del título, no con los badges. El `mb-6` de la fila reemplaza al del header. */}
+      <div className="mb-6 flex items-start gap-3">
+        {backButton}
+        <TaskDetailHeader
+          task={task}
+          column={column}
+          columnIndex={columnIndex}
+          titleAs="h1"
+          className="min-w-0 flex-1"
+          actions={
+            // (QL-142/143) Menú solo-ADMIN: descartar/restaurar y eliminar (con cascada).
+            // Se renderiza `null` internamente para no-ADMIN.
+            <TaskAdminMenu
+              task={task}
+              projectId={projectId}
+              onDeleted={() => navigate(`/projects/${projectId}`)}
+            />
+          }
+        />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         {/* Columna principal: contenido de trabajo. */}
