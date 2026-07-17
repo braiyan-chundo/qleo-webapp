@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { ApiError } from '@/core/api/fetch-client';
+import { SAFETY_NET_POLL_MS } from '@/core/query/query-client';
 
 import {
   tasksService,
@@ -22,11 +23,13 @@ import {
  */
 
 /**
- * (P8) Intervalo de sondeo de las vistas de trabajo (tablero/lista/detalle). El MVP usa
- * **polling** (no WebSocket), así que tareas movidas/editadas desde otra sesión se reflejan
- * en vivo. TanStack pausa el timer con la pestaña en segundo plano (no satura la API).
+ * (QL-133) Sondeo del **estado de tiempo** de la tarea. NO usa `SAFETY_NET_POLL_MS` a propósito:
+ * `workedMs` de una tarea en curso avanza con el **reloj**, no por un cambio que alguien haga, y
+ * el bus `/realtime` solo difunde cambios. No hay ningún evento que despierte esta query, así
+ * que bajarla a 60 s no la cubriría el tiempo real: solo haría que el contador saltara de minuto
+ * en minuto. Se queda en la cadencia de siempre.
  */
-const WORK_POLL_MS = 15_000;
+const TIME_TICK_POLL_MS = 15_000;
 
 /** Claves de query del feature. Centralizadas para invalidación consistente. */
 export const taskKeys = {
@@ -84,7 +87,7 @@ export function useTasks(projectId: string | undefined) {
     queryKey: taskKeys.list(projectId ?? ''),
     queryFn: () => tasksService.list({ projectId: projectId as string }),
     enabled: !!projectId,
-    refetchInterval: WORK_POLL_MS,
+    refetchInterval: SAFETY_NET_POLL_MS,
     refetchOnWindowFocus: true,
   });
 }
@@ -97,7 +100,7 @@ export function useMyTasks() {
   return useQuery({
     queryKey: taskKeys.mine(),
     queryFn: () => tasksService.listMine(),
-    refetchInterval: WORK_POLL_MS,
+    refetchInterval: SAFETY_NET_POLL_MS,
     refetchOnWindowFocus: true,
   });
 }
@@ -108,7 +111,7 @@ export function useTask(id: string | undefined) {
     queryKey: taskKeys.detail(id ?? ''),
     queryFn: () => tasksService.getById(id as string),
     enabled: !!id,
-    refetchInterval: WORK_POLL_MS,
+    refetchInterval: SAFETY_NET_POLL_MS,
     refetchOnWindowFocus: true,
   });
 }
@@ -285,7 +288,7 @@ export function useTaskTime(taskId: string | undefined) {
     queryFn: () => tasksService.getTime(taskId as string),
     enabled: !!taskId,
     refetchOnMount: 'always',
-    refetchInterval: WORK_POLL_MS,
+    refetchInterval: TIME_TICK_POLL_MS,
     refetchOnWindowFocus: true,
   });
 }

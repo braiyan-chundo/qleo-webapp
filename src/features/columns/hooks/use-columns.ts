@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { SAFETY_NET_POLL_MS } from '@/core/query/query-client';
+
 import {
   columnsService,
   type Column,
@@ -20,12 +22,21 @@ export const columnKeys = {
   list: (projectId: string) => [...columnKeys.lists(), projectId] as const,
 };
 
-/** Lista de columnas de un proyecto (ordenada por `order` asc). Solo corre si hay projectId. */
+/**
+ * Lista de columnas de un proyecto (ordenada por `order` asc). Solo corre si hay projectId.
+ *
+ * (QL-133) Se refresca en vivo por el bus `/realtime` (`entity: 'column'`). Hasta QL-133 este
+ * hook **no tenía refresco ninguno** —ni poll ni refetch al enfocar—, así que una columna
+ * creada/renombrada/reordenada por otro usuario era invisible hasta re-montar la vista: era la
+ * causa más literal del "me toca salir y entrar para que actualice". El poll queda de red de
+ * seguridad por si un evento no llega.
+ */
 export function useColumns(projectId: string | undefined) {
   return useQuery({
     queryKey: columnKeys.list(projectId ?? ''),
     queryFn: () => columnsService.list(projectId as string),
     enabled: !!projectId,
+    refetchInterval: SAFETY_NET_POLL_MS,
   });
 }
 

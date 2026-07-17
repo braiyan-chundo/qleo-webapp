@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { SAFETY_NET_POLL_MS } from '@/core/query/query-client';
+
 import {
   checklistsService,
   type ChecklistItem,
@@ -21,19 +23,17 @@ export const checklistKeys = {
   list: (taskId: string) => [...checklistKeys.lists(), taskId] as const,
 };
 
-/** (P8) Intervalo de sondeo del checklist (MVP = polling; cambios de colaboradores en vivo). */
-const CHECKLIST_POLL_MS = 15_000;
-
 /**
  * Lista de ítems del checklist de una tarea (ordenada por `order` asc). Solo corre si hay taskId.
- * Sondea cada ~15 s y al reenfocar la ventana para ver cambios de otras sesiones (P8).
+ * (QL-133) Los cambios de colaboradores llegan en vivo por el bus `/realtime`
+ * (`entity: 'checklist'`); el poll queda de red de seguridad.
  */
 export function useChecklist(taskId: string | undefined) {
   return useQuery({
     queryKey: checklistKeys.list(taskId ?? ''),
     queryFn: () => checklistsService.list(taskId as string),
     enabled: !!taskId,
-    refetchInterval: CHECKLIST_POLL_MS,
+    refetchInterval: SAFETY_NET_POLL_MS,
     refetchOnWindowFocus: true,
   });
 }

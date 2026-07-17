@@ -5,6 +5,7 @@ import { ThemeProvider } from 'next-themes'
 import './index.css'
 import App from './App.tsx'
 import { queryClient } from '@/core/query/query-client'
+import { RealtimeProvider } from '@/features/realtime/context/RealtimeProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -19,7 +20,12 @@ createRoot(document.getElementById('root')!).render(
       disableTransitionOnChange
     >
       <QueryClientProvider client={queryClient}>
-        <App />
+        {/* QL-133: socket único `/realtime` a nivel de app (no de ruta: el dashboard y "Mis
+            tareas" muestran datos de varios proyectos). Dentro del QueryClientProvider porque
+            traduce los eventos a invalidaciones; se auto-gatea por sesión (sin token no conecta). */}
+        <RealtimeProvider>
+          <App />
+        </RealtimeProvider>
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,

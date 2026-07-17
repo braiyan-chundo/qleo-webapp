@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { SAFETY_NET_POLL_MS } from '@/core/query/query-client';
 import type { UserDirectoryEntry } from '@/features/users/services/users.service';
 import { useAuthStore } from '@/store/auth.store';
 import {
@@ -31,6 +32,11 @@ export const projectKeys = {
  * Lista paginada de proyectos con búsqueda y filtro de archivados. `enabled` permite montar el
  * hook sin disparar la petición (p. ej. el fallback de "Proyectos recientes", que solo consulta
  * la API cuando el historial de visitas está vacío).
+ *
+ * (QL-133) Se refresca en vivo por el bus `/realtime` (`entity: 'project'`). Hasta QL-133 la
+ * LISTA no tenía refresco alguno (solo lo tenía el detalle), así que un proyecto creado o
+ * archivado por otro usuario no aparecía/desaparecía hasta re-montar. El poll es la red de
+ * seguridad.
  */
 export function useProjects(
   params: ProjectListParams,
@@ -40,11 +46,9 @@ export function useProjects(
     queryKey: projectKeys.list(params),
     queryFn: () => projectsService.list(params),
     enabled,
+    refetchInterval: SAFETY_NET_POLL_MS,
   });
 }
-
-/** (P8) Intervalo de sondeo del detalle de proyecto (membresía/managers de otras sesiones en vivo). */
-const PROJECT_POLL_MS = 15_000;
 
 /** Detalle de un proyecto por id. Solo corre si hay id. Registra la visita en "recientes". */
 export function useProject(id: string | undefined) {
@@ -52,7 +56,7 @@ export function useProject(id: string | undefined) {
     queryKey: projectKeys.detail(id ?? ''),
     queryFn: () => projectsService.getById(id as string),
     enabled: !!id,
-    refetchInterval: PROJECT_POLL_MS,
+    refetchInterval: SAFETY_NET_POLL_MS,
     refetchOnWindowFocus: true,
   });
 

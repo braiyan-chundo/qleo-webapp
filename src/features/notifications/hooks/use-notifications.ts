@@ -7,6 +7,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 
+import { SAFETY_NET_POLL_MS } from '@/core/query/query-client';
 import type { Paginated } from '@/shared/types/paginated';
 
 import {
@@ -46,8 +47,13 @@ export const notificationKeys = {
 /** Intervalo de sondeo del badge (§3.10 sugiere 30–60 s). */
 const UNREAD_POLL_MS = 45_000;
 
-/** Intervalo de sondeo de la LISTA/bandeja (§3.10 = polling; el badge no basta para verlas llegar). */
-const LIST_POLL_MS = 30_000;
+/**
+ * (QL-133) Red de seguridad de la bandeja. Sube de 30 s a 60 s con **más** razón que el resto:
+ * el `refetchInterval` de una infinite query refresca **TODAS** las páginas cargadas, así que con
+ * 3 páginas abiertas cada tick eran 3 peticiones. Las notificaciones nuevas ya llegan en vivo por
+ * el bus `/realtime` (`entity: 'notification'`, sala `user:<id>`).
+ */
+const LIST_POLL_MS = SAFETY_NET_POLL_MS;
 
 /** Tamaño de página de la bandeja con scroll infinito (QL-137). */
 export const NOTIFICATIONS_PAGE_SIZE = 20;
