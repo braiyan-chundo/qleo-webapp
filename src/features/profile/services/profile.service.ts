@@ -15,6 +15,13 @@ export interface UpdateMePayload {
   avatarUrl?: string;
   /** QL-91: silenciar el push genérico del Muro Corporativo (las menciones siguen llegando). */
   wallPushMuted?: boolean;
+  /**
+   * QL-153: token de la paleta curada para el primary en modo **claro**. Semántica por campo:
+   * ausente = no se toca; string (≤32) = se guarda; `null` = resetea a genérico.
+   */
+  themePrimaryLight?: string | null;
+  /** QL-153: token de la paleta curada para el primary en modo **oscuro**. Misma semántica. */
+  themePrimaryDark?: string | null;
 }
 
 /** Body de `PATCH /users/me/password`. */

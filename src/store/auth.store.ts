@@ -26,6 +26,14 @@ export interface User {
    * `@/shared/lib/permissions`, nunca este campo suelto.
    */
   canCreateProjects?: boolean;
+  /**
+   * QL-153: token de la paleta curada para el color primary en modo **claro**. `null`/ausente
+   * = genérico (sin preferencia). El backend solo persiste la clave (string corto, p. ej.
+   * `'violet'`); el mapeo token→tokens Material 3 lo posee el front (`features/profile/lib/theme-palette`).
+   */
+  themePrimaryLight?: string | null;
+  /** QL-153: token de la paleta curada para el color primary en modo **oscuro**. `null` = genérico. */
+  themePrimaryDark?: string | null;
 }
 
 interface AuthState {

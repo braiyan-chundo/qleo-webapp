@@ -15,6 +15,7 @@ import { getDailySlogan } from '@/shared/config/slogans';
 import { useAppBadgeSync } from '@/shared/hooks/use-app-badge-sync';
 import { useNavHistoryTracker } from '@/shared/hooks/use-nav-history-tracker';
 import { useAppUpdateToast, useReportAppVersion } from '@/features/app-version/hooks/use-app-version';
+import { useApplyUserTheme } from '@/features/profile/hooks/use-apply-user-theme';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +56,11 @@ export function AppLayout() {
   useReportAppVersion();
   // (QL-148) Si venimos de pulsar "Actualizar", confirma con un toast que el build nuevo ya cargó.
   useAppUpdateToast();
+
+  // (QL-153) Aplica el color primary elegido por el usuario (claro/oscuro) inyectando tokens M3
+  // inline en <html>. Vive aquí porque `AppLayout` solo se monta con sesión y dentro del
+  // ThemeProvider; al hacer logout limpia las props para no dejar pegado el color anterior.
+  useApplyUserTheme();
 
   const handleLogout = () => {
     logout();
