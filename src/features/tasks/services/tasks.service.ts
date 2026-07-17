@@ -27,6 +27,18 @@ export interface TaskCompletedBy {
   name: string;
 }
 
+/** Usuario que dio el visto bueno a una tarea (QL-145, §3.39). */
+export interface TaskValidatedBy {
+  id: string;
+  name: string;
+}
+
+/**
+ * Estado del visto bueno para cerrar una tarea (QL-145, §3.39):
+ * `NONE` nadie pidió · `REQUESTED` el Responsable solicitó revisión · `VALIDATED` ya validada.
+ */
+export type ReviewStatus = 'NONE' | 'REQUESTED' | 'VALIDATED';
+
 /** DTO de respuesta del backend para una tarea (QL-07/QL-08, §3.7). */
 export interface Task {
   id: string;
@@ -63,6 +75,18 @@ export interface Task {
   completedBy: TaskCompletedBy | null;
   /** `true` si `completedAt != null` (QL-17, §3.13). */
   isCompleted: boolean;
+  /**
+   * (QL-145, §3.39) Estado del visto bueno para cerrar: `NONE` nadie pidió, `REQUESTED` el
+   * Responsable solicitó revisión, `VALIDATED` ya recibió el visto bueno del Creador u Observador.
+   * El ASSIGNEE (que no es Creador) no puede cerrar hasta que esté `VALIDATED`.
+   */
+  reviewStatus: ReviewStatus;
+  /** (QL-145, §3.39) ISO8601 en que el Responsable solicitó revisión, o `null`. */
+  reviewRequestedAt: string | null;
+  /** (QL-145, §3.39) ISO8601 del visto bueno, o `null` si aún no se validó. */
+  validatedAt: string | null;
+  /** (QL-145, §3.39) Quién dio el visto bueno, o `null`. Para pintar "Validado por: {name}". */
+  validatedBy: TaskValidatedBy | null;
   /**
    * (QL-62, §3.22) Timing automático por columna (independiente del cierre RF-2.5):
    * `startedAt` = 1ª vez que se movió a la columna `isStart`; `finishedAt` = último cruce a
@@ -301,5 +325,21 @@ export const tasksService = {
   /** Reabre la tarea, limpiando el cierre (QL-17, §3.13). Devuelve el `Task`. */
   reopen: (id: string) => {
     return api.post<Task>(`/tasks/${id}/reopen`);
+  },
+
+  /**
+   * El Responsable (ASSIGNEE) **solicita revisión** para poder cerrar (QL-145, §3.39). Notifica a
+   * Creador+Observadores. Solo ASSIGNEE (si no → 403 `REVIEW_REQUEST_FORBIDDEN`). Devuelve el `Task`.
+   */
+  requestReview: (id: string) => {
+    return api.post<Task>(`/tasks/${id}/request-review`);
+  },
+
+  /**
+   * El Creador u Observador da el **visto bueno** que habilita el cierre (QL-145, §3.39). Solo
+   * CREATOR/OBSERVER (si no → 403 `TASK_VALIDATION_FORBIDDEN`). Devuelve el `Task`.
+   */
+  validate: (id: string) => {
+    return api.post<Task>(`/tasks/${id}/validate`);
   },
 };

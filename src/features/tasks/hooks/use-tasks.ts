@@ -328,3 +328,42 @@ export function useReopenTask(projectId: string, taskId: string) {
     },
   });
 }
+
+/**
+ * (QL-145, §3.39) El Responsable **solicita revisión** para poder cerrar la tarea. Solo ASSIGNEE.
+ * Muta la tarea (cambia `reviewStatus` a `REQUESTED`), así que invalida detalle, listado (por si
+ * un badge lo refleja) y "Mis tareas". El bus `/realtime` (QL-133) también despertará el detalle,
+ * pero se invalida aquí igual para no depender solo de él. Puede rechazar con `ApiError`
+ * (`REVIEW_REQUEST_FORBIDDEN` 403); el componente decide el mensaje.
+ */
+export function useRequestReview(projectId: string, taskId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => tasksService.requestReview(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
+    },
+  });
+}
+
+/**
+ * (QL-145, §3.39) El Creador u Observador da el **visto bueno** que habilita el cierre del
+ * Responsable. Solo CREATOR/OBSERVER. Muta la tarea (`reviewStatus` a `VALIDATED`,
+ * `validatedAt/By`), así que invalida detalle, listado y "Mis tareas". Puede rechazar con
+ * `ApiError` (`TASK_VALIDATION_FORBIDDEN` 403); el componente decide el mensaje.
+ */
+export function useValidateTask(projectId: string, taskId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => tasksService.validate(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
+    },
+  });
+}

@@ -1,4 +1,4 @@
-import { CheckCircle2, Square } from 'lucide-react';
+import { BadgeCheck, CheckCircle2, Square } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -43,6 +43,13 @@ export function TaskDetailHeader({
             <Badge className="bg-tertiary-container text-on-tertiary-container">
               <CheckCircle2 className="size-3.5" />
               Completada
+            </Badge>
+          )}
+          {/* QL-145: visto bueno visible para todos cuando la tarea ya fue validada. */}
+          {task.validatedAt && task.validatedBy && (
+            <Badge className="bg-tertiary-container text-on-tertiary-container">
+              <BadgeCheck className="size-3.5" />
+              Validado por: {task.validatedBy.name}
             </Badge>
           )}
           {task.currentUserRole && (
