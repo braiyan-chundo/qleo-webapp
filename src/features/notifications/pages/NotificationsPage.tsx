@@ -1,68 +1,65 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo } from 'react';
 import { toast } from 'sonner';
-import { Bell, CheckCheck, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Bell, CheckCheck, Loader2, SearchX } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import {
-  useQueryParamNumber,
-  useQueryParams,
-  useQueryParamState,
-} from '@/shared/hooks/use-query-param-state';
+import { InfiniteScrollSentinel } from '@/shared/components/InfiniteScrollSentinel';
 
 import {
+  useDeleteNotification,
   useMarkAllRead,
   useMarkRead,
-  useNotifications,
+  useMarkUnread,
+  useNotificationFacets,
+  useNotificationsInfinite,
 } from '../hooks/use-notifications';
+import { useNotificationFilters } from '../hooks/use-notification-filters';
 import type { Notification } from '../services/notifications.service';
-import { notificationText, timeAgo } from '../lib/notification-text';
-import { resolveNotificationHref } from '../lib/notification-nav';
-import { NotificationAvatar } from '../components/NotificationAvatar';
-
-const PAGE_SIZE = 12;
-
-type Filter = 'all' | 'unread';
+import { groupNotificationsByDate } from '../lib/notification-groups';
+import { NotificationFilters } from '../components/NotificationFilters';
+import { NotificationRow } from '../components/NotificationRow';
 
 /**
- * Bandeja de notificaciones (QL-13, §3.10). Lista paginada con filtro Todas/No leídas,
- * "marcar todas como leídas", y navegación de una notificación → tarea (resolviendo el
- * proyecto vía `tasksService.getById`). MVP: polling del badge en la campana del topbar.
+ * Bandeja de notificaciones (QL-13 §3.10, enriquecida en QL-137 §3.36). Tablón con:
+ * pestañas Todas/No leídas, **filtros por tipo y proyecto con contadores** (`/facets`), filtro
+ * por tarea, **agrupación por fecha**, acciones por notificación (leer/no leer/eliminar) y
+ * **scroll infinito**. Todos los filtros viven en la URL (compartibles, sobreviven al recargo).
+ *
+ * ⚠️ QL-139: **una acción del usuario = un solo `setParams`**. Toda la escritura de la URL está
+ * encapsulada en `useNotificationFilters`, que respeta esa regla; aquí NO se encadenan setters.
  */
 export function NotificationsPage() {
-  // Filtro + paginación persistidos en la URL (params: `estado`, `page`).
-  const [filter] = useQueryParamState<Filter>('estado', 'all');
-  const [page, setPage] = useQueryParamNumber('page', 1);
-  const setParams = useQueryParams();
+  const filtersApi = useNotificationFilters();
+  const { filters, params, hasContentFilters, hasAnyFilter, setUnread, setTask, clearAll } =
+    filtersApi;
 
-  const params = useMemo(
-    () => ({ page, limit: PAGE_SIZE, unread: filter === 'unread' }),
-    [page, filter],
-  );
+  const { data, isLoading, isError, error, isFetching, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useNotificationsInfinite(params);
+  const facets = useNotificationFacets();
 
-  const { data, isLoading, isError, error, isFetching } = useNotifications(params);
   const markRead = useMarkRead();
+  const markUnread = useMarkUnread();
   const markAllRead = useMarkAllRead();
+  const deleteNotification = useDeleteNotification();
 
-  const notifications = data?.data ?? [];
-  const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Las páginas de la infinite query, aplanadas: el orden `createdAt` desc ya viene del backend.
+  const notifications = useMemo<Notification[]>(
+    () => data?.pages.flatMap((page) => page.data) ?? [],
+    [data],
+  );
+  const groups = useMemo(() => groupNotificationsByDate(notifications), [notifications]);
 
-  /**
-   * Cambia de pestaña y vuelve a la página 1 en **una sola** actualización de la URL (QL-139).
-   * Antes eran dos setters (`setFilter` + `setPage`) y el segundo pisaba al primero: ambos
-   * computaban desde la URL del render actual, así que `setPage(1)` navegaba con unos params
-   * que aún no tenían `estado` → la pestaña "No leídas" nunca se activaba. Ver `useQueryParams`.
-   */
-  const changeFilter = (next: Filter) => {
-    setParams({
-      // `null` = quitar el param, que es el default de cada uno ('all' y página 1).
-      estado: next === 'all' ? null : next,
-      page: null,
-    });
-  };
+  const total = data?.pages[0]?.total ?? 0;
+  const unreadTotal = facets.data?.unread ?? 0;
+
+  // No hay facets por tarea (§3.36): el rótulo del chip se deduce de las notis cargadas, que al
+  // filtrar por tarea traen todas la misma. Si aún no hay ninguna, el chip cae a texto genérico.
+  const taskLabel = useMemo(() => {
+    if (!filters.taskId) return undefined;
+    return notifications.find((n) => n.task?.id === filters.taskId)?.task?.title;
+  }, [filters.taskId, notifications]);
 
   const handleMarkAll = () => {
     markAllRead.mutate(undefined, {
@@ -76,6 +73,21 @@ export function NotificationsPage() {
       onError: () => toast.error('No se pudieron marcar como leídas'),
     });
   };
+
+  const handleDelete = (id: string) => {
+    deleteNotification.mutate(id, {
+      onSuccess: () => toast.success('Notificación eliminada'),
+      onError: () => toast.error('No se pudo eliminar la notificación'),
+    });
+  };
+
+  const handleMarkUnread = (id: string) => {
+    markUnread.mutate(id, {
+      onError: () => toast.error('No se pudo marcar como no leída'),
+    });
+  };
+
+  const deletingId = deleteNotification.isPending ? deleteNotification.variables : undefined;
 
   return (
     <div className="p-4 md:p-8">
@@ -96,7 +108,7 @@ export function NotificationsPage() {
           variant="outline"
           className="h-10"
           onClick={handleMarkAll}
-          disabled={markAllRead.isPending || total === 0}
+          disabled={markAllRead.isPending || unreadTotal === 0}
         >
           {markAllRead.isPending ? <Loader2 className="animate-spin" /> : <CheckCheck />}
           Marcar todas como leídas
@@ -104,91 +116,97 @@ export function NotificationsPage() {
       </header>
 
       <div className="max-w-3xl">
-      <div className="flex items-center gap-2">
-        <FilterTab active={filter === 'all'} onClick={() => changeFilter('all')}>
-          Todas
-        </FilterTab>
-        <FilterTab active={filter === 'unread'} onClick={() => changeFilter('unread')}>
-          No leídas
-        </FilterTab>
-        {isFetching && !isLoading && (
-          <Loader2 className="ml-auto size-4 animate-spin text-on-surface-variant" />
-        )}
-      </div>
-
-      <div className="mt-4">
-        {isLoading && (
-          <ul className="space-y-2">
-            {[0, 1, 2, 3].map((i) => (
-              <li key={i}>
-                <Skeleton className="h-16 w-full rounded-lg" />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {isError && (
-          <p className="rounded-lg border border-error/20 bg-error-container px-4 py-3 text-sm font-medium text-on-error-container">
-            {error instanceof Error ? error.message : 'No se pudieron cargar las notificaciones'}
-          </p>
-        )}
-
-        {!isLoading && !isError && notifications.length === 0 && (
-          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-outline-variant/50 bg-surface-container-lowest px-6 py-12 text-center">
-            <Bell className="size-8 text-on-surface-variant/60" />
-            <p className="text-sm font-medium text-on-surface">No tienes notificaciones</p>
-            <p className="text-xs text-on-surface-variant">
-              {filter === 'unread'
-                ? 'Estás al día: nada sin leer.'
-                : 'Aquí verás cuando te mencionen en una tarea.'}
-            </p>
-          </div>
-        )}
-
-        {!isLoading && !isError && notifications.length > 0 && (
-          <ul className="space-y-2">
-            {notifications.map((notification) => (
-              <NotificationRow
-                key={notification.id}
-                notification={notification}
-                onMarkRead={(id) => markRead.mutate(id)}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {!isError && totalPages > 1 && (
-        <div className="mt-5 flex items-center justify-between">
-          <span className="text-xs text-on-surface-variant">
-            Página {page} de {totalPages}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="size-8"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1 || isFetching}
-              aria-label="Página anterior"
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="size-8"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages || isFetching}
-              aria-label="Página siguiente"
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <FilterTab active={!filters.unread} onClick={() => setUnread(false)}>
+            Todas
+          </FilterTab>
+          <FilterTab active={filters.unread} onClick={() => setUnread(true)}>
+            No leídas
+            {unreadTotal > 0 && (
+              <span className="ml-1.5 tabular-nums opacity-70">{unreadTotal}</span>
+            )}
+          </FilterTab>
+          {isFetching && !isLoading && !isFetchingNextPage && (
+            <Loader2 className="ml-auto size-4 animate-spin text-on-surface-variant" />
+          )}
         </div>
-      )}
+
+        <NotificationFilters
+          api={filtersApi}
+          facets={facets.data}
+          isLoading={facets.isLoading}
+          taskLabel={taskLabel}
+        />
+
+        <div className="mt-4">
+          {isLoading && (
+            <ul className="space-y-2">
+              {[0, 1, 2, 3].map((i) => (
+                <li key={i}>
+                  <Skeleton className="h-16 w-full rounded-lg" />
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {isError && (
+            <p className="rounded-lg border border-error/20 bg-error-container px-4 py-3 text-sm font-medium text-on-error-container">
+              {error instanceof Error
+                ? error.message
+                : 'No se pudieron cargar las notificaciones'}
+            </p>
+          )}
+
+          {!isLoading && !isError && notifications.length === 0 && (
+            <EmptyState
+              filtered={hasAnyFilter}
+              unreadOnly={filters.unread}
+              hasContentFilters={hasContentFilters}
+              onClear={clearAll}
+            />
+          )}
+
+          {!isLoading && !isError && notifications.length > 0 && (
+            <>
+              {groups.map((group) => (
+                <section key={group.label} className="mb-4 last:mb-0">
+                  {/* Cabecera pegajosa: al scrollear una bandeja larga, el tramo en el que
+                      estás sigue visible. */}
+                  <h2 className="sticky top-0 z-10 bg-surface/95 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-on-surface-variant backdrop-blur-sm">
+                    {group.label}
+                  </h2>
+                  <ul className="space-y-2">
+                    {group.items.map((notification) => (
+                      <NotificationRow
+                        key={notification.id}
+                        notification={notification}
+                        onMarkRead={(id) => markRead.mutate(id)}
+                        onMarkUnread={handleMarkUnread}
+                        onDelete={handleDelete}
+                        onFilterByTask={
+                          filters.taskId === null ? (id) => setTask(id) : undefined
+                        }
+                        deleting={deletingId === notification.id}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ))}
+
+              <InfiniteScrollSentinel
+                hasNextPage={hasNextPage}
+                isFetchingNextPage={isFetchingNextPage}
+                onLoadMore={fetchNextPage}
+              />
+
+              {!hasNextPage && total > 0 && (
+                <p className="py-3 text-center text-xs text-on-surface-variant">
+                  {total === 1 ? '1 notificación' : `${total} notificaciones`}
+                </p>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -205,6 +223,7 @@ function FilterTab({ active, onClick, children }: FilterTabProps) {
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
         'rounded-full px-3 py-1 text-sm font-medium transition-colors',
         active
@@ -217,67 +236,55 @@ function FilterTab({ active, onClick, children }: FilterTabProps) {
   );
 }
 
-interface NotificationRowProps {
-  notification: Notification;
-  onMarkRead: (id: string) => void;
+interface EmptyStateProps {
+  filtered: boolean;
+  unreadOnly: boolean;
+  hasContentFilters: boolean;
+  onClear: () => void;
 }
 
 /**
- * Fila de la bandeja. Al hacer clic: marca leída (optimista, vía el mutation del padre) y
- * navega según el tipo (§3.10): `PROJECT_MEMBER_ADDED` va directo al proyecto; las notis de
- * tarea resuelven su proyecto con `tasksService.getById`. Si la resolución falla, igual queda
- * marcada como leída.
+ * Estado vacío. Distingue **"no tienes notificaciones"** de **"no hay ninguna que cumpla estos
+ * filtros"**: son cosas distintas y confundirlas hace pensar que la bandeja está rota. Cuando
+ * hay filtros de contenido, además ofrece la salida (quitarlos).
  */
-function NotificationRow({ notification, onMarkRead }: NotificationRowProps) {
-  const navigate = useNavigate();
-  const [resolving, setResolving] = useState(false);
+function EmptyState({ filtered, unreadOnly, hasContentFilters, onClear }: EmptyStateProps) {
+  const Icon = hasContentFilters ? SearchX : Bell;
 
-  const handleClick = async () => {
-    if (resolving) return;
-    if (!notification.read) onMarkRead(notification.id);
-    setResolving(true);
-    try {
-      const href = await resolveNotificationHref(notification);
-      if (href) navigate(href);
-    } catch {
-      toast.error('No se pudo abrir la notificación (puede haber sido eliminada)');
-    } finally {
-      setResolving(false);
+  const { title, hint } = (() => {
+    if (hasContentFilters) {
+      return {
+        title: 'No hay notificaciones con estos filtros',
+        hint: unreadOnly
+          ? 'Ninguna sin leer coincide. Prueba con "Todas" o quita algún filtro.'
+          : 'Prueba a quitar algún filtro para ver más.',
+      };
     }
-  };
+    if (unreadOnly) {
+      return { title: 'Estás al día', hint: 'No tienes notificaciones sin leer.' };
+    }
+    return {
+      title: 'No tienes notificaciones',
+      hint: 'Aquí verás cuando te mencionen en una tarea.',
+    };
+  })();
 
   return (
-    <li>
-      <button
-        type="button"
-        onClick={handleClick}
-        className={cn(
-          'flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors',
-          notification.read
-            ? 'border-outline-variant/30 bg-surface-container-lowest hover:bg-surface-container-low'
-            : 'border-primary/20 bg-surface-container-low hover:bg-surface-container',
-        )}
-      >
-        <NotificationAvatar
-          actor={notification.actor}
-          className="mt-0.5 shrink-0"
-        />
-
-        <div className="min-w-0 flex-1">
-          <p className="text-sm text-on-surface">{notificationText(notification)}</p>
-          <p className="mt-0.5 text-xs text-on-surface-variant">
-            {timeAgo(notification.createdAt)}
-          </p>
-        </div>
-
-        {resolving ? (
-          <Loader2 className="mt-1 size-3.5 shrink-0 animate-spin text-on-surface-variant" />
-        ) : (
-          !notification.read && (
-            <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-hidden />
-          )
-        )}
-      </button>
-    </li>
+    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-outline-variant/50 bg-surface-container-lowest px-6 py-12 text-center">
+      <Icon className="size-8 text-on-surface-variant/60" aria-hidden />
+      <p className="text-sm font-medium text-on-surface">{title}</p>
+      <p className="text-xs text-on-surface-variant">{hint}</p>
+      {filtered && hasContentFilters && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-2 h-8"
+          onClick={onClear}
+        >
+          Quitar filtros
+        </Button>
+      )}
+    </div>
   );
 }
