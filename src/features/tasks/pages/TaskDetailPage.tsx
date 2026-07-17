@@ -19,6 +19,8 @@ import { RoleManager } from '../components/RoleManager';
 import { TaskDetailHeader } from '../components/detail/TaskDetailHeader';
 import { TaskDescription } from '../components/detail/TaskDescription';
 import { TaskCreatorActions } from '../components/detail/TaskCreatorActions';
+import { TaskAdminMenu } from '../components/detail/TaskAdminMenu';
+import { TaskAuditLogSection } from '../components/detail/TaskAuditLogSection';
 
 /**
  * Vista dedicada y deep-linkable de una tarea (QL-25): `/projects/:id/tasks/:taskId`. Layout
@@ -92,6 +94,15 @@ export function TaskDetailPage() {
         columnName={columnName}
         titleAs="h1"
         className="mb-6"
+        actions={
+          // (QL-142/143) Menú solo-ADMIN: descartar/restaurar y eliminar (con cascada).
+          // Se renderiza `null` internamente para no-ADMIN.
+          <TaskAdminMenu
+            task={task}
+            projectId={projectId}
+            onDeleted={() => navigate(`/projects/${projectId}`)}
+          />
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
@@ -125,20 +136,18 @@ export function TaskDetailPage() {
           {isCreator && (
             <>
               <Separator />
-              <TaskCreatorActions
-                task={task}
-                projectId={projectId}
-                layout="stacked"
-                onDeleted={() => navigate(`/projects/${projectId}`)}
-              />
+              <TaskCreatorActions task={task} projectId={projectId} layout="stacked" />
             </>
           )}
         </aside>
       </div>
 
-      {/* Análisis de la tarea (P5): solo ADMIN de plataforma. Full width bajo el detalle. */}
+      {/* Sección "Solo administradores" (req. 3+4): historial de logs de la tarea (QL-144) y
+          análisis por-tarea (P5). Solo ADMIN de plataforma; el borrado/descarte vive en el
+          menú kebab de la cabecera (`TaskAdminMenu`). */}
       {isAdmin && (
-        <div className="mt-8">
+        <div className="mt-8 space-y-8">
+          <TaskAuditLogSection taskId={task.id} />
           <TaskAnalyticsSection taskId={task.id} />
         </div>
       )}

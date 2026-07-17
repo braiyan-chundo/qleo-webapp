@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 
 import { ApiError } from '@/core/api/fetch-client';
 import { SAFETY_NET_POLL_MS } from '@/core/query/query-client';
+import { notificationKeys } from '@/features/notifications/hooks/use-notifications';
 
 import {
   tasksService,
@@ -36,6 +37,12 @@ export const taskKeys = {
   all: ['tasks'] as const,
   lists: () => [...taskKeys.all, 'list'] as const,
   list: (projectId: string) => [...taskKeys.lists(), projectId] as const,
+  /**
+   * (QL-142) Tareas **descartadas** del proyecto (sección "Descartadas"). Fuera del subárbol
+   * `lists()` a propósito: es una vista rara de ADMIN, así que las invalidaciones del tablero no
+   * la refrescan; las mutaciones discard/restore/delete la invalidan de forma explícita.
+   */
+  discardedList: (projectId: string) => [...taskKeys.all, 'discarded', projectId] as const,
   /** Tareas del usuario del token en todos los proyectos (pantalla "Mis tareas"). */
   mine: () => [...taskKeys.all, 'mine'] as const,
   details: () => [...taskKeys.all, 'detail'] as const,
@@ -100,6 +107,21 @@ export function useMyTasks() {
   return useQuery({
     queryKey: taskKeys.mine(),
     queryFn: () => tasksService.listMine(),
+    refetchInterval: SAFETY_NET_POLL_MS,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/**
+ * (QL-142, §3.41) **SOLO** las tareas descartadas del proyecto (papelera reversible). Alimenta la
+ * sección "Descartadas" del proyecto. El backend excluye estas tareas del tablero normal, así que
+ * esta consulta es la única que las trae. Sondea en vivo como el resto del board.
+ */
+export function useDiscardedTasks(projectId: string | undefined) {
+  return useQuery({
+    queryKey: taskKeys.discardedList(projectId ?? ''),
+    queryFn: () => tasksService.list({ projectId: projectId as string, discarded: true }),
+    enabled: !!projectId,
     refetchInterval: SAFETY_NET_POLL_MS,
     refetchOnWindowFocus: true,
   });
@@ -204,7 +226,13 @@ export function useMoveTask(projectId: string) {
   });
 }
 
-/** Elimina una tarea (solo CREATOR) e invalida listado y detalle. */
+/**
+ * (QL-143, §3.40) **Elimina** la tarea por completo (hard-delete con cascada). **Solo ADMIN**
+ * de plataforma; el backend responde 403 (sin `error.code`) si no. Es **irreversible**: además
+ * del tablero, invalida "Mis tareas", la lista de descartadas (por si se borra una descartada) y
+ * las notificaciones (la cascada elimina las que apuntaban a la tarea), y **quita** el detalle de
+ * la caché. Devuelve el `Task` eliminado (echo) para el toast.
+ */
 export function useDeleteTask(projectId: string) {
   const queryClient = useQueryClient();
 
@@ -212,7 +240,51 @@ export function useDeleteTask(projectId: string) {
     mutationFn: (id: string) => tasksService.remove(id),
     onSuccess: (_task, id) => {
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.discardedList(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       queryClient.removeQueries({ queryKey: taskKeys.detail(id) });
+    },
+  });
+}
+
+/**
+ * (QL-142, §3.41) **Descarta** la tarea (papelera reversible). **Solo ADMIN** (403 si no). La saca
+ * del tablero y de "Mis tareas" y la mete en "Descartadas": invalida board, "Mis tareas", la lista
+ * de descartadas y el detalle (que ahora trae `isDiscarded: true`). Notifica a los involucrados en
+ * backend (`TASK_DISCARDED`), así que refresca también las notificaciones.
+ */
+export function useDiscardTask(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => tasksService.discard(id),
+    onSuccess: (_task, id) => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.discardedList(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    },
+  });
+}
+
+/**
+ * (QL-142, §3.41) **Restaura** una tarea descartada a su columna del tablero. **Solo ADMIN** (403
+ * si no). Simétrico a `useDiscardTask`: la devuelve al board y a "Mis tareas" y la quita de
+ * "Descartadas". Notifica en backend (`TASK_RESTORED`).
+ */
+export function useRestoreTask(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => tasksService.restore(id),
+    onSuccess: (_task, id) => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.discardedList(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     },
   });
 }

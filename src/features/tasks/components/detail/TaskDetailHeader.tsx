@@ -1,4 +1,4 @@
-import { BadgeCheck, CheckCircle2, Square } from 'lucide-react';
+import { Archive, BadgeCheck, CheckCircle2, Square } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,8 @@ interface TaskDetailHeaderProps {
    * página). Por defecto un `<h2>`. Recibe las clases de tipografía del título.
    */
   titleAs?: 'h1' | 'h2';
+  /** Acciones a la derecha del título (p. ej. el menú solo-ADMIN `TaskAdminMenu`). */
+  actions?: React.ReactNode;
   className?: string;
 }
 
@@ -28,6 +30,7 @@ export function TaskDetailHeader({
   task,
   columnName,
   titleAs = 'h2',
+  actions,
   className,
 }: TaskDetailHeaderProps) {
   const TitleTag = titleAs;
@@ -39,6 +42,13 @@ export function TaskDetailHeader({
           {task.title}
         </TitleTag>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {/* QL-142: si está descartada, banderín visible junto a los badges de estado. */}
+          {task.isDiscarded && (
+            <Badge className="bg-surface-container-high text-on-surface-variant">
+              <Archive className="size-3.5" />
+              Descartada
+            </Badge>
+          )}
           {task.isCompleted && (
             <Badge className="bg-tertiary-container text-on-tertiary-container">
               <CheckCircle2 className="size-3.5" />
@@ -57,6 +67,7 @@ export function TaskDetailHeader({
               Tu rol: {TASK_ROLE_LABEL[task.currentUserRole]}
             </Badge>
           )}
+          {actions}
         </div>
       </div>
 

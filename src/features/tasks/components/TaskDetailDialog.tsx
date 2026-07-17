@@ -18,6 +18,7 @@ import { formatDueDate, isOverdue } from '../lib/deadline';
 import { CompletionSection } from './CompletionSection';
 import { TaskDetailHeader } from './detail/TaskDetailHeader';
 import { TaskDescription } from './detail/TaskDescription';
+import { TaskAdminMenu } from './detail/TaskAdminMenu';
 
 interface TaskDetailDialogProps {
   taskId: string | null;
@@ -72,7 +73,18 @@ export function TaskDetailDialog({
 
         {task && (
           <>
-            <TaskDetailHeader task={task} columnName={columnName} />
+            <TaskDetailHeader
+              task={task}
+              columnName={columnName}
+              actions={
+                // (QL-142/143) Menú solo-ADMIN; al eliminar cierra el vistazo (la tarea ya no existe).
+                <TaskAdminMenu
+                  task={task}
+                  projectId={projectId}
+                  onDeleted={() => onOpenChange(false)}
+                />
+              }
+            />
 
             <TaskDescription description={task.description} clamp />
 

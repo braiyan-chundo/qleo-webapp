@@ -44,6 +44,7 @@ import { TaskBoard } from '@/features/tasks/components/TaskBoard';
 import { TaskListView } from '@/features/tasks/components/TaskListView';
 import { GanttView } from '@/features/tasks/components/GanttView';
 import { PlannerView } from '@/features/tasks/components/PlannerView';
+import { DiscardedTasksSection } from '@/features/tasks/components/DiscardedTasksSection';
 import { ProjectDocumentsPanel } from '@/features/attachments/components/ProjectDocumentsPanel';
 import { BoardFilterPanel } from '@/features/tasks/components/BoardFilterPanel';
 import { useTasks } from '@/features/tasks/hooks/use-tasks';
@@ -58,7 +59,13 @@ import { ProjectFormDialog } from '../components/ProjectFormDialog';
 import { ArchiveProjectDialog } from '../components/ArchiveProjectDialog';
 import { ProjectDetailsDialog } from '../components/ProjectDetailsDialog';
 
-type BoardView = 'kanban' | 'list' | 'gantt' | 'planner' | 'documents';
+type BoardView =
+  | 'kanban'
+  | 'list'
+  | 'gantt'
+  | 'planner'
+  | 'documents'
+  | 'discarded';
 
 interface ViewTab {
   key: BoardView;
@@ -74,9 +81,22 @@ const VIEW_TABS: ViewTab[] = [
   { key: 'documents', label: 'Documentos', icon: <FileText className="size-4" /> },
 ];
 
+/**
+ * (QL-142) Pestaña "Descartadas" — papelera reversible del proyecto. Solo se muestra a ADMIN de
+ * plataforma (restaurar es solo-ADMIN y el concepto es de administración), así que va aparte de
+ * `VIEW_TABS` y se añade condicionalmente.
+ */
+const DISCARDED_TAB: ViewTab = {
+  key: 'discarded',
+  label: 'Descartadas',
+  icon: <Archive className="size-4" />,
+};
+
 /** Tab de vista por defecto cuando el query `?view=` está ausente o es inválido. */
 const DEFAULT_VIEW: BoardView = 'kanban';
-const VIEW_KEYS = VIEW_TABS.map((tab) => tab.key);
+// Incluye `discarded` para que el deep-link `?view=discarded` de un ADMIN sea válido; el render
+// vuelve a `kanban` si un no-ADMIN lo fuerza por URL.
+const VIEW_KEYS = [...VIEW_TABS, DISCARDED_TAB].map((tab) => tab.key);
 
 /** Máximo de avatares visibles en el grupo de miembros de la cabecera (el resto → "+N"). */
 const MAX_HEADER_AVATARS = 4;
@@ -89,6 +109,7 @@ function isBoardView(value: string | null): value is BoardView {
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
   const { data: project, isLoading, isError, error } = useProject(id);
 
   // Datos compartidos por las vistas del board (misma caché de Query que consumen dentro).
@@ -111,7 +132,12 @@ export function ProjectDetailPage() {
   // el history con cada cambio de tab (el back sigue volviendo al listado de proyectos).
   const [searchParams, setSearchParams] = useSearchParams();
   const viewParam = searchParams.get('view');
-  const view: BoardView = isBoardView(viewParam) ? viewParam : DEFAULT_VIEW;
+  const rawView: BoardView = isBoardView(viewParam) ? viewParam : DEFAULT_VIEW;
+  // (QL-142) "Descartadas" es solo-ADMIN: si un no-ADMIN fuerza `?view=discarded` por URL,
+  // se cae a la vista por defecto en vez de mostrar una pestaña que no le corresponde.
+  const view: BoardView =
+    rawView === 'discarded' && !isAdmin ? DEFAULT_VIEW : rawView;
+  const visibleTabs = isAdmin ? [...VIEW_TABS, DISCARDED_TAB] : VIEW_TABS;
   const setView = (next: BoardView) => {
     setSearchParams(
       (prev) => {
@@ -289,22 +315,25 @@ export function ProjectDetailPage() {
             <TooltipContent>{membersLabel} · Ver detalles</TooltipContent>
           </Tooltip>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" aria-label="Filtrar">
-                <ListFilter />
-                <span className="hidden sm:inline">Filtrar</span>
-                {filters.activeCount > 0 && (
-                  <Badge className="ml-1 h-5 min-w-5 justify-center rounded-full bg-primary px-1.5 text-on-primary tabular-nums">
-                    {filters.activeCount}
-                  </Badge>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-72">
-              <BoardFilterPanel filters={filters} />
-            </PopoverContent>
-          </Popover>
+          {/* Filtrar y "Nueva tarea" no aplican a la papelera (QL-142): allí solo se restaura. */}
+          {view !== 'discarded' && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" aria-label="Filtrar">
+                  <ListFilter />
+                  <span className="hidden sm:inline">Filtrar</span>
+                  {filters.activeCount > 0 && (
+                    <Badge className="ml-1 h-5 min-w-5 justify-center rounded-full bg-primary px-1.5 text-on-primary tabular-nums">
+                      {filters.activeCount}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72">
+                <BoardFilterPanel filters={filters} />
+              </PopoverContent>
+            </Popover>
+          )}
 
           {/* Configurar tablero: acción primaria del Kanban (antes escondida en una fila
               propia del board y en el `···` de cada columna). Solo aplica a esta vista y a
@@ -327,13 +356,15 @@ export function ProjectDetailPage() {
             </Tooltip>
           )}
 
-          <Button
-            onClick={() => setCreateTaskOpen(true)}
-            aria-label="Nueva tarea"
-          >
-            <Plus />
-            <span className="hidden sm:inline">Nueva tarea</span>
-          </Button>
+          {view !== 'discarded' && (
+            <Button
+              onClick={() => setCreateTaskOpen(true)}
+              aria-label="Nueva tarea"
+            >
+              <Plus />
+              <span className="hidden sm:inline">Nueva tarea</span>
+            </Button>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -385,7 +416,7 @@ export function ProjectDetailPage() {
           teclado lo arrastra el propio navegador dentro del contenedor scrollable. */}
       <div className="border-b border-outline-variant/60">
         <div className="no-scrollbar flex flex-nowrap gap-1 overflow-x-auto">
-          {VIEW_TABS.map((tab) => {
+          {visibleTabs.map((tab) => {
             const active = view === tab.key;
             return (
               <button
@@ -437,6 +468,9 @@ export function ProjectDetailPage() {
         />
       )}
       {view === 'documents' && <ProjectDocumentsPanel project={project} />}
+      {/* (QL-142) Papelera reversible del proyecto. La pestaña solo existe para ADMIN, y el
+          guardado de `view` arriba impide llegar aquí sin serlo. */}
+      {view === 'discarded' && <DiscardedTasksSection projectId={project.id} />}
 
       <ProjectDetailsDialog
         project={project}

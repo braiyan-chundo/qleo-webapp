@@ -33,6 +33,12 @@ export interface TaskValidatedBy {
   name: string;
 }
 
+/** ADMIN que descartó una tarea (QL-142, §3.41). */
+export interface TaskDiscardedBy {
+  id: string;
+  name: string;
+}
+
 /**
  * Estado del visto bueno para cerrar una tarea (QL-145, §3.39):
  * `NONE` nadie pidió · `REQUESTED` el Responsable solicitó revisión · `VALIDATED` ya validada.
@@ -96,6 +102,16 @@ export interface Task {
   startedAt: string | null;
   finishedAt: string | null;
   durationMs: number | null;
+  /**
+   * (QL-142, §3.41) `true` si la tarea está **descartada** (papelera reversible): sale del
+   * tablero y de "Mis tareas" y solo aparece en la sección "Descartadas" del proyecto
+   * (`GET /tasks?projectId=…&discarded=true`). Distinto de eliminar (QL-143), que la destruye.
+   */
+  isDiscarded: boolean;
+  /** (QL-142, §3.41) ISO8601 del descarte, o `null` si no está descartada. */
+  discardedAt: string | null;
+  /** (QL-142, §3.41) ADMIN que la descartó, o `null` si no está descartada. */
+  discardedBy: TaskDiscardedBy | null;
   createdAt: string;
 }
 
@@ -148,6 +164,11 @@ export interface CompleteTaskPayload {
 export interface TaskListParams {
   projectId?: string;
   columnId?: string;
+  /**
+   * (QL-142, §3.41) `true` → devuelve **SOLO** las tareas descartadas del proyecto (para la
+   * sección "Descartadas"). Omitir/`false` → el listado normal, que **excluye** las descartadas.
+   */
+  discarded?: boolean;
 }
 
 /** Body para crear una tarea (§3.7). Si falta `columnId` cae en la columna default. */
@@ -249,6 +270,7 @@ function buildQuery(params: TaskListParams): string {
   const search = new URLSearchParams();
   if (params.projectId) search.set('projectId', params.projectId);
   if (params.columnId) search.set('columnId', params.columnId);
+  if (params.discarded) search.set('discarded', 'true');
   const qs = search.toString();
   return qs ? `?${qs}` : '';
 }
@@ -288,8 +310,30 @@ export const tasksService = {
     return api.patch<Task>(`/tasks/${id}/move`, data);
   },
 
+  /**
+   * (QL-143, §3.40) **Elimina** la tarea por completo: hard-delete con **cascada** (adjuntos y
+   * su fichero, comentarios, notificaciones, checklist, tiempos, transiciones). **Solo ADMIN**
+   * de plataforma (403 sin `error.code` si no). **Irreversible**; conserva la auditoría. Devuelve
+   * el `Task` eliminado (echo) para el toast.
+   */
   remove: (id: string) => {
     return api.delete<Task>(`/tasks/${id}`);
+  },
+
+  /**
+   * (QL-142, §3.41) **Descarta** la tarea (papelera reversible): la saca del tablero y de "Mis
+   * tareas". **Solo ADMIN** (403 si no). Devuelve el `Task` con `isDiscarded: true`.
+   */
+  discard: (id: string) => {
+    return api.post<Task>(`/tasks/${id}/discard`);
+  },
+
+  /**
+   * (QL-142, §3.41) **Restaura** una tarea descartada a su columna del tablero. **Solo ADMIN**
+   * (403 si no). Devuelve el `Task` con `isDiscarded: false`.
+   */
+  restore: (id: string) => {
+    return api.post<Task>(`/tasks/${id}/restore`);
   },
 
   assignRole: (id: string, data: AssignRolePayload) => {
