@@ -13,6 +13,7 @@ import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/Authed
 import { QleoLogo } from '@/shared/components/QleoLogo';
 import { getDailySlogan } from '@/shared/config/slogans';
 import { useAppBadgeSync } from '@/shared/hooks/use-app-badge-sync';
+import { useNavHistoryTracker } from '@/shared/hooks/use-nav-history-tracker';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,11 @@ export function AppLayout() {
   // Mantiene el badge del icono de la app en sync con los no leídos mientras la PWA está
   // abierta (QL-118); complementa el badge que pinta el service worker con la app cerrada.
   useAppBadgeSync();
+
+  // Registra el historial de navegación interno de la app (QL-140) para que el `BackButton`
+  // genérico sepa a dónde volver y qué mostrar en su tooltip. Vive aquí (no en cada página)
+  // porque `AppLayout` permanece montado entre rutas del área autenticada.
+  useNavHistoryTracker();
 
   const handleLogout = () => {
     logout();

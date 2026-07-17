@@ -1,8 +1,7 @@
 import { useCallback, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Archive,
-  ArrowLeft,
   CalendarRange,
   FileText,
   GanttChartSquare,
@@ -39,6 +38,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
+import { BackButton } from '@/shared/components/BackButton';
 
 import { TaskBoard } from '@/features/tasks/components/TaskBoard';
 import { TaskListView } from '@/features/tasks/components/TaskListView';
@@ -157,13 +157,10 @@ export function ProjectDetailPage() {
   if (isError || !project) {
     return (
       <div className="p-4 md:p-8">
-        <Link
-          to="/projects"
-          className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface"
-        >
-          <ArrowLeft className="size-4" />
-          Volver a proyectos
-        </Link>
+        <BackButton
+          fallback={{ to: '/projects', label: 'Proyectos' }}
+          className="mb-6"
+        />
         <div className="rounded-xl border border-error/20 bg-error-container px-6 py-10 text-center">
           <p className="text-sm font-medium text-on-error-container">
             No se pudo cargar el proyecto
@@ -210,21 +207,7 @@ export function ProjectDetailPage() {
             (código/estado) baja bajo el título en vez de robarle el ancho. En `sm+` se fuerza
             `flex-nowrap` → la cabecera queda exactamente como está hoy. */}
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-nowrap">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                asChild
-                variant="ghost"
-                size="icon-lg"
-                className="shrink-0 text-on-surface-variant hover:text-on-surface"
-              >
-                <Link to="/projects" aria-label="Volver a proyectos">
-                  <ArrowLeft className="size-5" />
-                </Link>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Volver a proyectos</TooltipContent>
-          </Tooltip>
+          <BackButton fallback={{ to: '/projects', label: 'Proyectos' }} />
 
           {dotClass && (
             <span

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BackButton } from '@/shared/components/BackButton';
 
 import { useIsAdmin } from '../hooks/use-is-admin';
 import { QuickStartSection } from '../components/QuickStartSection';
@@ -81,7 +82,10 @@ export function HelpPage() {
   return (
     <div className="w-full p-4 md:p-6 lg:p-8">
       <header className="mb-6">
-        <h1 className="text-3xl font-bold text-on-surface">Ayuda</h1>
+        <div className="flex items-center gap-3">
+          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
+          <h1 className="text-3xl font-bold text-on-surface">Ayuda</h1>
+        </div>
         <p className="mt-1 text-on-surface-variant">
           Todo lo que necesitas para sacarle partido a Qleo: primeros pasos, tareas,
           tablero, muro, roles, notificaciones, conceptos, atajos y respuestas rápidas.

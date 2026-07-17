@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { BarChart3, Users } from 'lucide-react';
 
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { BackButton } from '@/shared/components/BackButton';
 import { useAuthStore } from '@/store/auth.store';
 import { useProjects } from '@/features/projects/hooks/use-projects';
 
@@ -52,7 +53,10 @@ export function AnalyticsPage() {
   return (
     <div className="space-y-8 p-4 md:p-8">
       <header>
-        <h1 className="text-3xl font-bold text-on-surface">Analíticas</h1>
+        <div className="flex items-center gap-3">
+          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
+          <h1 className="text-3xl font-bold text-on-surface">Analíticas</h1>
+        </div>
         <p className="mt-1 text-sm text-on-surface-variant">
           Métricas de uso y rendimiento de Qleo.
         </p>

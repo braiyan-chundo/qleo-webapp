@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { CalendarDays, Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { ApiError } from '@/core/api/fetch-client';
+import { BackButton } from '@/shared/components/BackButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -175,7 +176,10 @@ export function HolidaysAdminPage() {
     <div className="p-4 md:p-8">
       {/* Encabezado */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-on-surface">Calendario laboral</h1>
+        <div className="flex items-center gap-3">
+          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
+          <h1 className="text-3xl font-bold text-on-surface">Calendario laboral</h1>
+        </div>
         <p className="mt-1 text-sm text-on-surface-variant">
           Gestiona los días festivos. Los fines de semana ya se consideran no laborables. El
           sistema solo avisa al fijar fechas límite; no reprograma tareas.

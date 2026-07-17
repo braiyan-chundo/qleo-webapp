@@ -12,6 +12,7 @@ import {
   DataTableCard,
   TablePagination,
 } from '@/shared/components/data-table';
+import { BackButton } from '@/shared/components/BackButton';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -121,14 +122,17 @@ export function AuditLogPage() {
     <div className="p-4 md:p-8">
       {/* Encabezado */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-on-surface">
-            Historial de cambios
-          </h1>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Quién hizo qué y cuándo. Toda mutación del sistema se registra
-            automáticamente.
-          </p>
+        <div className="flex items-start gap-3">
+          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
+          <div>
+            <h1 className="text-3xl font-bold text-on-surface">
+              Historial de cambios
+            </h1>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Quién hizo qué y cuándo. Toda mutación del sistema se registra
+              automáticamente.
+            </p>
+          </div>
         </div>
 
         <Select value={entityType} onValueChange={setEntityType}>

@@ -1,6 +1,7 @@
 import { Bell, Fingerprint, KeyRound, Palette, SlidersHorizontal, UserCog } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
+import { BackButton } from '@/shared/components/BackButton';
 
 import { useMyProfile } from '../hooks/use-profile';
 import { ProfileInfoForm } from '../components/ProfileInfoForm';
@@ -23,7 +24,10 @@ export function ProfilePage() {
   return (
     <div className="p-4 md:p-8">
       <header className="mb-6">
-        <h1 className="text-3xl font-bold text-on-surface">Mi cuenta</h1>
+        <div className="flex items-center gap-3">
+          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
+          <h1 className="text-3xl font-bold text-on-surface">Mi cuenta</h1>
+        </div>
         <p className="mt-1 text-on-surface-variant">
           Gestiona tus datos de perfil, tu contraseña y tus preferencias.
         </p>

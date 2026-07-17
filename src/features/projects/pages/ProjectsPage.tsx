@@ -20,6 +20,7 @@ import {
   useQueryParamState,
 } from '@/shared/hooks/use-query-param-state';
 import { canCreateProjects } from '@/shared/lib/permissions';
+import { BackButton } from '@/shared/components/BackButton';
 import { useAuthStore } from '@/store/auth.store';
 
 import { useProjects } from '../hooks/use-projects';
@@ -113,13 +114,16 @@ export function ProjectsPage() {
     <div className="p-4 md:p-8">
       {/* Encabezado */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-on-surface">Proyectos</h1>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            {canCreate
-              ? 'Crea, edita y organiza tus proyectos.'
-              : 'Consulta y organiza los proyectos en los que participas.'}
-          </p>
+        <div className="flex items-start gap-3">
+          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
+          <div>
+            <h1 className="text-3xl font-bold text-on-surface">Proyectos</h1>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              {canCreate
+                ? 'Crea, edita y organiza tus proyectos.'
+                : 'Consulta y organiza los proyectos en los que participas.'}
+            </p>
+          </div>
         </div>
         {canCreate && (
           <Button onClick={openCreate} className="h-10">

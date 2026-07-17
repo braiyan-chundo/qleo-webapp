@@ -5,6 +5,7 @@ import { Bell, CheckCheck, Loader2, SearchX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { BackButton } from '@/shared/components/BackButton';
 import { InfiniteScrollSentinel } from '@/shared/components/InfiniteScrollSentinel';
 
 import {
@@ -93,6 +94,7 @@ export function NotificationsPage() {
     <div className="p-4 md:p-8">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
+          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
           <div className="flex size-11 items-center justify-center rounded-xl bg-primary-container text-on-primary-container">
             <Bell className="size-5" />
           </div>

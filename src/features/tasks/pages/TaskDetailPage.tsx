@@ -1,8 +1,8 @@
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { BackButton } from '@/shared/components/BackButton';
 import { useAuthStore } from '@/store/auth.store';
 
 import { useColumns } from '@/features/columns/hooks/use-columns';
@@ -36,13 +36,10 @@ export function TaskDetailPage() {
   const { data: columns } = useColumns(projectId || undefined);
 
   const backToProject = (
-    <Link
-      to={`/projects/${projectId}`}
-      className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-on-surface-variant transition-colors hover:text-on-surface"
-    >
-      <ArrowLeft className="size-4" />
-      Volver al proyecto
-    </Link>
+    <BackButton
+      fallback={{ to: `/projects/${projectId}`, label: 'Proyecto' }}
+      className="mb-6"
+    />
   );
 
   if (isLoading) {

@@ -15,6 +15,7 @@ import {
   StatusDot,
   TablePagination,
 } from '@/shared/components/data-table';
+import { BackButton } from '@/shared/components/BackButton';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -112,11 +113,14 @@ export function UsersAdminPage() {
     <div className="p-4 md:p-8">
       {/* Encabezado */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-on-surface">Usuarios</h1>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Administra las cuentas del espacio: altas, roles de plataforma y estado.
-          </p>
+        <div className="flex items-start gap-3">
+          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
+          <div>
+            <h1 className="text-3xl font-bold text-on-surface">Usuarios</h1>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Administra las cuentas del espacio: altas, roles de plataforma y estado.
+            </p>
+          </div>
         </div>
         <Button onClick={openCreate} className="h-10">
           <Plus />

@@ -4,6 +4,7 @@ import { AlertCircle, Info, Loader2, MessagesSquare, RefreshCw, Search } from 'l
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { BackButton } from '@/shared/components/BackButton';
 
 import {
   useMarkWallRead,
@@ -128,6 +129,7 @@ export function WallView({ infoOpen = false, onToggleInfo }: WallViewProps) {
           <WallSearch onClose={() => setSearchOpen(false)} onJump={handleSearchJump} />
         ) : (
           <>
+            <BackButton fallback={{ to: '/', label: 'Inicio' }} />
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary-container dark:text-primary">
               <MessagesSquare className="size-5" />
             </span>

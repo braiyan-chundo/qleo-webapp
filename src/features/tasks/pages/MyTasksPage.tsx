@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 
 import { useProjects } from '@/features/projects/hooks/use-projects';
 import type { Project } from '@/features/projects/types/project';
+import { BackButton } from '@/shared/components/BackButton';
 import {
   useQueryParamSearch,
   useQueryParamState,
@@ -113,7 +114,10 @@ export function MyTasksPage() {
   return (
     <div className="p-4 md:p-8">
       <header className="mb-6">
-        <h1 className="text-3xl font-bold text-on-surface">Mis tareas</h1>
+        <div className="flex items-center gap-3">
+          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
+          <h1 className="text-3xl font-bold text-on-surface">Mis tareas</h1>
+        </div>
         <p className="mt-1 text-on-surface-variant">
           Todas las tareas en las que participas. Ordénalas por fecha límite (más próximas
           primero) o agrúpalas por proyecto.
