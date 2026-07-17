@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils';
 
 import { useColumns } from '@/features/columns/hooks/use-columns';
+import { LabelChip } from '@/features/labels/components/LabelChip';
 import {
   useQueryParamSearch,
   useQueryParamState,
@@ -173,6 +174,7 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
       return {
         title: task.title,
         status: columnName.get(task.columnId) ?? '',
+        label: task.labels[0]?.name ?? '',
         assignee: assignee?.user?.name ?? (assignee ? assignee.userId : ''),
         assigneeEmail: assignee?.user?.email ?? '',
         dueDate: formatDueDate(task.dueDate),
@@ -308,6 +310,11 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
                     {task.title}
                   </span>
                 </div>
+                {task.labels[0] && (
+                  <div className="mt-1">
+                    <LabelChip label={task.labels[0]} />
+                  </div>
+                )}
                 <DataCardRow label="Estado">
                   {statusName ? (
                     <Badge className="bg-surface-container-high text-on-surface-variant">
@@ -472,6 +479,7 @@ function TaskRow({ task, statusName, onOpen }: TaskRowProps) {
           >
             {task.title}
           </span>
+          {task.labels[0] && <LabelChip label={task.labels[0]} />}
         </span>
       </TableCell>
       <TableCell>

@@ -1,4 +1,5 @@
 import { api } from '@/core/api/fetch-client';
+import type { Label } from '@/features/labels/services/labels.service';
 
 /** Rol de un usuario POR TAREA (QL-08, §3.7). Distinto del rol de plataforma. */
 export type TaskRole = 'CREATOR' | 'ASSIGNEE' | 'COLLABORATOR' | 'OBSERVER';
@@ -34,8 +35,13 @@ export interface Task {
   title: string;
   description?: string;
   order: number;
-  /** Categoría corta opcional (p.ej. "VUELOS"), o `null`. Se muestra como pill en la card. */
-  label: string | null;
+  /**
+   * (QL-146, §3.38) Ids de etiquetas de la tarea (0 o 1 por ahora; el modelo ya es array para
+   * habilitar múltiples más adelante). Reemplaza al viejo `label: string | null` de texto libre.
+   */
+  labelIds: string[];
+  /** (QL-146, §3.38) Las mismas etiquetas ya RESUELTAS para pintar el chip (`labels[0]`). */
+  labels: Label[];
   /** Fecha de inicio ISO opcional, o `null`. */
   startDate: string | null;
   /** Ítems de checklist completados (poblado en LISTA y detalle; 0 en mutaciones). */
@@ -126,8 +132,11 @@ export interface CreateTaskPayload {
   title: string;
   description?: string;
   columnId?: string;
-  /** Categoría corta opcional (p.ej. "VUELOS"). */
-  label?: string;
+  /**
+   * (QL-146, §3.38) Etiqueta(s) de la tarea: **0 o 1** id, y cada id debe estar en
+   * `project.labelIds` (si no → 400 `LABEL_NOT_IN_PROJECT`). `[]` = sin etiqueta.
+   */
+  labelIds?: string[];
   /** Fecha de inicio ISO opcional. */
   startDate?: string | null;
   /**
@@ -179,8 +188,11 @@ export interface UpdateTaskPayload {
   title?: string;
   description?: string;
   columnId?: string;
-  /** Categoría corta; `null` la limpia. */
-  label?: string | null;
+  /**
+   * (QL-146, §3.38) Reemplaza el set de etiquetas de la tarea (0 o 1 id ∈ `project.labelIds`):
+   * `[]` la deja sin etiqueta; omitirlo no la toca.
+   */
+  labelIds?: string[];
   /** Fecha de inicio ISO; `null` la limpia. */
   startDate?: string | null;
 }

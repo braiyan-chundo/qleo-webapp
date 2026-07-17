@@ -14,8 +14,9 @@ import {
 import { cn } from '@/lib/utils';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 
+import { LabelChip } from '@/features/labels/components/LabelChip';
+
 import type { Task, TaskAssignment } from '../services/tasks.service';
-import { labelPillByText } from '../lib/palette';
 import {
   formatDueDate,
   formatDueDateShort,
@@ -75,15 +76,10 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
       onClick={onClick}
       className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-3 text-left transition-colors hover:border-outline-variant hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
-      {task.label && (
-        <span
-          className={cn(
-            'mb-2 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase',
-            labelPillByText(task.label),
-          )}
-        >
-          {task.label}
-        </span>
+      {task.labels[0] && (
+        <div className="mb-2">
+          <LabelChip label={task.labels[0]} />
+        </div>
       )}
 
       <div className="flex items-start gap-1.5">

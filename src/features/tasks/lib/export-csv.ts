@@ -11,6 +11,7 @@ const UTF8_BOM = '﻿';
 export const CSV_HEADERS = [
   'Título',
   'Estado',
+  'Etiqueta',
   'Responsable',
   'Email responsable',
   'Fecha límite',
@@ -22,6 +23,8 @@ export const CSV_HEADERS = [
 export interface TaskCsvRow {
   title: string;
   status: string;
+  /** (QL-146) Nombre de la etiqueta de la tarea (`labels[0]`), o vacío. */
+  label: string;
   assignee: string;
   assigneeEmail: string;
   dueDate: string;
@@ -58,6 +61,7 @@ export function buildTasksCsv(rows: TaskCsvRow[]): string {
       toCsvLine([
         row.title,
         row.status,
+        row.label,
         row.assignee,
         row.assigneeEmail,
         row.dueDate,

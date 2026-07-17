@@ -8,8 +8,11 @@ export const taskFormSchema = z.object({
   title: z.string().trim().min(1, 'El título es obligatorio'),
   description: z.string().trim().optional(),
   columnId: z.string().optional(),
-  /** Categoría corta opcional (p.ej. "VUELOS"). */
-  label: z.string().trim().optional(),
+  /**
+   * (QL-146, §3.38) Id de la etiqueta elegida del catálogo del proyecto, o `''` = sin etiqueta.
+   * Una sola por ahora; se envía como `labelIds` (`[]` o `[id]`).
+   */
+  labelId: z.string().optional(),
   /** Fecha de inicio opcional (valor de `<input type="date">`, `YYYY-MM-DD`). */
   startDate: z.string().optional(),
   /**

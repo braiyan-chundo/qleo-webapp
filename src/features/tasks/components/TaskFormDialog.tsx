@@ -23,7 +23,8 @@ import {
 } from '@/components/ui/dialog';
 
 import { useColumns } from '@/features/columns/hooks/use-columns';
-import { useProjectMembers } from '@/features/projects/hooks/use-projects';
+import { useProject, useProjectMembers } from '@/features/projects/hooks/use-projects';
+import { TaskLabelSelect } from '@/features/labels/components/TaskLabelSelect';
 import { ApiError } from '@/core/api/fetch-client';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -54,7 +55,7 @@ const emptyValues: TaskFormValues = {
   title: '',
   description: '',
   columnId: '',
-  label: '',
+  labelId: '',
   startDate: '',
   dueDate: '',
   deadlineLocked: false,
@@ -84,6 +85,10 @@ export function TaskFormDialog({
   const { data: columns, isLoading: columnsLoading } = useColumns(
     open ? projectId : undefined,
   );
+  // (QL-146) El selector de etiqueta ofrece SOLO `project.labels`. Se pide con el diálogo abierto
+  // (mismo patrón que `BoardSettingsDialog`). El backend rechaza etiquetas ajenas al proyecto.
+  const { data: project } = useProject(open ? projectId : undefined);
+  const projectLabels = project?.labels ?? [];
   const defaultColumn = columns?.find((c) => c.isDefault);
   // (QL-63) Al crear se preselecciona explícitamente la columna Backlog (equivale a la
   // `isDefault` inicial); si no hubiera, cae en la default. El selector sigue editable.
@@ -127,7 +132,7 @@ export function TaskFormDialog({
         title: task.title,
         description: task.description ?? '',
         columnId: task.columnId,
-        label: task.label ?? '',
+        labelId: task.labels[0]?.id ?? '',
         startDate: isoToDateInput(task.startDate),
         // En edición el deadline lo gestiona la DeadlineSection del detalle (no aquí).
         dueDate: '',
@@ -149,7 +154,8 @@ export function TaskFormDialog({
 
   const onSubmit = (values: TaskFormValues) => {
     const description = values.description?.trim() || undefined;
-    const label = values.label?.trim() || undefined;
+    // (QL-146) `labelIds` con 0 o 1 elemento; `[]` deja la tarea sin etiqueta.
+    const labelIds = values.labelId ? [values.labelId] : [];
     const startDate = dateInputToIso(values.startDate ?? '');
 
     if (isEdit && task) {
@@ -160,8 +166,8 @@ export function TaskFormDialog({
             title: values.title.trim(),
             description,
             columnId: values.columnId || undefined,
-            // `null` limpia la etiqueta/fecha si el usuario las borró.
-            label: label ?? null,
+            labelIds,
+            // `null` limpia la fecha si el usuario la borró.
             startDate,
           },
         },
@@ -200,7 +206,7 @@ export function TaskFormDialog({
           title: values.title.trim(),
           description,
           columnId: values.columnId || undefined,
-          label,
+          labelIds,
           startDate,
           dueDate,
           deadlineLocked,
@@ -296,37 +302,40 @@ export function TaskFormDialog({
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="label" className="text-on-surface">
-                Etiqueta
-              </Label>
-              <Input
-                id="label"
-                placeholder="VUELOS"
-                className="h-10"
-                {...register('label')}
-              />
-            </div>
+          {/* (QL-146) Etiqueta: una sola, elegida del catálogo del proyecto (`project.labels`).
+              Si el proyecto no tiene etiquetas, el selector muestra un vacío explicativo. */}
+          <div className="grid gap-1.5">
+            <Label className="text-on-surface">Etiqueta</Label>
+            <Controller
+              control={control}
+              name="labelId"
+              render={({ field }) => (
+                <TaskLabelSelect
+                  labels={projectLabels}
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+          </div>
 
-            <div className="grid gap-1.5">
-              <Label htmlFor="startDate" className="text-on-surface">
-                Fecha de inicio
-              </Label>
-              <Controller
-                control={control}
-                name="startDate"
-                render={({ field }) => (
-                  <DatePicker
-                    id="startDate"
-                    className="w-full"
-                    value={dateInputToDate(field.value ?? '')}
-                    onChange={(date) => field.onChange(dateToDateInput(date))}
-                    placeholder="Sin fecha"
-                  />
-                )}
-              />
-            </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="startDate" className="text-on-surface">
+              Fecha de inicio
+            </Label>
+            <Controller
+              control={control}
+              name="startDate"
+              render={({ field }) => (
+                <DatePicker
+                  id="startDate"
+                  className="w-full sm:w-1/2"
+                  value={dateInputToDate(field.value ?? '')}
+                  onChange={(date) => field.onChange(dateToDateInput(date))}
+                  placeholder="Sin fecha"
+                />
+              )}
+            />
           </div>
 
           {/* (P1/§3.6) Fecha límite solo en el ALTA: en edición se gestiona con la

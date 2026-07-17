@@ -112,16 +112,3 @@ export function projectAccent(color: PaletteKey | null | undefined): string | nu
 export function projectDot(color: PaletteKey | null | undefined): string | null {
   return color ? PALETTE[color].dot : null;
 }
-
-/**
- * Pill de categoría determinista por texto (para la etiqueta de la tarjeta, que no tiene un
- * color propio): un hash simple del `label` elige una entrada estable de la paleta.
- */
-export function labelPillByText(label: string): string {
-  let hash = 0;
-  for (let i = 0; i < label.length; i += 1) {
-    hash = (hash * 31 + label.charCodeAt(i)) | 0;
-  }
-  const idx = ((hash % PALETTE_KEYS.length) + PALETTE_KEYS.length) % PALETTE_KEYS.length;
-  return PALETTE[PALETTE_KEYS[idx]].pill;
-}

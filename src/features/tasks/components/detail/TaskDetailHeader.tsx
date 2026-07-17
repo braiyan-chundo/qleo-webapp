@@ -2,6 +2,7 @@ import { CheckCircle2, Square } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { LabelChip } from '@/features/labels/components/LabelChip';
 
 import type { Task } from '../../services/tasks.service';
 import { TASK_ROLE_BADGE_CLASS, TASK_ROLE_LABEL } from '../../lib/roles';
@@ -52,13 +53,16 @@ export function TaskDetailHeader({
         </div>
       </div>
 
-      {columnName && (
-        <p className="mt-1 flex flex-wrap items-center gap-3 text-sm text-on-surface-variant">
-          <span className="inline-flex items-center gap-1">
-            <Square className="size-3.5" />
-            {columnName}
-          </span>
-        </p>
+      {(columnName || task.labels[0]) && (
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-on-surface-variant">
+          {columnName && (
+            <span className="inline-flex items-center gap-1">
+              <Square className="size-3.5" />
+              {columnName}
+            </span>
+          )}
+          {task.labels[0] && <LabelChip label={task.labels[0]} size="md" />}
+        </div>
       )}
     </div>
   );

@@ -29,6 +29,9 @@ import {
   type ProjectFormValues,
 } from '../schemas/project.schema';
 
+import { ProjectLabelManager } from '@/features/labels/components/ProjectLabelManager';
+import type { Label as CatalogLabel } from '@/features/labels/services/labels.service';
+
 import { ProjectColorPicker } from './ProjectColorPicker';
 import { MemberMultiSelect } from './MemberMultiSelect';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
@@ -89,6 +92,9 @@ export function ProjectFormDialog({
 
   // Miembros pre-seleccionados en la CREACIÓN (en edición se gestionan en vivo).
   const [members, setMembers] = useState<UserDirectoryEntry[]>([]);
+  // (QL-146) Etiquetas adoptadas por el proyecto (objetos completos para pintar chips). Se
+  // envían como `labelIds` al guardar, tanto en creación como en edición.
+  const [labels, setLabels] = useState<CatalogLabel[]>([]);
 
   const canManage =
     isEdit && !!user && (user.role === 'ADMIN' || project.createdBy === user.id);
@@ -108,6 +114,7 @@ export function ProjectFormDialog({
   useEffect(() => {
     if (!open) return;
     setMembers([]);
+    setLabels(project?.labels ?? []);
     if (project) {
       reset({
         name: project.name,
@@ -130,7 +137,11 @@ export function ProjectFormDialog({
     mutationError instanceof Error ? mutationError.message : '';
 
   const onSubmit = (values: ProjectFormValues) => {
-    const payload = toPayload(values);
+    // (QL-146) El set de etiquetas del proyecto va en cada guardado; en PATCH reemplaza el set.
+    const payload: ProjectPayload = {
+      ...toPayload(values),
+      labelIds: labels.map((label) => label.id),
+    };
 
     if (isEdit && project) {
       const updateData: UpdateProjectPayload = { ...payload };
@@ -300,6 +311,16 @@ export function ProjectFormDialog({
                 />
               )}
             />
+          </div>
+
+          {/* (QL-146) Etiquetas del proyecto: elegir del catálogo global, crear nuevas y quitar
+              las que no se usan. Se envían como `labelIds` al guardar. */}
+          <div className="grid gap-1.5">
+            <Label className="text-on-surface">Etiquetas</Label>
+            <p className="text-xs text-on-surface-variant">
+              Del catálogo global. Solo las etiquetas del proyecto pueden usarse en sus tareas.
+            </p>
+            <ProjectLabelManager value={labels} onChange={setLabels} />
           </div>
 
           {/* (P7, §3.4) Antelación del aviso de deadline al Responsable. Solo en edición

@@ -1,3 +1,5 @@
+import type { Label } from '@/features/labels/services/labels.service';
+
 /**
  * Clave de la paleta de color de un proyecto (QL-29, §3.4), o `null` = sin color.
  * Comparte la misma paleta que las columnas (`ColumnColor`).
@@ -73,6 +75,13 @@ export interface Project {
   taskCounts: { total: number; done: number };
   /** (QL-37) `round(done/total*100)`, `0` si `total=0`. Rango 0–100. */
   progressPct: number;
+  /**
+   * (QL-146, §3.38) Ids de las etiquetas del catálogo **adoptadas** por el proyecto. Las tareas
+   * solo pueden referenciar etiquetas de este set (`LABEL_NOT_IN_PROJECT` en caso contrario).
+   */
+  labelIds: string[];
+  /** (QL-146, §3.38) Las mismas etiquetas ya RESUELTAS (para pintar chips y el selector). */
+  labels: Label[];
   /** Lista (QL-37): hasta 4 participantes de tareas. Detalle (QL-51): membresía real completa. */
   members: ProjectMember[];
   /** Lista: nº de participantes (para el "+N"). Detalle (QL-51): nº de miembros reales. */

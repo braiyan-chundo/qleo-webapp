@@ -12,6 +12,12 @@ export interface ProjectPayload {
   endDate?: string;
   /** Color distintivo (QL-29). `null` limpia el color; omitido = no toca. */
   color?: ProjectColor | null;
+  /**
+   * (QL-146, §3.38) Etiquetas del catálogo adoptadas por el proyecto. El backend deduplica y
+   * valida que cada id exista (`LABEL_NOT_FOUND` si no). En `PATCH` **reemplaza** el set
+   * (enviar `[]` lo vacía; omitirlo no lo toca).
+   */
+  labelIds?: string[];
 }
 
 /**
