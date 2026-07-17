@@ -43,7 +43,9 @@ export function TaskDetailDialog({
 
   const { data: columns } = useColumns(open ? projectId : undefined);
 
-  const columnName = columns?.find((c) => c.id === task?.columnId)?.name;
+  // (QL-141) Columna actual + su posición ordenada (para el color estable del chip).
+  const columnIndex = columns?.findIndex((c) => c.id === task?.columnId) ?? -1;
+  const column = columnIndex >= 0 ? columns?.[columnIndex] : undefined;
 
   const assignee = task?.assignments.find((a) => a.role === 'ASSIGNEE')?.user;
   const overdue = task ? isOverdue(task.dueDate) && !task.isCompleted : false;
@@ -75,7 +77,8 @@ export function TaskDetailDialog({
           <>
             <TaskDetailHeader
               task={task}
-              columnName={columnName}
+              column={column}
+              columnIndex={columnIndex}
               actions={
                 // (QL-142/143) Menú solo-ADMIN; al eliminar cierra el vistazo (la tarea ya no existe).
                 <TaskAdminMenu

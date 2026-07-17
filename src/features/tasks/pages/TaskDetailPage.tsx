@@ -17,6 +17,7 @@ import { TimeTrackerSection } from '../components/TimeTrackerSection';
 import { TaskAnalyticsSection } from '../components/TaskAnalyticsSection';
 import { RoleManager } from '../components/RoleManager';
 import { TaskDetailHeader } from '../components/detail/TaskDetailHeader';
+import { TaskColumnMover } from '../components/detail/TaskColumnMover';
 import { TaskDescription } from '../components/detail/TaskDescription';
 import { TaskCreatorActions } from '../components/detail/TaskCreatorActions';
 import { TaskAdminMenu } from '../components/detail/TaskAdminMenu';
@@ -83,7 +84,9 @@ export function TaskDetailPage() {
 
   const isCreator = task.currentUserRole === 'CREATOR';
   const isAdmin = user?.role === 'ADMIN';
-  const columnName = columns?.find((c) => c.id === task.columnId)?.name;
+  // (QL-141) Columna actual + su posición ordenada (para el color estable del chip).
+  const columnIndex = columns?.findIndex((c) => c.id === task.columnId) ?? -1;
+  const column = columnIndex >= 0 ? columns?.[columnIndex] : undefined;
 
   return (
     <div className="p-4 md:p-8">
@@ -91,7 +94,8 @@ export function TaskDetailPage() {
 
       <TaskDetailHeader
         task={task}
-        columnName={columnName}
+        column={column}
+        columnIndex={columnIndex}
         titleAs="h1"
         className="mb-6"
         actions={
@@ -125,6 +129,9 @@ export function TaskDetailPage() {
 
         {/* Columna lateral: estado, plazos, roles y acciones. */}
         <aside className="space-y-4 lg:sticky lg:top-6">
+          {/* (QL-141) Mover la tarea entre columnas contiguas (siguiente/anterior). */}
+          <TaskColumnMover task={task} projectId={projectId} />
+
           <CompletionSection task={task} projectId={projectId} />
 
           <DeadlineSection task={task} projectId={projectId} />

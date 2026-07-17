@@ -1,16 +1,27 @@
-import { Archive, BadgeCheck, CheckCircle2, Square } from 'lucide-react';
+import { Archive, BadgeCheck, CheckCircle2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { LabelChip } from '@/features/labels/components/LabelChip';
+import type { Column } from '@/features/columns/services/columns.service';
 
 import type { Task } from '../../services/tasks.service';
 import { TASK_ROLE_BADGE_CLASS, TASK_ROLE_LABEL } from '../../lib/roles';
+import { columnColor } from '../../lib/palette';
 
 interface TaskDetailHeaderProps {
   task: Task;
-  /** Nombre de la columna resuelto por el llamador (de `useColumns`). */
-  columnName?: string;
+  /**
+   * (QL-141) Columna actual de la tarea, resuelta por el llamador contra `useColumns`. Se pinta
+   * como chip con el **punto de color** de la columna (el mismo helper `columnColor` que usa el
+   * board), no solo su nombre.
+   */
+  column?: Column;
+  /**
+   * (QL-141) Posición de la columna en el listado ordenado (para derivar un color estable si
+   * `Column.color` es null, igual que el board). Se ignora cuando la columna sí trae `color`.
+   */
+  columnIndex?: number;
   /**
    * Elemento que renderiza el título (para usar `DialogTitle` en el modal o un `<h1>` en la
    * página). Por defecto un `<h2>`. Recibe las clases de tipografía del título.
@@ -28,7 +39,8 @@ interface TaskDetailHeaderProps {
  */
 export function TaskDetailHeader({
   task,
-  columnName,
+  column,
+  columnIndex = 0,
   titleAs = 'h2',
   actions,
   className,
@@ -71,12 +83,18 @@ export function TaskDetailHeader({
         </div>
       </div>
 
-      {(columnName || task.labels[0]) && (
+      {(column || task.labels[0]) && (
         <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-on-surface-variant">
-          {columnName && (
-            <span className="inline-flex items-center gap-1">
-              <Square className="size-3.5" />
-              {columnName}
+          {column && (
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className={cn(
+                  'size-2.5 shrink-0 rounded-full',
+                  columnColor(column.color, columnIndex),
+                )}
+                aria-hidden
+              />
+              {column.name}
             </span>
           )}
           {task.labels[0] && <LabelChip label={task.labels[0]} size="md" />}
