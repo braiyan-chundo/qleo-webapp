@@ -18,6 +18,7 @@ export const REALTIME_ENTITIES = [
   'attachment',
   'wall',
   'notification',
+  'user-avatar',
 ] as const;
 
 export type RealtimeEntity = (typeof REALTIME_ENTITIES)[number];
@@ -34,7 +35,7 @@ export type RealtimeAction = 'created' | 'updated' | 'deleted';
 export interface RealtimeEvent {
   entity: RealtimeEntity;
   action: RealtimeAction;
-  /** `null` solo en `wall` y `notification`. */
+  /** `null` en `wall`, `notification` y `user-avatar`. */
   projectId: string | null;
   /** Presente en `task`/`comment`/`checklist` y adjuntos de tarea. */
   taskId: string | null;

@@ -9,6 +9,7 @@ import { dashboardKeys } from '@/features/dashboard/hooks/use-my-dashboard';
 import { notificationKeys } from '@/features/notifications/hooks/use-notifications';
 import { projectKeys } from '@/features/projects/hooks/use-projects';
 import { taskKeys } from '@/features/tasks/hooks/use-tasks';
+import { userKeys } from '@/features/users/hooks/use-users';
 import { wallSharedKeys } from '@/features/wall/hooks/use-wall-shared';
 import { wallKeys } from '@/features/wall/hooks/use-wall';
 
@@ -115,6 +116,33 @@ function keysForEvent(event: RealtimeEvent, queryClient: QueryClient): QueryKey[
       // `all` es prefijo de `lists()`, `feeds()` (bandeja infinita, QL-137), `facets()` y
       // `unreadCount()`: una sola invalidación cubre badge, campana, bandeja y contadores.
       return [notificationKeys.all];
+    }
+
+    case 'user-avatar': {
+      // QL-152 (§3.44): un usuario cambió/quitó su foto. Se invalida a ras de feature porque el
+      // avatar de ese usuario aparece en toda la app y no hay filtro fino por userId aquí.
+      // ⚠️ El blob del avatar NO está keyeado por userId sino por su `downloadUrl`
+      // (`['avatar-blob', <url>]`), así que se invalida el PREFIJO `['avatar-blob']` (igual que
+      // `useResetAvatarCache`) para que TODO `AuthedAvatar` montado vuelva a hacer el fetch.
+      // Las listas/detalles que llevan `avatarDownloadUrl` se refrescan por su prefijo raíz.
+      // No se ramifica por `action`: en `deleted` el refetch dará 404 y caerá a iniciales, que es
+      // lo correcto.
+      //
+      // Muro: NO se usa `wallKeys.all` (mismo motivo que el `case 'wall'`): arrastraría `feed()`
+      // —caché gestionada a mano con historial y ventana `around`, invalidarla destruiría el
+      // scroll-back / el salto a mensaje de QL-119— y `presence()`, que sirve el socket. El feed
+      // no necesita tocarse: los avatares de sus autores ya se refrescan por el prefijo
+      // `['avatar-blob']`. Solo se invalidan las keys del muro que llevan avatar y no son
+      // destructivas: `pinned()` y `wallSharedKeys.all()`.
+      return [
+        ['avatar-blob'],
+        userKeys.all,
+        taskKeys.all,
+        commentKeys.all,
+        projectKeys.all,
+        wallKeys.pinned(),
+        wallSharedKeys.all(),
+      ];
     }
 
     default: {
