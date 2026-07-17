@@ -72,6 +72,8 @@ export function buildOptimisticMessage({
     pinnedAt: null,
     pinnedBy: null,
     replyTo,
+    // (QL-147) Un mensaje aún en vuelo no tiene reacciones; llegarán con el confirmado del POST.
+    reactions: [],
     createdAt: now,
     updatedAt: now,
     pending: true,

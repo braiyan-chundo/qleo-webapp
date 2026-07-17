@@ -8,6 +8,7 @@ import type {
   WallFeedParams,
   WallMessage,
   WallPresenceCount,
+  WallReaction,
   WallReadResult,
   WallReplyPreview,
   WallSearchResult,
@@ -61,11 +62,13 @@ function handleUnauthorized(status: number) {
  * conservando `id/author/createdAt`. `deleted` puede faltar en respuestas de endpoints que solo
  * devuelven mensajes vivos → se asume `false` al normalizar.
  */
-type RawWallMessage = Omit<WallMessage, 'body' | 'deleted' | 'replyTo'> & {
+type RawWallMessage = Omit<WallMessage, 'body' | 'deleted' | 'replyTo' | 'reactions'> & {
   body: string | null;
   deleted?: boolean;
   /** Puede faltar en respuestas de endpoints previos a QL-103 → se asume `null` al normalizar. */
   replyTo?: WallReplyPreview | null;
+  /** (QL-147) Puede faltar en respuestas de endpoints previos a QL-147 → se asume `[]` al normalizar. */
+  reactions?: WallReaction[];
 };
 
 /**
@@ -84,11 +87,18 @@ function normalizeWallMessage(raw: RawWallMessage): WallMessage {
       editedAt: null,
       pinnedAt: null,
       pinnedBy: null,
-      // La lápida no arrastra su cita (QL-103): `replyTo` siempre null en un borrado.
+      // La lápida no arrastra su cita (QL-103) ni sus reacciones (QL-147): ambos vacíos en un borrado.
       replyTo: null,
+      reactions: [],
     };
   }
-  return { ...raw, deleted: false, body: raw.body ?? '', replyTo: raw.replyTo ?? null };
+  return {
+    ...raw,
+    deleted: false,
+    body: raw.body ?? '',
+    replyTo: raw.replyTo ?? null,
+    reactions: raw.reactions ?? [],
+  };
 }
 
 function buildQuery(params: WallFeedParams): string {
@@ -220,6 +230,18 @@ export const wallService = {
    */
   unpin: async (id: string): Promise<WallMessage> => {
     return normalizeWallMessage(await api.post<RawWallMessage>(`/wall/messages/${id}/unpin`));
+  },
+
+  /**
+   * (QL-147, §3.42) Alterna la reacción propia a un mensaje (`POST .../reactions`): **toggle con
+   * reemplazo** —el mismo emoji la quita, otro la reemplaza; una por usuario—. Devuelve el
+   * `WallMessage` con las `reactions` recalculadas. No dispara push (gesto ligero). `404`
+   * `WALL_MESSAGE_NOT_FOUND` / `409` `WALL_MESSAGE_ALREADY_DELETED` si no existe o está borrado.
+   */
+  react: async (id: string, emoji: string): Promise<WallMessage> => {
+    return normalizeWallMessage(
+      await api.post<RawWallMessage>(`/wall/messages/${id}/reactions`, { emoji }),
+    );
   },
 
   /**

@@ -310,6 +310,37 @@ export function useDeleteWallMessage() {
   });
 }
 
+/** Payload de reacción a un mensaje del muro (QL-147, §3.42): el emoji a alternar. */
+export interface ReactToWallMessageInput {
+  id: string;
+  emoji: string;
+}
+
+/**
+ * (QL-147, §3.42) Alterna la reacción propia a un mensaje del muro (`POST .../reactions`): es un
+ * **toggle con reemplazo** (mismo emoji la quita, otro la reemplaza; una por usuario) y devuelve el
+ * mensaje con las `reactions` recalculadas.
+ *
+ * **Caché del feed gestionada a mano:** el feed vive en una única entrada (`wallKeys.feed()`) con
+ * `staleTime: Infinity` (historial + ventana `around` + polling), así que al éxito **reemplazamos
+ * SOLO ese mensaje** por el devuelto vía `mergeMessages` (mismo `id` → conserva su posición) y
+ * **NO invalidamos el feed entero** (eso descartaría el historial/ventana ya cargados y provocaría
+ * un salto de scroll). Las reacciones de OTROS a mensajes ya cargados no se refrescan solas —el
+ * poll solo trae mensajes nuevos—: limitación conocida y aceptable del MVP.
+ */
+export function useReactToWallMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, emoji }: ReactToWallMessageInput) => wallService.react(id, emoji),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<WallFeedItem[]>(wallKeys.feed(), (prev) =>
+        mergeMessages(prev ?? [], [updated]),
+      );
+    },
+  });
+}
+
 /**
  * Conteo de mensajes no leídos del muro (QL-91, §3.25) para el badge del nav. Sondea cada
  * ~45 s (misma cadencia que la campana) y al reenfocar la ventana. Devuelve `{ count }`;

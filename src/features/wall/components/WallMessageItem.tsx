@@ -9,6 +9,7 @@ import {
   Pin,
   PinOff,
   Reply,
+  SmilePlus,
   Trash2,
   X,
 } from 'lucide-react';
@@ -44,12 +45,16 @@ import {
   useDeleteWallMessage,
   useEditWallMessage,
   usePinMessage,
+  useReactToWallMessage,
   useUnpinMessage,
 } from '../hooks/use-wall';
 import { useWallDirectory } from '../hooks/use-wall-directory';
+import { useLongPress } from '../hooks/use-long-press';
 import { notifyWallError } from '../lib/wall-errors';
 import { WallMentionText } from './WallMentionText';
 import { WallMessageAttachments } from './WallMessageAttachments';
+import { WallReactionChips } from './WallReactionChips';
+import { WallReactionPicker } from './WallReactionPicker';
 import { WallReplyQuote } from './WallReplyQuote';
 
 interface WallMessageItemProps {
@@ -109,13 +114,60 @@ export function WallMessageItem({
   const pinMessage = usePinMessage();
   const unpinMessage = useUnpinMessage();
   const pinBusy = pinMessage.isPending || unpinMessage.isPending;
-  // Directorio para sembrar el editor con las menciones ya presentes (ids → {id,name}).
-  const { resolve } = useWallDirectory(canEdit);
+  // Directorio para sembrar el editor con las menciones ya presentes (ids → {id,name}) y, (QL-147),
+  // para resolver los nombres del tooltip "quién reaccionó" cuando el mensaje tiene reacciones.
+  const { resolve } = useWallDirectory(canEdit || message.reactions.length > 0);
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(body);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const mentionCandidates = useRef<CommentMention[]>([]);
+
+  // (QL-147) Reacciones estilo WhatsApp: selector (hover/long-press) + chips bajo el mensaje.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const reactToMessage = useReactToWallMessage();
+  const reactMutate = reactToMessage.mutate;
+  // Reaccionar aplica a mensajes vivos ya confirmados (la lápida retorna antes; un mensaje en vuelo
+  // no tiene id real). Cualquier autenticado puede reaccionar, incluido el propio autor.
+  const canReact = !pending;
+  // Emoji con el que YA reaccionó el usuario (para resaltarlo en la barra rápida), o null.
+  const myReactionEmoji =
+    message.reactions.find((r) => !!currentUserId && r.userIds.includes(currentUserId))
+      ?.emoji ?? null;
+
+  const handleReact = useCallback(
+    (emoji: string) => {
+      setPickerOpen(false);
+      reactMutate(
+        { id: message.id, emoji },
+        { onError: (err) => notifyWallError(err, 'No se pudo reaccionar') },
+      );
+    },
+    [message.id, reactMutate],
+  );
+
+  // Long-press abre el selector en táctil (sin hover); en desktop lo abre el botón al pasar el cursor.
+  const longPress = useLongPress(() => {
+    if (canReact) setPickerOpen(true);
+  });
+
+  // Tooltip "quién reaccionó": nombres del directorio ("Tú" para el propio); si aún no cargó, cae al
+  // conteo. `resolve` ya está habilitado (arriba) cuando el mensaje tiene reacciones.
+  const describeReactors = useCallback(
+    (userIds: string[]) => {
+      const nameById = new Map(resolve(userIds).map((u) => [u.id, u.name]));
+      const known = userIds
+        .map((id) => (id === currentUserId ? 'Tú' : nameById.get(id)))
+        .filter((name): name is string => !!name);
+      const unknown = userIds.length - known.length;
+      if (known.length === 0) {
+        return userIds.length === 1 ? '1 reacción' : `${userIds.length} reacciones`;
+      }
+      if (unknown > 0) known.push(unknown === 1 ? '1 más' : `${unknown} más`);
+      return known.join(', ');
+    },
+    [resolve, currentUserId],
+  );
 
   const registerMention = useCallback((mention: CommentMention) => {
     if (!mentionCandidates.current.some((m) => m.id === mention.id)) {
@@ -224,6 +276,22 @@ export function WallMessageItem({
         )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+
+  // (QL-147) Disparador de reacción para **desktop**: aparece al pasar el cursor sobre el mensaje
+  // (`group-hover/msg`) y es enfocable por teclado (`focus-visible`). En táctil, donde no hay hover,
+  // el selector se abre con long-press sobre la burbuja. Ambos abren el mismo `WallReactionPicker`.
+  const reactionTrigger = canReact && (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={() => setPickerOpen(true)}
+      aria-label="Reaccionar"
+      className="size-7 shrink-0 self-center text-on-surface-variant opacity-0 transition-opacity focus-visible:opacity-100 group-hover/msg:opacity-100"
+    >
+      <SmilePlus className="size-4" />
+    </Button>
   );
 
   // Avatar de la burbuja. En un mensaje **agrupado** (QL-99) se sustituye por un hueco del
@@ -386,41 +454,66 @@ export function WallMessageItem({
             </div>
           </div>
         ) : (
-          <div
-            className={cn(
-              'flex min-w-0 max-w-full items-center gap-1',
-              isOwn && 'flex-row-reverse',
-            )}
-          >
-            {/* Burbuja: tono distinto para los mensajes propios; esquina "pinchada"
-                hacia el avatar (izq. ajenos, der. propios) para el look de chat. */}
+          <>
             <div
               className={cn(
-                'min-w-0 max-w-full rounded-2xl px-3.5 py-2',
-                isOwn
-                  ? 'rounded-br-sm bg-surface-container-high text-on-surface'
-                  : 'rounded-bl-sm bg-surface-container text-on-surface',
+                'flex min-w-0 max-w-full items-center gap-1',
+                isOwn && 'flex-row-reverse',
               )}
             >
-              {/* Cita del mensaje respondido (QL-103): clicable → salta al original. */}
-              {message.replyTo && (
-                <WallReplyQuote
-                  reply={message.replyTo}
-                  onJump={onJumpToMessage}
-                  className="mb-1.5"
-                />
-              )}
-              {body.length > 0 && (
-                <p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
-                  <WallMentionText body={body} mentions={mentions} />
-                </p>
-              )}
-              {attachments.length > 0 && (
-                <WallMessageAttachments attachments={attachments} />
-              )}
+              {/* (QL-147) La burbuja es el ancla del selector de reacciones (hover/long-press). */}
+              <WallReactionPicker
+                open={pickerOpen}
+                onOpenChange={setPickerOpen}
+                activeEmoji={myReactionEmoji}
+                onSelect={handleReact}
+                align={isOwn ? 'end' : 'start'}
+              >
+                {/* Burbuja: tono distinto para los mensajes propios; esquina "pinchada"
+                    hacia el avatar (izq. ajenos, der. propios) para el look de chat. */}
+                <div
+                  {...longPress}
+                  className={cn(
+                    'min-w-0 max-w-full rounded-2xl px-3.5 py-2',
+                    isOwn
+                      ? 'rounded-br-sm bg-surface-container-high text-on-surface'
+                      : 'rounded-bl-sm bg-surface-container text-on-surface',
+                  )}
+                >
+                  {/* Cita del mensaje respondido (QL-103): clicable → salta al original. */}
+                  {message.replyTo && (
+                    <WallReplyQuote
+                      reply={message.replyTo}
+                      onJump={onJumpToMessage}
+                      className="mb-1.5"
+                    />
+                  )}
+                  {body.length > 0 && (
+                    <p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
+                      <WallMentionText body={body} mentions={mentions} />
+                    </p>
+                  )}
+                  {attachments.length > 0 && (
+                    <WallMessageAttachments attachments={attachments} />
+                  )}
+                </div>
+              </WallReactionPicker>
+              {reactionTrigger}
+              {actions}
             </div>
-            {actions}
-          </div>
+
+            {/* (QL-147) Chips de reacciones bajo el mensaje, resaltando la propia. */}
+            {message.reactions.length > 0 && (
+              <WallReactionChips
+                reactions={message.reactions}
+                currentUserId={currentUserId}
+                onToggle={handleReact}
+                describeReactors={describeReactors}
+                align={isOwn ? 'end' : 'start'}
+                disabled={reactToMessage.isPending}
+              />
+            )}
+          </>
         )}
       </div>
 

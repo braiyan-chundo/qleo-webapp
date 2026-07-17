@@ -26,6 +26,21 @@ export interface WallAuthor {
 export type WallPinnedBy = WallAuthor;
 
 /**
+ * Reacción **agrupada por emoji** a un mensaje del muro (QL-147, §3.42). El backend agrupa por
+ * emoji (una reacción por usuario y mensaje) y devuelve el array ordenado por `count` desc. El
+ * front deriva **"mía"** = `userIds.includes(miUserId)` (id del usuario logueado). `userIds` sirve
+ * además para el tooltip "quién reaccionó". En una **lápida** (`deleted:true`) es `[]`.
+ */
+export interface WallReaction {
+  /** Emoji (literal Unicode). */
+  emoji: string;
+  /** Nº de usuarios que reaccionaron con este emoji (= `userIds.length`). */
+  count: number;
+  /** userIds que reaccionaron con este emoji. Contiene el propio id si la reacción es mía. */
+  userIds: string[];
+}
+
+/**
  * Vista **reducida** del mensaje citado cuando otro lo responde (QL-103, §3.25). Poblada en
  * `WallMessage.replyTo` si ese mensaje es una respuesta; `null` si no. El backend ya resuelve
  * el `preview` (extracto ≤120 chars, o "📎 Adjunto" / "🎤 Nota de voz" / "Este mensaje fue
@@ -78,6 +93,12 @@ export interface WallMessage {
    * SIEMPRE `null` en una lápida (`deleted:true`).
    */
   replyTo: WallReplyPreview | null;
+  /**
+   * (QL-147, §3.42) Reacciones agrupadas por emoji, orden `count` desc. `[]` si nadie reaccionó y
+   * SIEMPRE `[]` en una lápida (`deleted:true`). Se deriva "mía" cruzando `userIds` con el id del
+   * usuario logueado.
+   */
+  reactions: WallReaction[];
   /** ISO8601 (base del cursor de paginación: el `id`/ObjectId ya ordena por tiempo). */
   createdAt: string;
   updatedAt: string;
