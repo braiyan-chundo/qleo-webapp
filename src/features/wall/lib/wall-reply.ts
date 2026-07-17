@@ -12,9 +12,14 @@ const PREVIEW_MAX = 120;
  * sigue siendo la fuente de verdad: en el feed llega ya resuelto en `WallMessage.replyTo`.
  */
 export function buildReplyPreview(message: WallMessage | WallFeedItem): WallReplyPreview {
+  // (QL-148) Solo se responde a mensajes de usuario (tienen autor); el fallback cubre el tipo
+  // nullable del contrato sin que esta función pueda romper si algún día se cita algo sin autor.
+  const author = message.author;
   return {
     id: message.id,
-    author: { id: message.author.id, name: message.author.name },
+    author: author
+      ? { id: author.id, name: author.name }
+      : { id: message.authorId ?? '', name: 'Sistema' },
     preview: derivePreview(message),
   };
 }

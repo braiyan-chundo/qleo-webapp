@@ -14,6 +14,7 @@ import { QleoLogo } from '@/shared/components/QleoLogo';
 import { getDailySlogan } from '@/shared/config/slogans';
 import { useAppBadgeSync } from '@/shared/hooks/use-app-badge-sync';
 import { useNavHistoryTracker } from '@/shared/hooks/use-nav-history-tracker';
+import { useAppUpdateToast, useReportAppVersion } from '@/features/app-version/hooks/use-app-version';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +48,13 @@ export function AppLayout() {
   // genérico sepa a dónde volver y qué mostrar en su tooltip. Vive aquí (no en cada página)
   // porque `AppLayout` permanece montado entre rutas del área autenticada.
   useNavHistoryTracker();
+
+  // (QL-148) Reporta `__APP_VERSION__` al backend una vez por carga (con sesión válida) para que
+  // publique el aviso de nueva versión en el muro. Vive aquí porque `AppLayout` solo se monta con
+  // sesión (dentro de `SessionGate`) y permanece montado en toda el área autenticada.
+  useReportAppVersion();
+  // (QL-148) Si venimos de pulsar "Actualizar", confirma con un toast que el build nuevo ya cargó.
+  useAppUpdateToast();
 
   const handleLogout = () => {
     logout();

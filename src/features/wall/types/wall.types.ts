@@ -54,12 +54,41 @@ export interface WallReplyPreview {
   preview: string;
 }
 
+/**
+ * Tipo de mensaje del muro (QL-148, §3.43). `'user'` = mensaje normal (el default en respuestas
+ * previas a QL-148, que no traían `type`). `'system'` = aviso generado por la plataforma (p.ej. el
+ * aviso de nueva versión): sin autor, inmutable y sin acciones de usuario.
+ */
+export type WallMessageType = 'user' | 'system';
+
+/**
+ * Metadatos de un mensaje de sistema (QL-148, §3.43). En `systemKind: 'version_release'` trae la
+ * versión anunciada (`{ version: 'X.Y.Z' }`); `null` en los mensajes de usuario.
+ */
+export interface WallSystemMeta {
+  /** Versión anunciada en un aviso de release (SemVer `x.y.z`). */
+  version?: string;
+}
+
 /** Mensaje expandido del muro (§3.25). */
 export interface WallMessage {
   id: string;
-  authorId: string;
-  /** Autor poblado. */
-  author: WallAuthor;
+  /**
+   * (QL-148) Discriminador: `'user'` en mensajes normales, `'system'` en avisos de la plataforma.
+   * El backend puede omitirlo en respuestas antiguas → el servicio lo normaliza a `'user'`.
+   */
+  type: WallMessageType;
+  /**
+   * (QL-148) Subtipo del mensaje de sistema (`'version_release'` en el aviso de nueva versión), o
+   * `null` en un mensaje de usuario.
+   */
+  systemKind: string | null;
+  /** (QL-148) Metadatos del mensaje de sistema (`{ version }` en `version_release`), o `null`. */
+  meta: WallSystemMeta | null;
+  /** (QL-148) `null` en un mensaje de sistema (no tiene autor); el id del autor en los de usuario. */
+  authorId: string | null;
+  /** Autor poblado, o `null` en un mensaje de sistema (QL-148). */
+  author: WallAuthor | null;
   /**
    * `true` si el mensaje fue **eliminado** (soft-delete). El feed ahora DEVUELVE los borrados
    * como "lápida": llegan con `body:null`, `attachments/mentions:[]`, `pinnedAt/pinnedBy/editedAt:

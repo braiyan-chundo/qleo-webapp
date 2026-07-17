@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 
-import { wallMessageAnchorId, type WallFeedItem } from '../lib/wall-feed';
+import { wallMessageAnchorId, type WallFeedItem, type WallUserFeedItem } from '../lib/wall-feed';
 import { formatWallTime } from '../lib/wall-dates';
 import { describeWallMessageDeletion } from '../lib/wall-attachments';
 import {
@@ -58,7 +58,8 @@ import { WallReactionPicker } from './WallReactionPicker';
 import { WallReplyQuote } from './WallReplyQuote';
 
 interface WallMessageItemProps {
-  message: WallFeedItem;
+  /** Mensaje de **usuario** (autor presente). Los de sistema los pinta `WallSystemMessage` (QL-148). */
+  message: WallUserFeedItem;
   /**
    * `true` si este mensaje continúa un grupo del mismo autor (QL-99): se ocultan avatar y
    * nombre, y la burbuja se pega a la anterior. Lo decide `WallView` a partir del mensaje previo.

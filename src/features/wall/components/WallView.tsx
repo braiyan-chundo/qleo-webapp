@@ -17,10 +17,11 @@ import { useWallPresence } from '../hooks/use-wall-presence';
 import { dateSeparatorLabel, isSameDay, withinGroupWindow } from '../lib/wall-dates';
 import { buildReplyPreview } from '../lib/wall-reply';
 import { notifyWallError } from '../lib/wall-errors';
-import { wallMessageAnchorId, type WallFeedItem } from '../lib/wall-feed';
+import { wallMessageAnchorId, type WallFeedItem, type WallUserFeedItem } from '../lib/wall-feed';
 import type { WallReplyPreview, WallSearchResult } from '../types/wall.types';
 import { WallComposer } from './WallComposer';
 import { WallMessageItem } from './WallMessageItem';
+import { WallSystemMessage } from './WallSystemMessage';
 import { WallSearch } from './WallSearch';
 import { WallTypingIndicator } from './WallTypingIndicator';
 
@@ -214,20 +215,44 @@ export function WallView({ infoOpen = false, onToggleInfo }: WallViewProps) {
               const prev = feed.messages[index - 1];
               const showSeparator =
                 !prev || !isSameDay(prev.createdAt, message.createdAt);
+
+              // (QL-148) Mensaje de sistema (sin autor, p.ej. aviso de nueva versión): tarjeta
+              // propia centrada, no una burbuja de usuario ni agrupable.
+              if (message.type === 'system') {
+                return (
+                  <Fragment key={message.id}>
+                    {showSeparator && <DateSeparator iso={message.createdAt} />}
+                    <WallSystemMessage
+                      message={message}
+                      highlighted={message.id === highlightedId}
+                    />
+                  </Fragment>
+                );
+              }
+
+              // (QL-148) Un mensaje de usuario siempre trae autor (contrato); guarda defensiva que
+              // además estrecha el tipo para `WallMessageItem` (que solo pinta mensajes con autor).
+              const author = message.author;
+              if (!author) return null;
+              const userMessage: WallUserFeedItem = { ...message, author };
+
               // Agrupa (estilo WhatsApp, QL-99) los mensajes seguidos del **mismo autor** dentro
               // de ~5 min: los subsiguientes no repintan avatar ni nombre. Se rompe el grupo si
-              // hay separador de día, cambia el autor, o el mensaje está fijado (lleva su banner).
+              // hay separador de día, cambia el autor, el previo es de sistema, o el mensaje está
+              // fijado (lleva su banner).
               const grouped =
                 !!prev &&
+                prev.type === 'user' &&
+                !!prev.author &&
                 !showSeparator &&
-                prev.author.id === message.author.id &&
+                prev.author.id === author.id &&
                 message.pinnedAt == null &&
                 withinGroupWindow(prev.createdAt, message.createdAt);
               return (
                 <Fragment key={message.id}>
                   {showSeparator && <DateSeparator iso={message.createdAt} />}
                   <WallMessageItem
-                    message={message}
+                    message={userMessage}
                     grouped={grouped}
                     highlighted={message.id === highlightedId}
                     onReply={startReply}

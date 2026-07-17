@@ -27,6 +27,17 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
+// --- Actualización forzada desde la app (QL-148) --------------------------
+// La acción "Actualizar" del aviso de nueva versión hace `registration.update()` y, si el SW
+// nuevo quedara en "waiting", nos manda `SKIP_WAITING` para activar el build nuevo de inmediato
+// (además del `self.skipWaiting()` de arriba, que ya cubre el flujo normal de autoUpdate).
+self.addEventListener('message', (event) => {
+  const data = event.data as { type?: string } | null
+  if (data?.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
+})
+
 // --- Payload que envía el backend (F2) ------------------------------------
 // El backend enviará: { title, body, url, type, badge? }. En el MVP `url` = '/notifications'.
 interface PushPayload {

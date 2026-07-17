@@ -59,6 +59,8 @@ export function WallPinnedPanel() {
 /** Tarjeta de un mensaje fijado: autor + extracto + "Por {pinnedBy} · {fecha}". */
 function PinnedCard({ message }: { message: WallMessage }) {
   const { author, body, attachments, pinnedBy, pinnedAt } = message;
+  // (QL-148) Los mensajes de sistema no se fijan; guarda defensiva para el estrechamiento de tipo.
+  if (!author) return null;
   const excerpt = body.trim() || (attachments.length > 0 ? 'Adjunto' : '');
 
   const goToMessage = () => {

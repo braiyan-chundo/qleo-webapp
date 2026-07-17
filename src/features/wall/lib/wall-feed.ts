@@ -18,6 +18,13 @@ export interface WallFeedItem extends WallMessage {
 }
 
 /**
+ * (QL-148) Item del feed garantizado de **usuario** (autor presente). Los mensajes de sistema
+ * (`type:'system'`, `author:null`) los pinta `WallSystemMessage`; `WallView` estrecha a este tipo
+ * antes de renderizar la burbuja de usuario, así que `WallMessageItem` no lidia con `author` nulo.
+ */
+export type WallUserFeedItem = WallFeedItem & { author: WallAuthor };
+
+/**
  * Id del ancla DOM de un mensaje del feed. El panel de fijados (QL-93) lo usa para hacer
  * `scrollIntoView` al mensaje si está cargado en el hilo (`document.getElementById`).
  */
@@ -61,6 +68,10 @@ export function buildOptimisticMessage({
   const now = new Date().toISOString();
   return {
     id: optimisticId(),
+    // (QL-148) Un mensaje optimista lo escribe el usuario: siempre `type:'user'`, sin campos de sistema.
+    type: 'user',
+    systemKind: null,
+    meta: null,
     authorId: author.id,
     author,
     deleted: false,

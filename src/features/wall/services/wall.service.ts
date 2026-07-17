@@ -7,11 +7,13 @@ import type {
   UpdateWallMessageDto,
   WallFeedParams,
   WallMessage,
+  WallMessageType,
   WallPresenceCount,
   WallReaction,
   WallReadResult,
   WallReplyPreview,
   WallSearchResult,
+  WallSystemMeta,
   WallUnreadCount,
 } from '../types/wall.types';
 import type { WallSharedResponse, WallSharedType } from '../types/wall-shared.types';
@@ -62,13 +64,22 @@ function handleUnauthorized(status: number) {
  * conservando `id/author/createdAt`. `deleted` puede faltar en respuestas de endpoints que solo
  * devuelven mensajes vivos → se asume `false` al normalizar.
  */
-type RawWallMessage = Omit<WallMessage, 'body' | 'deleted' | 'replyTo' | 'reactions'> & {
+type RawWallMessage = Omit<
+  WallMessage,
+  'body' | 'deleted' | 'replyTo' | 'reactions' | 'type' | 'systemKind' | 'meta'
+> & {
   body: string | null;
   deleted?: boolean;
   /** Puede faltar en respuestas de endpoints previos a QL-103 → se asume `null` al normalizar. */
   replyTo?: WallReplyPreview | null;
   /** (QL-147) Puede faltar en respuestas de endpoints previos a QL-147 → se asume `[]` al normalizar. */
   reactions?: WallReaction[];
+  /** (QL-148) Puede faltar en respuestas previas a QL-148 → se asume `'user'` al normalizar. */
+  type?: WallMessageType;
+  /** (QL-148) `'version_release'` en el aviso de versión; `null`/ausente en mensajes de usuario. */
+  systemKind?: string | null;
+  /** (QL-148) `{ version }` en un aviso de versión; `null`/ausente en mensajes de usuario. */
+  meta?: WallSystemMeta | null;
 };
 
 /**
@@ -77,9 +88,18 @@ type RawWallMessage = Omit<WallMessage, 'body' | 'deleted' | 'replyTo' | 'reacti
  * cada uno por separado y baste con `deleted` para decidir el render.
  */
 function normalizeWallMessage(raw: RawWallMessage): WallMessage {
+  // (QL-148) Discriminador y campos de sistema: en respuestas antiguas o de usuario, `type` cae a
+  // `'user'` y `systemKind`/`meta` a `null` (los avisos de sistema los pobla el backend).
+  const type: WallMessageType = raw.type ?? 'user';
+  const systemKind = raw.systemKind ?? null;
+  const meta = raw.meta ?? null;
+
   if (raw.deleted) {
     return {
       ...raw,
+      type,
+      systemKind,
+      meta,
       deleted: true,
       body: '',
       mentions: [],
@@ -94,6 +114,9 @@ function normalizeWallMessage(raw: RawWallMessage): WallMessage {
   }
   return {
     ...raw,
+    type,
+    systemKind,
+    meta,
     deleted: false,
     body: raw.body ?? '',
     replyTo: raw.replyTo ?? null,
