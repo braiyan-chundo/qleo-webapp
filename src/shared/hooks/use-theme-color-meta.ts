@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useTheme } from 'next-themes';
 
+import { useAuthStore } from '@/store/auth.store';
+
 /**
  * Mantiene `<meta name="theme-color">` sincronizado con el tema activo (QL-47).
  *
@@ -13,6 +15,14 @@ import { useTheme } from 'next-themes';
  * QL-75: el arranque (recarga dura) ya lo cubre el script inline pre-paint de `index.html`;
  * este hook sigue siendo necesario para los cambios de tema **en caliente** (toggle,
  * opción "Sistema" siguiendo al SO) que ocurren después de montar React.
+ *
+ * QL-155: el color primary por usuario (QL-153) se inyecta inline en `<html>` por el applier
+ * (`useApplyUserTheme`), y el meta lee `--primary` **computado**. Ese cambio de preferencia no
+ * altera `resolvedTheme`, así que el efecto también observa `themePrimaryLight/Dark` del usuario
+ * en sesión: al cambiar el primary elegido, el meta se recomputa y la barra del SO/PWA hereda el
+ * nuevo color (antes se quedaba con el primary anterior). El applier corre en un hijo (`AppLayout`)
+ * respecto a este hook (`App`), y además el rAF difiere la lectura a después del commit, así que
+ * `getComputedStyle` ya ve el `--primary` recién inyectado.
  */
 const FALLBACK_PRIMARY = {
   light: '#004ccd',
@@ -21,6 +31,8 @@ const FALLBACK_PRIMARY = {
 
 export function useThemeColorMeta(): void {
   const { resolvedTheme } = useTheme();
+  const themePrimaryLight = useAuthStore((s) => s.user?.themePrimaryLight);
+  const themePrimaryDark = useAuthStore((s) => s.user?.themePrimaryDark);
 
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>(
@@ -46,5 +58,5 @@ export function useThemeColorMeta(): void {
     });
 
     return () => cancelAnimationFrame(raf);
-  }, [resolvedTheme]);
+  }, [resolvedTheme, themePrimaryLight, themePrimaryDark]);
 }
