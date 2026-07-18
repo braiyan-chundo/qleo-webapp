@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AlertTriangle,
-  CalendarClock,
+  CalendarOff,
   Loader2,
+  Pencil,
   Plus,
   Save,
   Trash2,
@@ -65,6 +66,9 @@ const WEEKDAY_LABELS = [
 
 const SATURDAY = 6;
 
+/** Modo de la vista: consulta de la malla guardada, o edición (nueva / editar). */
+type Mode = 'view' | 'edit';
+
 /** Ventana mínima de un turno para pintarlo y detectar solapes. */
 interface ShiftInfo {
   id: string;
@@ -86,16 +90,14 @@ function emptyWeekdays(): string[][] {
 
 /**
  * Editor de **mallas horarias por usuario** (QL-163, §3.48, solo ADMIN). Es el contenido del tab
- * "Mallas" del Calendario ADMIN. Flujo:
+ * "Mallas" del Calendario ADMIN. Tiene **dos modos** (refactor a petición del cliente):
  *
- * - Selector de usuario → carga su malla **vigente** y su **historial** de versiones.
- * - Editor por día de la semana (Dom…Sáb): multi-selección de turnos del catálogo (0..N), con
- *   aviso visual si dos turnos del mismo día se **solapan** (pre-validación en cliente; el backend
- *   es la fuente de verdad → `SHIFT_OVERLAP`). El patrón es **semanal** (se replica solo).
- * - Sábado intermedio: toggle + fecha ancla (un sábado de referencia); si hay turnos el sábado el
- *   ancla es obligatoria (`SCHEDULE_ANCHOR_REQUIRED`), validado también en cliente.
- * - Vigencia (`validFrom`) + guardar como **versión nueva** (`useCreateSchedule`) o **corregir en
- *   sitio** la versión cargada (`useUpdateSchedule`); borrar una versión (`useDeleteSchedule`).
+ * - **Vista** (por defecto al elegir usuario): muestra la malla **guardada** (vigente) en solo
+ *   lectura —turnos por día, sábado intermedio, vigencia— con acciones **Editar** y **Eliminar**.
+ *   Si el usuario no tiene malla, un estado vacío con **Nueva malla**.
+ * - **Edición**: se entra con **Nueva malla** (form vacío → botón *Guardar malla*, crea versión) o
+ *   con **Editar** (form cargado con la malla → botón *Actualizar malla*, corrige la versión en
+ *   sitio). Valida solapes de turnos por día y el ancla del sábado intermedio antes de guardar.
  */
 export function UserScheduleManager() {
   const currentUser = useAuthStore((s) => s.user);
@@ -126,7 +128,12 @@ export function UserScheduleManager() {
   const deleteSchedule = useDeleteSchedule();
   const isSaving = createSchedule.isPending || updateSchedule.isPending;
 
-  // --- Estado editable de la malla ---
+  // --- Modo + versión mostrada en solo lectura ---
+  const [mode, setMode] = useState<Mode>('view');
+  /** Versión que se muestra en modo vista (por defecto la vigente; puede ser una del historial). */
+  const [viewVersion, setViewVersion] = useState<UserSchedule | null>(null);
+
+  // --- Estado editable de la malla (modo edición) ---
   const [weekdays, setWeekdays] = useState<string[][]>(emptyWeekdays);
   const [saturdayAlternate, setSaturdayAlternate] = useState(false);
   const [saturdayAnchor, setSaturdayAnchor] = useState<string | null>(null);
@@ -135,7 +142,7 @@ export function UserScheduleManager() {
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const loadFromSchedule = (source: UserSchedule | null) => {
+  const loadEditorFrom = (source: UserSchedule | null) => {
     if (!source) {
       setWeekdays(emptyWeekdays());
       setSaturdayAlternate(false);
@@ -151,19 +158,21 @@ export function UserScheduleManager() {
     setEditingVersionId(source.id);
   };
 
-  // Inicializa el editor a la malla vigente **una vez por usuario**. Las acciones manuales
-  // (elegir otra versión, "Nueva malla") no lo re-disparan; al cambiar de usuario, sí.
+  // Al cambiar de usuario (o tras cargar por primera vez) volvemos a **modo vista** mostrando la
+  // malla vigente. No se re-dispara al editar (acción manual) ni al recargar por otras causas: solo
+  // cuando el usuario cambia. Las mutaciones fuerzan el re-sync poniendo el ref a `null`.
   const initializedForRef = useRef<string | null>(null);
   useEffect(() => {
     if (!userId) return;
     if (schedule === undefined) return; // aún cargando
     if (initializedForRef.current === userId) return;
     initializedForRef.current = userId;
-    loadFromSchedule(schedule);
+    setMode('view');
+    setViewVersion(schedule ?? null);
   }, [userId, schedule]);
 
-  // Mapa id → info del turno (catálogo completo, incluidos retirados para poder pintar una
-  // versión antigua que aún los referencie).
+  // Mapa id → info del turno (catálogo completo, incluidos retirados para poder pintar una versión
+  // antigua que aún los referencie).
   const shiftById = useMemo(() => {
     const map = new Map<string, ShiftInfo>();
     for (const s of catalog ?? []) {
@@ -180,7 +189,7 @@ export function UserScheduleManager() {
 
   const activeShifts = useMemo(() => (catalog ?? []).filter((s) => s.active), [catalog]);
 
-  // Ids en solape, por día, para el aviso visual.
+  // Ids en solape, por día, para el aviso visual (modo edición).
   const overlapByDay = useMemo(
     () =>
       weekdays.map((ids) => {
@@ -214,12 +223,19 @@ export function UserScheduleManager() {
     );
   };
 
+  // --- Transiciones de modo ---
   const startNewSchedule = () => {
-    loadFromSchedule(null);
+    loadEditorFrom(null);
+    setMode('edit');
   };
 
-  const loadVersion = (version: UserSchedule) => {
-    loadFromSchedule(version);
+  const startEdit = () => {
+    loadEditorFrom(viewVersion);
+    setMode('edit');
+  };
+
+  const cancelEdit = () => {
+    setMode('view');
   };
 
   const buildDto = () => ({
@@ -268,9 +284,11 @@ export function UserScheduleManager() {
     createSchedule.mutate(
       { userId, ...buildDto() },
       {
-        onSuccess: () => {
-          toast.success('Malla guardada como nueva versión vigente.');
-          // Re-inicializa a la vigente recién creada (para poder "corregir" luego).
+        onSuccess: (created) => {
+          toast.success('Malla guardada.');
+          setViewVersion(created);
+          setMode('view');
+          // Re-sincroniza con la vigente del servidor al refrescar (por si difiere).
           initializedForRef.current = null;
         },
         onError: onSaveError,
@@ -283,23 +301,35 @@ export function UserScheduleManager() {
     updateSchedule.mutate(
       { id: editingVersionId, dto: buildDto() },
       {
-        onSuccess: () => toast.success('Versión de la malla corregida.'),
+        onSuccess: (updated) => {
+          toast.success('Malla actualizada.');
+          setViewVersion(updated);
+          setMode('view');
+          initializedForRef.current = null;
+        },
         onError: onSaveError,
       },
     );
   };
 
+  const handleSave = () => {
+    if (editingVersionId) handleUpdate();
+    else handleCreate();
+  };
+
   const handleDelete = () => {
-    if (!editingVersionId) return;
-    deleteSchedule.mutate(editingVersionId, {
+    if (!viewVersion) return;
+    deleteSchedule.mutate(viewVersion.id, {
       onSuccess: () => {
-        toast.success('Versión de la malla eliminada.');
+        toast.success('Malla eliminada.');
         setConfirmDelete(false);
+        setMode('view');
+        setViewVersion(null);
         initializedForRef.current = null; // recargar a la nueva vigente (o vacío)
       },
       onError: (err) => {
         setConfirmDelete(false);
-        toast.error(err instanceof Error ? err.message : 'No se pudo eliminar la versión.');
+        toast.error(err instanceof Error ? err.message : 'No se pudo eliminar la malla.');
       },
     });
   };
@@ -308,7 +338,7 @@ export function UserScheduleManager() {
 
   return (
     <div className="space-y-6">
-      {/* Selector de usuario */}
+      {/* Selector de usuario + acción principal */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="grid gap-1.5">
           <span className="text-sm font-medium text-on-surface">Usuario</span>
@@ -319,7 +349,7 @@ export function UserScheduleManager() {
             placeholder="Elegir usuario…"
           />
         </div>
-        {selected && (
+        {selected && mode === 'view' && (
           <Button variant="outline" onClick={startNewSchedule} className="h-11">
             <Plus />
             Nueva malla
@@ -329,7 +359,7 @@ export function UserScheduleManager() {
 
       {!selected ? (
         <div className="rounded-xl border border-dashed border-outline-variant/60 bg-surface-container-low px-6 py-12 text-center text-sm text-on-surface-variant">
-          Elige un usuario para configurar su malla horaria.
+          Elige un usuario para consultar o configurar su malla horaria.
         </div>
       ) : scheduleLoading ? (
         <div className="space-y-2">
@@ -337,8 +367,148 @@ export function UserScheduleManager() {
             <Skeleton key={i} className="h-14 rounded-lg" />
           ))}
         </div>
+      ) : mode === 'view' ? (
+        // ─────────────── MODO VISTA (solo lectura de la malla guardada) ───────────────
+        !viewVersion ? (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-outline-variant/60 bg-surface-container-low px-6 py-12 text-center">
+            <CalendarOff className="size-8 text-tertiary" />
+            <div className="grid gap-1">
+              <span className="text-sm font-medium text-on-surface">
+                Este usuario no tiene mallas asignadas
+              </span>
+              <span className="text-sm text-on-surface-variant">
+                Usa <b>Nueva malla</b> para crear su primera malla horaria.
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* Historial de versiones (si hay más de una) para previsualizarlas en solo lectura */}
+            {(versions ?? []).length > 1 && (
+              <div className="space-y-2">
+                <span className="text-sm font-medium text-on-surface">Versiones</span>
+                <div className="flex flex-wrap gap-2">
+                  {(versions ?? []).map((version) => {
+                    const isViewing = version.id === viewVersion.id;
+                    const isCurrent = version.id === schedule?.id;
+                    return (
+                      <Button
+                        key={version.id}
+                        type="button"
+                        variant={isViewing ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewVersion(version)}
+                      >
+                        Desde {version.validFrom}
+                        {isCurrent && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'ml-1 border-tertiary/40 text-tertiary',
+                              isViewing && 'border-on-primary/40 text-on-primary',
+                            )}
+                          >
+                            Vigente
+                          </Badge>
+                        )}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Resumen semanal en solo lectura */}
+            <div className="divide-y divide-outline-variant/40 overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-low">
+              {WEEKDAY_LABELS.map((label, dayIndex) => {
+                const shifts = viewVersion.weekdays[dayIndex]?.shifts ?? [];
+                return (
+                  <div
+                    key={label}
+                    className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start"
+                  >
+                    <span className="w-24 shrink-0 pt-1 text-sm font-medium text-on-surface">
+                      {label}
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      {shifts.length === 0 ? (
+                        <span className="py-1 text-sm text-on-surface-variant/70">Descanso</span>
+                      ) : (
+                        shifts.map((shift) => (
+                          <span
+                            key={shift.id}
+                            className="flex items-center gap-1.5 rounded-full border border-outline-variant/60 bg-surface py-1 pr-2.5 pl-2 text-xs text-on-surface"
+                          >
+                            <span
+                              className="size-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: shift.color ?? 'var(--color-primary)' }}
+                              aria-hidden
+                            />
+                            <span className="font-medium">{shift.name}</span>
+                            <span className="tabular-nums text-on-surface-variant">
+                              {formatShiftHours(shift)}
+                            </span>
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {viewVersion.saturdayAlternate && (
+              <p className="text-xs text-on-surface-variant">
+                <b>Sábado intermedio</b>: los turnos del sábado rigen semanas alternas
+                {viewVersion.saturdayAnchor
+                  ? `, ancladas al sábado ${viewVersion.saturdayAnchor}.`
+                  : '.'}
+              </p>
+            )}
+
+            {/* Vigencia + acciones sobre la malla */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-4">
+              <span className="text-sm text-on-surface-variant">
+                Vigente desde <b className="text-on-surface">{viewVersion.validFrom}</b>
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={startEdit}>
+                  <Pencil />
+                  Editar
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-error hover:bg-error-container hover:text-on-error-container"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={deleteSchedule.isPending}
+                >
+                  <Trash2 />
+                  Eliminar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )
       ) : (
-        <>
+        // ─────────────────────────── MODO EDICIÓN ───────────────────────────
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="grid gap-0.5">
+              <h3 className="text-lg font-semibold text-on-surface">
+                {editingVersionId ? 'Editar malla' : 'Nueva malla'}
+              </h3>
+              <p className="text-sm text-on-surface-variant">
+                {editingVersionId
+                  ? 'Modifica los turnos de la malla y actualiza.'
+                  : 'Configura los turnos de cada día y guarda la nueva malla.'}
+              </p>
+            </div>
+            <Button variant="ghost" onClick={cancelEdit} disabled={isSaving}>
+              <X />
+              Cancelar
+            </Button>
+          </div>
+
           {noShifts && (
             <div className="flex items-start gap-2 rounded-lg border border-outline-variant/60 bg-surface-container-low p-3 text-sm text-on-surface-variant">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-tertiary" />
@@ -346,41 +516,6 @@ export function UserScheduleManager() {
                 Aún no hay turnos en el catálogo. Créalos en el tab <b>Turnos</b> para poder
                 asignarlos aquí.
               </span>
-            </div>
-          )}
-
-          {/* Historial de versiones */}
-          {(versions ?? []).length > 0 && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium text-on-surface">Versiones</span>
-              <div className="flex flex-wrap gap-2">
-                {(versions ?? []).map((version) => {
-                  const isEditing = version.id === editingVersionId;
-                  const isCurrent = version.id === schedule?.id;
-                  return (
-                    <Button
-                      key={version.id}
-                      type="button"
-                      variant={isEditing ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => loadVersion(version)}
-                    >
-                      Desde {version.validFrom}
-                      {isCurrent && (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'ml-1 border-tertiary/40 text-tertiary',
-                            isEditing && 'border-on-primary/40 text-on-primary',
-                          )}
-                        >
-                          Vigente
-                        </Badge>
-                      )}
-                    </Button>
-                  );
-                })}
-              </div>
             </div>
           )}
 
@@ -545,7 +680,7 @@ export function UserScheduleManager() {
             )}
           </div>
 
-          {/* Vigencia + acciones */}
+          {/* Vigencia + guardar/actualizar */}
           <div className="grid gap-4 rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-4">
             <div className="grid gap-1.5">
               <FieldLabel htmlFor="valid-from" className="text-xs text-on-surface-variant">
@@ -559,40 +694,23 @@ export function UserScheduleManager() {
                 placeholder="Elegir fecha"
               />
               <span className="text-xs text-on-surface-variant">
-                Guardar como cambio vigente crea una <b>versión nueva</b> desde esta fecha; las
-                anteriores se conservan.
+                {editingVersionId
+                  ? 'Al actualizar se corrige esta versión sin crear una nueva.'
+                  : 'La malla rige desde esta fecha; las versiones anteriores se conservan.'}
               </span>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={handleCreate} disabled={isSaving || noShifts}>
-                {createSchedule.isPending ? <Loader2 className="animate-spin" /> : <Save />}
-                Guardar como cambio vigente
+              <Button onClick={handleSave} disabled={isSaving || noShifts}>
+                {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
+                {editingVersionId ? 'Actualizar malla' : 'Guardar malla'}
               </Button>
-              {editingVersionId && (
-                <Button variant="outline" onClick={handleUpdate} disabled={isSaving || noShifts}>
-                  {updateSchedule.isPending ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <CalendarClock />
-                  )}
-                  Corregir esta versión
-                </Button>
-              )}
-              {editingVersionId && (
-                <Button
-                  variant="ghost"
-                  className="text-error hover:bg-error-container hover:text-on-error-container"
-                  onClick={() => setConfirmDelete(true)}
-                  disabled={deleteSchedule.isPending}
-                >
-                  <Trash2 />
-                  Eliminar versión
-                </Button>
-              )}
+              <Button variant="outline" onClick={cancelEdit} disabled={isSaving}>
+                Cancelar
+              </Button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       <AlertDialog
@@ -603,10 +721,10 @@ export function UserScheduleManager() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar esta versión de la malla?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar esta malla?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará la versión vigente desde {validFrom}. Si era la vigente, regirá la
-              anterior (o ninguna). Esta acción no se puede deshacer.
+              Se eliminará la malla vigente desde {viewVersion?.validFrom ?? '—'}. Si era la
+              vigente, regirá la anterior (o ninguna). Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -37,11 +37,10 @@ export function BottomNav() {
   const { count: wallUnread } = useWallUnreadCount();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // "Más" es una lista plana: los grupos (p. ej. Administración QL-149, Calendario QL-165) se
-  // expanden en sus hijos con `flattenNavItems`, que es consciente del rol: si un grupo no deja
-  // hijos visibles (p. ej. Calendario para un MEMBER) devuelve el parent como link plano, así que
-  // el MEMBER conserva la sección. El filtro externo por `adminOnly` sigue quitando los parents
-  // solo-ADMIN (p. ej. Administración) del menú de un MEMBER.
+  // "Más" es una lista plana: los grupos (p. ej. Administración QL-149) se expanden en sus hijos
+  // con `flattenNavItems`, que es consciente del rol: si un grupo no deja hijos visibles devuelve
+  // el parent como link plano, así que el MEMBER conserva la sección. El filtro externo por
+  // `adminOnly` sigue quitando los parents solo-ADMIN (p. ej. Administración) del menú de un MEMBER.
   const menuItems = flattenNavItems(allNavItems, isAdmin).filter(
     (item) => !item.adminOnly || isAdmin,
   );

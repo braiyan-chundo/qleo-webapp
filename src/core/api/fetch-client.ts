@@ -65,8 +65,17 @@ class FetchClient {
         return Promise.reject(new ApiError(errorMessage, errorCode, response.status));
       }
 
-      // Backend wraps data in { success: true, data: T }
-      return result?.data ?? result;
+      // El backend envuelve todo en `{ success, data, error }`. Devolvemos `data` tal cual —incluido
+      // `null`, que es un valor legítimo (p. ej. "sin malla vigente", "sin recurso actual")—; solo
+      // caemos a `result` crudo si la respuesta NO vino envuelta. El viejo `result?.data ?? result`
+      // trataba `data: null` como "no hay data" y devolvía el sobre entero, reventando a los
+      // consumidores tipados como `T | null` (p. ej. el calendario del MEMBER sin malla).
+      const isEnvelope =
+        result != null &&
+        typeof result === 'object' &&
+        'success' in result &&
+        'data' in result;
+      return (isEnvelope ? result.data : result) as T;
     } catch (error) {
       return Promise.reject(error);
     }

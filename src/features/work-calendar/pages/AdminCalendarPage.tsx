@@ -1,11 +1,10 @@
 import type { ComponentType } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, CalendarRange, Clock, PartyPopper } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BackButton } from '@/shared/components/BackButton';
-import { activeNavUrl } from '@/shared/config/nav';
 import { ShiftCatalogManager } from '@/features/shifts/components/ShiftCatalogManager';
 import { UserScheduleManager } from '@/features/schedules/components/UserScheduleManager';
 
@@ -17,13 +16,8 @@ import { HolidaysManager } from '../components/HolidaysManager';
  * `AdminSettingsPage`, QL-149): añadir una sección es sumar una entrada con su `Component`.
  */
 interface CalendarTab {
-  /** Clave estable del tab (valor de la `Tabs`). */
+  /** Clave estable del tab: valor de la `Tabs` y del query param `?tab=`. */
   value: string;
-  /**
-   * Sub-ruta de la sección (QL-165). La sección activa se deriva del `pathname` (no de `?tab=`),
-   * para que el sidebar se ilumine por ruta. Los tabs navegan a esta `url`.
-   */
-  url: string;
   label: string;
   icon: LucideIcon;
   Component: ComponentType;
@@ -32,49 +26,53 @@ interface CalendarTab {
 const CALENDAR_TABS: readonly CalendarTab[] = [
   {
     value: 'calendario',
-    url: '/calendar',
     label: 'Calendario',
     icon: CalendarDays,
     Component: AdminCalendarTab,
   },
   {
     value: 'festivos',
-    url: '/calendar/festivos',
     label: 'Festivos',
     icon: PartyPopper,
     Component: HolidaysManager,
   },
   {
     value: 'turnos',
-    url: '/calendar/turnos',
     label: 'Turnos',
     icon: Clock,
     Component: ShiftCatalogManager,
   },
   {
     value: 'mallas',
-    url: '/calendar/mallas',
     label: 'Mallas',
     icon: CalendarRange,
     Component: UserScheduleManager,
   },
 ] as const;
 
+const DEFAULT_TAB = CALENDAR_TABS[0];
+
 /**
- * Calendario ADMIN (QL-163/QL-165, solo ADMIN). Cierra el epic "Turnos y mallas" (Lote Y) en el
- * front: reúne el **calendario** (de cualquier usuario), la gestión de **festivos**, el catálogo de
- * **turnos** y las **mallas** horarias por usuario. Desde QL-165 cada sección es una **sub-ruta**
- * (`/calendar`, `/calendar/festivos`, …) en vez de un `?tab=`, para que el resaltado del sidebar
- * case por `pathname`; la sección activa se deriva del pathname (el prefijo más largo que casa, vía
- * `activeNavUrl`) y los tabs navegan a su ruta. Se monta desde la rama ADMIN de `CalendarPage`.
+ * Calendario ADMIN (QL-163, solo ADMIN). Cierra el epic "Turnos y mallas" (Lote Y) en el front:
+ * reúne el **calendario** (de cualquier usuario), la gestión de **festivos**, el catálogo de
+ * **turnos** y las **mallas** horarias por usuario, todo en **una sola ruta** (`/calendar`) con
+ * **tabs**. La sección activa vive en el query param `?tab=` (deep-link/refresh estables) en vez
+ * de en sub-rutas: se revirtió el esquema `/calendar/festivos|…` de QL-165 para que el sidebar
+ * muestre un único ítem "Calendario". Se monta desde la rama ADMIN de `CalendarPage`.
  */
 export function AdminCalendarPage() {
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const activeUrl = activeNavUrl(pathname, CALENDAR_TABS) ?? CALENDAR_TABS[0].url;
+  const tabParam = searchParams.get('tab');
   const activeTab =
-    CALENDAR_TABS.find((t) => t.url === activeUrl) ?? CALENDAR_TABS[0];
+    CALENDAR_TABS.find((t) => t.value === tabParam) ?? DEFAULT_TAB;
+
+  const selectTab = (value: string) => {
+    // El tab por defecto deja la URL limpia (`/calendar`); el resto fija `?tab=`. `replace` evita
+    // inflar el historial al alternar secciones.
+    if (value === DEFAULT_TAB.value) setSearchParams({}, { replace: true });
+    else setSearchParams({ tab: value }, { replace: true });
+  };
 
   return (
     <div className="p-4 md:p-8">
@@ -94,7 +92,7 @@ export function AdminCalendarPage() {
             <TabsTrigger
               key={t.value}
               value={t.value}
-              onClick={() => navigate(t.url)}
+              onClick={() => selectTab(t.value)}
             >
               <t.icon />
               {t.label}

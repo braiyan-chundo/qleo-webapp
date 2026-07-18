@@ -66,19 +66,14 @@ function App() {
                     ADMIN o creador (el backend autoriza). El acceso del menú es adminOnly. */}
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
-                {/* Calendario (QL-162): autenticado. La página se ramifica por rol —el MEMBER ve
-                    su calendario de solo lectura; el ADMIN, la administración con sus secciones. El
-                    menú ya no es `adminOnly`. */}
+                {/* Calendario (QL-162): **ruta única** autenticada. La página se ramifica por rol —el
+                    MEMBER ve su calendario de solo lectura; el ADMIN, la administración con sus
+                    secciones en **tabs** (`?tab=`, dentro de la misma ruta). Se revirtieron las
+                    sub-rutas `/calendar/festivos|turnos|mallas` de QL-165. */}
                 <Route path="/calendar" element={<CalendarPage />} />
 
                 {/* Área de administración (solo ADMIN) */}
                 <Route element={<AdminRoute />}>
-                  {/* QL-165: sub-secciones del Calendario ADMIN como sub-rutas (antes `?tab=`), para
-                      que el resaltado del sidebar case por `pathname`. Un MEMBER que entre queda
-                      redirigido por el guard. Todas montan `CalendarPage` (rama ADMIN). */}
-                  <Route path="/calendar/festivos" element={<CalendarPage />} />
-                  <Route path="/calendar/turnos" element={<CalendarPage />} />
-                  <Route path="/calendar/mallas" element={<CalendarPage />} />
                   <Route path="/admin" element={<UsersAdminPage />} />
                   {/* QL-149: Configuración (tabs; hoy solo el catálogo de Etiquetas). */}
                   <Route

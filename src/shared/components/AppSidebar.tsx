@@ -142,11 +142,11 @@ export function AppSidebar() {
                 const isActive = isNavItemActive(pathname, item.url);
                 const badgeCount = item.badge === 'wall' ? wallUnread : 0;
 
-                // Grupo con sub-ítems estáticos (QL-149/QL-165, p. ej. "Administración",
-                // "Calendario"): se despliega en sus hijos con el mismo patrón visual que Proyectos.
-                // Los hijos se filtran por rol; si tras filtrar queda alguno → grupo desplegable con
-                // esos hijos; si NO queda ninguno (p. ej. "Calendario" para un MEMBER, cuyos hijos
-                // son todos `adminOnly`) → se cae al link plano del parent de más abajo.
+                // Grupo con sub-ítems estáticos (QL-149, p. ej. "Administración"): se despliega en
+                // sus hijos con el mismo patrón visual que Proyectos. Los hijos se filtran por rol;
+                // si tras filtrar queda alguno → grupo desplegable con esos hijos; si NO queda
+                // ninguno (grupo con hijos todos `adminOnly`, visto por un MEMBER) → se cae al link
+                // plano del parent de más abajo.
                 if (item.children) {
                   const visibleChildren = item.children.filter(
                     (child) => !child.adminOnly || isAdmin,

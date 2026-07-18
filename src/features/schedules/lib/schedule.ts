@@ -48,7 +48,9 @@ export function shiftsForDay(
 ): ResolvedShift[] {
   if (!schedule) return [];
   const dow = date.getDay(); // 0=Dom … 6=Sáb, misma convención que weekdays
-  const shifts = schedule.weekdays[dow]?.shifts ?? [];
+  // `weekdays?.[dow]` (no solo `[dow]?.`): si por lo que sea `weekdays` no viniera (dato del
+  // servidor), no reventamos con `undefined[dow]` — devolvemos "sin turnos" en vez de crashear.
+  const shifts = schedule.weekdays?.[dow]?.shifts ?? [];
   if (shifts.length === 0) return [];
 
   if (dow === 6 && schedule.saturdayAlternate) {

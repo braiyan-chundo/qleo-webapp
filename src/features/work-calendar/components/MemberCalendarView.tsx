@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarOff, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,7 +51,9 @@ export function MemberCalendarView({ userId, ownCalendar = true }: MemberCalenda
   // reejecuta el `useMemo` de la grilla en balde.
   const weekendDays = useMemo(() => config?.weekendDays ?? [0, 6], [config?.weekendDays]);
 
-  const { data: schedule } = useUserSchedule(userId);
+  const { data: schedule, isLoading: scheduleLoading } = useUserSchedule(userId);
+  // Cargada la malla y no hay ninguna vigente → el usuario no tiene malla asignada.
+  const noSchedule = !scheduleLoading && !schedule;
 
   const grid = useMemo(
     () => buildMonthGrid(viewMonth.year, viewMonth.month, weekendDays),
@@ -111,7 +113,24 @@ export function MemberCalendarView({ userId, ownCalendar = true }: MemberCalenda
         </div>
       </div>
 
-      <Legend hasSchedule={!!schedule} ownCalendar={ownCalendar} />
+      {noSchedule && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-outline-variant/60 bg-surface-container-low p-4 text-sm text-on-surface">
+          <CalendarOff className="mt-0.5 size-5 shrink-0 text-tertiary" />
+          <div className="grid gap-0.5">
+            <span className="font-medium">
+              {ownCalendar
+                ? 'No tienes mallas asignadas'
+                : 'Este usuario no tiene mallas asignadas'}
+            </span>
+            <span className="text-on-surface-variant">
+              Se muestran los festivos y días no laborables. La malla horaria la asigna un
+              administrador.
+            </span>
+          </div>
+        </div>
+      )}
+
+      <Legend />
 
       {holidaysLoading ? (
         <Skeleton className="h-[28rem] rounded-xl" />
@@ -152,13 +171,7 @@ export function MemberCalendarView({ userId, ownCalendar = true }: MemberCalenda
 }
 
 /** Leyenda de los tipos de día del calendario. */
-function Legend({
-  hasSchedule,
-  ownCalendar,
-}: {
-  hasSchedule: boolean;
-  ownCalendar: boolean;
-}) {
+function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-on-surface-variant">
       <LegendSwatch
@@ -177,13 +190,6 @@ function Legend({
         <span className="size-3 rounded-full bg-primary" aria-hidden />
         Hoy
       </span>
-      {!hasSchedule && (
-        <span className="text-on-surface-variant/80">
-          {ownCalendar
-            ? '· No tienes una malla horaria asignada'
-            : '· Este usuario no tiene una malla horaria asignada'}
-        </span>
-      )}
     </div>
   );
 }

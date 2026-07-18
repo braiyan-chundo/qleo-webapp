@@ -7,9 +7,6 @@ import {
   History,
   HelpCircle,
   CalendarDays,
-  CalendarRange,
-  Clock,
-  PartyPopper,
   UserCircle,
   BarChart3,
   Megaphone,
@@ -61,20 +58,14 @@ export const primaryNavItems: NavItem[] = [
   { title: 'Mis tareas', url: '/tasks', icon: ClipboardList },
   { title: 'Notificaciones', url: '/notifications', icon: Bell },
   {
-    // QL-165: el Calendario pasa a ser un grupo expandible (mismo patrón que "Administración").
-    // El **parent** es visible para TODOS (sin `adminOnly`): el MEMBER lo ve como link plano a su
-    // calendario de solo lectura; el ADMIN lo despliega en sus 4 sub-secciones (todas `adminOnly`).
-    // El filtrado por rol de los hijos lo hace el consumidor (sidebar / bottom nav): si tras filtrar
-    // no queda ningún hijo, el parent se pinta como link plano.
+    // Calendario = **una sola ruta** `/calendar` (link plano para todos). Revierte la variante
+    // QL-165 (grupo expandible con sub-rutas `/calendar/festivos|turnos|mallas`): las secciones del
+    // ADMIN (Calendario · Festivos · Turnos · Mallas) viven ahora como **tabs dentro de la página**
+    // (`?tab=`), no como subítems del sidebar. El MEMBER ve el mismo link → su calendario de solo
+    // lectura. El resaltado casa por `pathname` ('/calendar') y sobrevive al cambio de `?tab=`.
     title: 'Calendario',
     url: '/calendar',
     icon: CalendarDays,
-    children: [
-      { title: 'Calendario', url: '/calendar', icon: CalendarDays, adminOnly: true },
-      { title: 'Festivos', url: '/calendar/festivos', icon: PartyPopper, adminOnly: true },
-      { title: 'Turnos', url: '/calendar/turnos', icon: Clock, adminOnly: true },
-      { title: 'Mallas', url: '/calendar/mallas', icon: CalendarRange, adminOnly: true },
-    ],
   },
   { title: 'Analíticas', url: '/analytics', icon: BarChart3, adminOnly: true },
   {
@@ -172,8 +163,8 @@ export function activeNavUrl(
  * Por cada grupo se filtran los hijos por rol (`!adminOnly || isAdmin`):
  * - si quedan hijos visibles → se devuelven esos (el parent-contenedor se descarta, su `url` ya
  *   la cubre un hijo);
- * - si NO queda ninguno (p. ej. "Calendario" para un MEMBER, cuyos hijos son todos `adminOnly`)
- *   → se devuelve el **parent** como link plano, para no perder la sección del menú.
+ * - si NO queda ninguno (un grupo cuyos hijos son todos `adminOnly`, visto por un MEMBER) → se
+ *   devuelve el **parent** como link plano, para no perder la sección del menú.
  *
  * Los ítems sin hijos se mantienen tal cual. El filtro por `adminOnly` de los ítems de primer
  * nivel (p. ej. el parent `adminOnly` de "Administración") lo sigue aplicando el consumidor.

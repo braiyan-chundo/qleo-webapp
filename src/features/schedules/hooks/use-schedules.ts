@@ -33,8 +33,13 @@ interface UseUserScheduleOptions {
 /**
  * Malla **vigente** de un usuario (§3.48). El backend devuelve `null` si no tiene malla
  * aplicable. **Permiso:** un MEMBER solo puede pedir la suya (otra → 403); el llamador de
- * QL-162 pasa siempre `user.id` del store. Las mallas cambian rara vez → `staleTime` alto
- * (se refrescan en vivo por el bus realtime `schedule`).
+ * QL-162 pasa siempre `user.id` del store.
+ *
+ * `staleTime: 0`: al **cambiar de usuario** (calendario ADMIN, editor de mallas) hay que traer su
+ * malla ACTUAL. Con el `staleTime` alto anterior (30 min), re-seleccionar a un usuario cuya malla
+ * ya estaba en caché —típicamente un `null` cacheado de cuando aún no tenía malla— servía ese valor
+ * viejo **sin repetir la petición**, así que la malla recién creada no aparecía. Las mutaciones ya
+ * invalidan; con `staleTime: 0` además cada selección/montaje re-pide (payload mínimo).
  */
 export function useUserSchedule(
   userId: string | undefined,
@@ -44,11 +49,12 @@ export function useUserSchedule(
     queryKey: scheduleKeys.userAt(userId ?? '', at),
     queryFn: () => schedulesService.getUserSchedule(userId as string, at),
     enabled: enabled && !!userId,
-    staleTime: 30 * 60 * 1000,
+    staleTime: 0,
   });
 }
 
-/** Historial de versiones de un usuario (solo ADMIN, §3.48). QL-163. */
+/** Historial de versiones de un usuario (solo ADMIN, §3.48). QL-163. `staleTime: 0` por el mismo
+ * motivo que `useUserSchedule`: al elegir usuario se re-pide su historial actual. */
 export function useUserScheduleVersions(
   userId: string | undefined,
   enabled = true,
@@ -57,7 +63,7 @@ export function useUserScheduleVersions(
     queryKey: scheduleKeys.userVersions(userId ?? ''),
     queryFn: () => schedulesService.getUserVersions(userId as string),
     enabled: enabled && !!userId,
-    staleTime: 30 * 60 * 1000,
+    staleTime: 0,
   });
 }
 
