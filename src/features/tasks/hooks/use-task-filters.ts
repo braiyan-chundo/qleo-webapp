@@ -1,10 +1,12 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import {
   useQueryParams,
   useQueryParamSearch,
   useQueryParamState,
 } from '@/shared/hooks/use-query-param-state';
+import { useAuthStore } from '@/store/auth.store';
 
 import type { Task, TaskAssignment } from '../services/tasks.service';
 
@@ -71,6 +73,11 @@ export interface UseTaskFiltersResult extends TaskFiltersState {
  * `filter(tasks)` en el punto que corresponda para no duplicar lógica.
  *
  * Nombres de param (cortos y consistentes): `q`, `resp`, `estado`.
+ *
+ * QL-156: por defecto el filtro de Responsable arranca preseleccionado al **usuario actual**
+ * (lo más común es "ver mis tareas"). Es solo el valor inicial: el usuario puede cambiarlo o
+ * elegir "Todos". Se respeta el deep-link — si la URL ya trae `resp` (incluso vacío), no se
+ * pisa; el default solo aplica cuando el param está **ausente** al montar.
  */
 export function useTaskFilters(tasks: Task[] | undefined): UseTaskFiltersResult {
   const { value: searchValue, setValue: setSearchValue, committed } =
@@ -78,6 +85,26 @@ export function useTaskFilters(tasks: Task[] | undefined): UseTaskFiltersResult 
   const [assigneeId, setAssigneeId] = useQueryParamState<string>(ASSIGNEE_PARAM, ALL);
   const [status, setStatus] = useQueryParamState<TaskStatusFilter>(STATUS_PARAM, 'all');
   const setParams = useQueryParams();
+
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  const currentUserName = useAuthStore((s) => s.user?.name);
+  const [urlParams] = useSearchParams();
+
+  /**
+   * Preselección one-shot del Responsable = usuario actual (QL-156). Solo si el `resp` está
+   * ausente en la URL al montar (deep-link con filtro → se respeta) y ya conocemos la sesión.
+   * El ref evita reaplicarlo cuando el usuario elige "Todos" o limpia (que dejan el param
+   * ausente): no queremos que "me" reaparezca solo.
+   */
+  const didInitAssignee = useRef(false);
+  useEffect(() => {
+    if (didInitAssignee.current) return;
+    if (!currentUserId) return; // esperamos a tener sesión resuelta
+    didInitAssignee.current = true;
+    if (!urlParams.has(ASSIGNEE_PARAM)) {
+      setAssigneeId(currentUserId);
+    }
+  }, [currentUserId, urlParams, setAssigneeId]);
 
   const search = committed.toLowerCase();
 
@@ -89,10 +116,16 @@ export function useTaskFilters(tasks: Task[] | undefined): UseTaskFiltersResult 
         map.set(assignee.userId, assignee.user?.name ?? assignee.userId);
       }
     });
+    // El usuario actual siempre debe poder seleccionarse (es el default): garantiza que la
+    // opción exista aunque todavía no sea responsable de ninguna tarea del proyecto, para que
+    // el select muestre correctamente "yo" en vez de caer al primer option.
+    if (currentUserId && !map.has(currentUserId)) {
+      map.set(currentUserId, currentUserName ?? currentUserId);
+    }
     return [...map.entries()]
       .map(([userId, name]) => ({ userId, name }))
       .sort((a, b) => a.name.localeCompare(b.name, 'es'));
-  }, [tasks]);
+  }, [tasks, currentUserId, currentUserName]);
 
   const filter = useCallback(
     (input: Task[]): Task[] =>
