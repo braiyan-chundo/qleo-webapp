@@ -15,7 +15,7 @@ import { UsersAdminPage } from '@/features/users/pages/UsersAdminPage';
 import { AdminSettingsPage } from '@/features/admin/pages/AdminSettingsPage';
 import { AuditLogPage } from '@/features/audit/pages/AuditLogPage';
 import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
-import { HolidaysAdminPage } from '@/features/work-calendar/pages/HolidaysAdminPage';
+import { CalendarPage } from '@/features/work-calendar/pages/CalendarPage';
 import { SessionGate } from '@/shared/components/SessionGate';
 import { PublicOnlyRoute } from '@/shared/components/PublicOnlyRoute';
 import { AdminRoute } from '@/shared/components/AdminRoute';
@@ -66,6 +66,10 @@ function App() {
                     ADMIN o creador (el backend autoriza). El acceso del menú es adminOnly. */}
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
+                {/* Calendario (QL-162): autenticado. La página se ramifica por rol —el MEMBER ve
+                    su calendario de solo lectura; el ADMIN, la administración (placeholder de los
+                    tabs de QL-163). El menú ya no es `adminOnly`. */}
+                <Route path="/calendar" element={<CalendarPage />} />
 
                 {/* Área de administración (solo ADMIN) */}
                 <Route element={<AdminRoute />}>
@@ -76,7 +80,6 @@ function App() {
                     element={<AdminSettingsPage />}
                   />
                   <Route path="/audit" element={<AuditLogPage />} />
-                  <Route path="/calendar" element={<HolidaysAdminPage />} />
                 </Route>
               </Route>
             </Route>

@@ -57,7 +57,9 @@ export const primaryNavItems: NavItem[] = [
   { title: 'Proyectos', url: '/projects', icon: Folder },
   { title: 'Mis tareas', url: '/tasks', icon: ClipboardList },
   { title: 'Notificaciones', url: '/notifications', icon: Bell },
-  { title: 'Calendario', url: '/calendar', icon: CalendarDays, adminOnly: true },
+  // QL-162: el Calendario es visible para TODOS (el MEMBER ve el suyo de solo lectura; el
+  // ADMIN, la administración). La página se ramifica por rol.
+  { title: 'Calendario', url: '/calendar', icon: CalendarDays },
   { title: 'Analíticas', url: '/analytics', icon: BarChart3, adminOnly: true },
   {
     // QL-149: "Administración" pasa a ser un grupo expandible. El padre navega a `/admin`

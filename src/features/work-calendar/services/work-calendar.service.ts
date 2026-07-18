@@ -66,6 +66,17 @@ export interface CreateHolidayDto {
   name: string;
 }
 
+/**
+ * Body de `PATCH /work-calendar/holidays/:id` (solo ADMIN, QL-159 §3.47). Ambos opcionales
+ * (parche parcial). Solo los festivos `MANUAL` son editables; sobre un `AUTO` → 400
+ * `AUTO_HOLIDAY_NOT_EDITABLE`. Nueva `date` que choca con otro festivo → 409
+ * `HOLIDAY_ALREADY_EXISTS`. Lo consume el CRUD de festivos del ADMIN (QL-163).
+ */
+export interface UpdateHolidayDto {
+  date?: string; // 'YYYY-MM-DD' o ISO8601
+  name?: string;
+}
+
 /** Construye un querystring solo con los params definidos. */
 function buildQuery(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();
@@ -90,6 +101,13 @@ export const workCalendarService = {
   /** Registra un festivo MANUAL (solo ADMIN). 409 `HOLIDAY_ALREADY_EXISTS` si ya existe ese día. */
   createHoliday: (dto: CreateHolidayDto) =>
     api.post<Holiday>('/work-calendar/holidays', dto),
+
+  /**
+   * (QL-159, §3.47) Edita un festivo MANUAL (solo ADMIN). Sobre un `AUTO` → 400
+   * `AUTO_HOLIDAY_NOT_EDITABLE`; nueva fecha ocupada → 409 `HOLIDAY_ALREADY_EXISTS`. QL-163.
+   */
+  updateHoliday: (id: string, dto: UpdateHolidayDto) =>
+    api.patch<Holiday>(`/work-calendar/holidays/${id}`, dto),
 
   /**
    * Elimina un festivo por id (solo ADMIN). Solo festivos `MANUAL`; sobre un `AUTO` → 400

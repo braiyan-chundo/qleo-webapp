@@ -2,10 +2,9 @@ import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { CalendarDays, Loader2, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { ApiError } from '@/core/api/fetch-client';
-import { BackButton } from '@/shared/components/BackButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,16 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DataCard, DataTableCard } from '@/shared/components/data-table';
-import { CalendarConfigPanel } from '../components/CalendarConfigPanel';
-import { WorkCalendarView } from '../components/WorkCalendarView';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DatePicker } from '@/components/ui/date-picker';
 import { cn } from '@/lib/utils';
 
 import {
@@ -46,41 +38,14 @@ import {
   useDeleteHoliday,
   useHolidays,
 } from '../hooks/use-work-calendar';
-import { DatePicker } from '@/components/ui/date-picker';
-
+import { CalendarConfigPanel } from './CalendarConfigPanel';
+import { WorkCalendarView } from './WorkCalendarView';
+import { HolidayEditDialog } from './HolidayEditDialog';
 import { holidayFormSchema, type HolidayFormValues } from '../schemas/holiday.schema';
 import type { Holiday } from '../services/work-calendar.service';
+import { dateToIsoDay, formatHolidayDate, isoDayToDate } from '../lib/holiday-date';
 
 const ALL_YEARS = 'ALL';
-
-/** `yyyy-mm-dd` → `Date` local (mediodía) para el DatePicker, o `undefined` si vacío. */
-function isoDayToDate(value: string): Date | undefined {
-  if (!value) return undefined;
-  const [year, month, day] = value.split('-').map(Number);
-  if (!year || !month || !day) return undefined;
-  return new Date(year, month - 1, day, 12, 0, 0);
-}
-
-/** `Date` local → `yyyy-mm-dd` (lo que espera el backend de festivos), o `''` si no hay. */
-function dateToIsoDay(date: Date | undefined): string {
-  if (!date || Number.isNaN(date.getTime())) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/** Formatea un `YYYY-MM-DD` a fecha legible en español (ej. "6 jul 2026"). */
-function formatHolidayDate(isoDay: string): string {
-  const [year, month, day] = isoDay.split('-').map(Number);
-  if (!year || !month || !day) return isoDay;
-  return new Date(year, month - 1, day).toLocaleDateString('es', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 /** Badge del origen del festivo (QL-68): automático (tertiary) vs. manual (secondary). */
 function SourceBadge({ source }: { source: Holiday['source'] }) {
@@ -92,15 +57,16 @@ function SourceBadge({ source }: { source: Holiday['source'] }) {
 }
 
 /**
- * Pantalla de administración del calendario laboral (QL-10 + QL-68/QL-69). Solo ADMIN (montada
- * bajo `AdminRoute`). Configura fines de semana y festivos automáticos, visualiza el calendario
- * por rango con leyenda y días laborables, y gestiona los festivos manuales (alta/baja). Los
- * festivos automáticos no se pueden borrar (se desactivan con el toggle).
+ * Gestión de **festivos y días no laborables** (QL-10 + QL-68/QL-69 + QL-163 edición, §3.47).
+ * Es el contenido del tab "Festivos" del Calendario ADMIN. Config del calendario (fines de semana,
+ * festivos automáticos), calendario visual por rango, y CRUD de festivos manuales (alta, edición y
+ * baja). Los festivos automáticos no se editan ni borran uno a uno (se desactivan con el toggle).
  */
-export function HolidaysAdminPage() {
+export function HolidaysManager() {
   const currentYear = new Date().getFullYear();
   const [yearFilter, setYearFilter] = useState<string>(ALL_YEARS);
   const [toDelete, setToDelete] = useState<Holiday | null>(null);
+  const [toEdit, setToEdit] = useState<Holiday | null>(null);
 
   const params = useMemo(
     () => (yearFilter === ALL_YEARS ? undefined : { year: Number(yearFilter) }),
@@ -142,9 +108,7 @@ export function HolidaysAdminPage() {
             toast.error('Ya hay un festivo registrado ese día');
             return;
           }
-          toast.error(
-            err instanceof Error ? err.message : 'No se pudo añadir el festivo',
-          );
+          toast.error(err instanceof Error ? err.message : 'No se pudo añadir el festivo');
         },
       },
     );
@@ -165,41 +129,28 @@ export function HolidaysAdminPage() {
           );
           return;
         }
-        toast.error(
-          err instanceof Error ? err.message : 'No se pudo eliminar el festivo',
-        );
+        toast.error(err instanceof Error ? err.message : 'No se pudo eliminar el festivo');
       },
     });
   };
 
   return (
-    <div className="p-4 md:p-8">
-      {/* Encabezado */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <BackButton fallback={{ to: '/', label: 'Inicio' }} />
-          <h1 className="text-3xl font-bold text-on-surface">Calendario laboral</h1>
-        </div>
-        <p className="mt-1 text-sm text-on-surface-variant">
-          Gestiona los días festivos. Los fines de semana ya se consideran no laborables. El
-          sistema solo avisa al fijar fechas límite; no reprograma tareas.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <p className="text-sm text-on-surface-variant">
+        Gestiona los días festivos. Los fines de semana ya se consideran no laborables. El sistema
+        solo avisa al fijar fechas límite; no reprograma tareas.
+      </p>
 
       {/* Configuración del calendario (fines de semana, festivos automáticos) */}
-      <div className="mb-8">
-        <CalendarConfigPanel />
-      </div>
+      <CalendarConfigPanel />
 
       {/* Calendario visual: rango de fechas, multi-mes, leyenda de 4 tipos y días laborables */}
-      <div className="mb-8">
-        <WorkCalendarView weekendDays={weekendDays} />
-      </div>
+      <WorkCalendarView weekendDays={weekendDays} />
 
       {/* Formulario: añadir festivo */}
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="mb-8 grid gap-4 rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-4 sm:grid-cols-[10rem_1fr_auto] sm:items-end"
+        className="grid gap-4 rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-4 sm:grid-cols-[10rem_1fr_auto] sm:items-end"
       >
         <div className="grid gap-1.5">
           <Label htmlFor="holiday-date" className="text-xs text-on-surface-variant">
@@ -239,17 +190,13 @@ export function HolidaysAdminPage() {
         </div>
 
         <Button type="submit" className="h-10" disabled={createHoliday.isPending}>
-          {createHoliday.isPending ? (
-            <Loader2 className="animate-spin" />
-          ) : (
-            <Plus className="size-4" />
-          )}
+          {createHoliday.isPending ? <Loader2 className="animate-spin" /> : <Plus className="size-4" />}
           Añadir festivo
         </Button>
       </form>
 
       {/* Filtro por año */}
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-on-surface-variant">
           {holidays.length} {holidays.length === 1 ? 'festivo' : 'festivos'}
         </p>
@@ -289,10 +236,10 @@ export function HolidaysAdminPage() {
           <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-primary-container text-primary">
             <CalendarDays className="size-7" />
           </div>
-          <h2 className="text-lg font-semibold text-on-surface">Sin festivos</h2>
+          <h3 className="text-lg font-semibold text-on-surface">Sin festivos</h3>
           <p className="mt-1 max-w-sm text-sm text-on-surface-variant">
-            Añade festivos con el formulario de arriba para que el sistema avise al fijar
-            fechas límite.
+            Añade festivos con el formulario de arriba para que el sistema avise al fijar fechas
+            límite.
           </p>
         </div>
       ) : (
@@ -312,15 +259,26 @@ export function HolidaysAdminPage() {
                     </p>
                   </div>
                   {!isAuto && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-on-surface-variant hover:text-error"
-                      onClick={() => setToDelete(holiday)}
-                      aria-label={`Eliminar ${holiday.name}`}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-on-surface-variant"
+                        onClick={() => setToEdit(holiday)}
+                        aria-label={`Editar ${holiday.name}`}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-on-surface-variant hover:text-error"
+                        onClick={() => setToDelete(holiday)}
+                        aria-label={`Eliminar ${holiday.name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               </DataCard>
@@ -332,7 +290,7 @@ export function HolidaysAdminPage() {
               <TableHead>Fecha</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Origen</TableHead>
-              <TableHead className="text-right">Acción</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -356,15 +314,26 @@ export function HolidaysAdminPage() {
                         Automático
                       </span>
                     ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-on-surface-variant hover:text-error"
-                        onClick={() => setToDelete(holiday)}
-                        aria-label={`Eliminar ${holiday.name}`}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-on-surface-variant"
+                          onClick={() => setToEdit(holiday)}
+                          aria-label={`Editar ${holiday.name}`}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-on-surface-variant hover:text-error"
+                          onClick={() => setToDelete(holiday)}
+                          aria-label={`Eliminar ${holiday.name}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
@@ -373,6 +342,14 @@ export function HolidaysAdminPage() {
           </TableBody>
         </DataTableCard>
       )}
+
+      {/* Edición de festivo manual */}
+      <HolidayEditDialog
+        holiday={toEdit}
+        onOpenChange={(open) => {
+          if (!open) setToEdit(null);
+        }}
+      />
 
       {/* Confirmación de borrado */}
       <AlertDialog
@@ -391,9 +368,7 @@ export function HolidaysAdminPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteHoliday.isPending}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteHoliday.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();

@@ -6,6 +6,7 @@ import {
   type Holiday,
   type HolidaysParams,
   type UpdateCalendarConfigDto,
+  type UpdateHolidayDto,
 } from '../services/work-calendar.service';
 
 /**
@@ -111,6 +112,22 @@ export function useCreateHoliday() {
 
   return useMutation({
     mutationFn: (dto: CreateHolidayDto) => workCalendarService.createHoliday(dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: calendarKeys.holidays() });
+    },
+  });
+}
+
+/**
+ * (QL-159, §3.47) Edita un festivo MANUAL (ADMIN) e invalida la lista. Puede fallar con 400
+ * `AUTO_HOLIDAY_NOT_EDITABLE` o 409 `HOLIDAY_ALREADY_EXISTS`; el llamador (QL-163) lo traduce.
+ */
+export function useUpdateHoliday() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: UpdateHolidayDto }) =>
+      workCalendarService.updateHoliday(id, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: calendarKeys.holidays() });
     },

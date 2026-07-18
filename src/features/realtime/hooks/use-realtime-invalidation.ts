@@ -8,8 +8,11 @@ import { commentKeys } from '@/features/comments/hooks/use-comments';
 import { dashboardKeys } from '@/features/dashboard/hooks/use-my-dashboard';
 import { notificationKeys } from '@/features/notifications/hooks/use-notifications';
 import { projectKeys } from '@/features/projects/hooks/use-projects';
+import { scheduleKeys } from '@/features/schedules/hooks/use-schedules';
+import { shiftKeys } from '@/features/shifts/hooks/use-shifts';
 import { taskKeys } from '@/features/tasks/hooks/use-tasks';
 import { userKeys } from '@/features/users/hooks/use-users';
+import { calendarKeys } from '@/features/work-calendar/hooks/use-work-calendar';
 import { wallSharedKeys } from '@/features/wall/hooks/use-wall-shared';
 import { wallKeys } from '@/features/wall/hooks/use-wall';
 
@@ -143,6 +146,26 @@ function keysForEvent(event: RealtimeEvent, queryClient: QueryClient): QueryKey[
         wallKeys.pinned(),
         wallSharedKeys.all(),
       ];
+    }
+
+    case 'shift': {
+      // QL-158 (§3.46): cambió el catálogo global de turnos. Se invalida a ras de feature
+      // (`shiftKeys.all` cubre las variantes activos/incluir-retirados). El calendario del
+      // MEMBER pinta los turnos vía la malla, que también se refresca por su propio evento.
+      return [shiftKeys.all];
+    }
+
+    case 'holiday': {
+      // QL-159 (§3.47): cambió un festivo. Afecta al calendario y a los avisos de deadline, así
+      // que se invalida el feature entero (`calendarKeys.all` cubre listas de festivos y `check`).
+      return [calendarKeys.all];
+    }
+
+    case 'schedule': {
+      // QL-160 (§3.48): cambió una malla. El payload trae el `id` de la VERSIÓN, no el `userId`,
+      // así que no hay filtro fino por usuario aquí: se invalida el feature entero
+      // (`scheduleKeys.all`) y cada malla mostrada (la del MEMBER, la que mire el ADMIN) refetch.
+      return [scheduleKeys.all];
     }
 
     default: {

@@ -19,6 +19,12 @@ export const REALTIME_ENTITIES = [
   'wall',
   'notification',
   'user-avatar',
+  // Lote Y — Turnos y mallas (§3.46/§3.47/§3.48). Se emiten a la sala `wall` (todos los
+  // autenticados) porque afectan al calendario de todos: catálogo global de turnos, festivos
+  // y la malla de cada usuario.
+  'shift', // QL-158 — cambió el catálogo global de turnos.
+  'holiday', // QL-159 — cambió un festivo del calendario laboral.
+  'schedule', // QL-160 — cambió una malla horaria de un usuario.
 ] as const;
 
 export type RealtimeEntity = (typeof REALTIME_ENTITIES)[number];
