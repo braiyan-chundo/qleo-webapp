@@ -129,7 +129,7 @@ export function ProjectCard({ project, onEdit, onArchive }: ProjectCardProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="border border-outline-variant/30 bg-surface-container-lowest"
+              className="w-52 border border-outline-variant/30 bg-surface-container-lowest"
             >
               <DropdownMenuItem
                 onClick={() => navigate(detailUrl)}

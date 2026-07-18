@@ -373,7 +373,7 @@ export function ProjectDetailPage() {
             >
               <MoreHorizontal className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem onSelect={() => openDetails(false)}>
                 <Info className="size-4" />
                 Detalles del proyecto

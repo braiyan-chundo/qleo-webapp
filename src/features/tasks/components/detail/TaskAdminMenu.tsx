@@ -116,7 +116,7 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
             <MoreVertical className="size-4" />
           )}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuLabel>Solo administradores</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
