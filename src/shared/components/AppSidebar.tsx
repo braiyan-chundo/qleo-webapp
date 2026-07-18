@@ -142,16 +142,25 @@ export function AppSidebar() {
                 const isActive = isNavItemActive(pathname, item.url);
                 const badgeCount = item.badge === 'wall' ? wallUnread : 0;
 
-                // Grupo con sub-ítems estáticos (QL-149, p. ej. "Administración"): se despliega
-                // en sus hijos con el mismo patrón visual que Proyectos.
+                // Grupo con sub-ítems estáticos (QL-149/QL-165, p. ej. "Administración",
+                // "Calendario"): se despliega en sus hijos con el mismo patrón visual que Proyectos.
+                // Los hijos se filtran por rol; si tras filtrar queda alguno → grupo desplegable con
+                // esos hijos; si NO queda ninguno (p. ej. "Calendario" para un MEMBER, cuyos hijos
+                // son todos `adminOnly`) → se cae al link plano del parent de más abajo.
                 if (item.children) {
-                  return (
-                    <NavGroupItem
-                      key={item.title}
-                      item={item}
-                      pathname={pathname}
-                    />
+                  const visibleChildren = item.children.filter(
+                    (child) => !child.adminOnly || isAdmin,
                   );
+                  if (visibleChildren.length > 0) {
+                    return (
+                      <NavGroupItem
+                        key={item.title}
+                        item={item}
+                        childItems={visibleChildren}
+                        pathname={pathname}
+                      />
+                    );
+                  }
                 }
 
                 // "Proyectos" es el único ítem con submenú: sigue navegando a `/projects` y
@@ -252,20 +261,25 @@ function NavItemContent({ item, badgeCount }: NavItemContentProps) {
 
 interface NavGroupItemProps {
   item: NavItem;
+  /**
+   * Hijos **ya filtrados por rol** por el consumidor (QL-165). Se pintan tal cual — no se usa
+   * `item.children` crudo — para que, p. ej., un MEMBER no vea hijos `adminOnly`.
+   */
+  childItems: NavItem[];
   pathname: string;
 }
 
 /**
- * Ítem de navegación **agrupador** con sub-ítems estáticos (QL-149, p. ej. "Administración").
+ * Ítem de navegación **agrupador** con sub-ítems estáticos (QL-149/QL-165, p. ej. "Administración",
+ * "Calendario").
  *
  * Sigue el mismo patrón visual que `ProjectsNavItem` pero con hijos fijos de la config (no dato
  * de servidor): el label/icono del padre es un link a su `url` (por defecto la del primer hijo)
  * y el chevron despliega el submenú. Se auto-expande cuando la ruta actual cae en un hijo y marca
  * el hijo correcto resolviendo el solapamiento de prefijos con `activeNavUrl` (el más específico).
  */
-function NavGroupItem({ item, pathname }: NavGroupItemProps) {
-  const children = item.children ?? [];
-  const activeChildUrl = activeNavUrl(pathname, children);
+function NavGroupItem({ item, childItems, pathname }: NavGroupItemProps) {
+  const activeChildUrl = activeNavUrl(pathname, childItems);
   const isActive = activeChildUrl !== null;
   const [open, setOpen] = useState(() => isActive);
 
@@ -301,7 +315,7 @@ function NavGroupItem({ item, pathname }: NavGroupItemProps) {
 
         <CollapsibleContent>
           <SidebarMenuSub className="mt-1 border-outline-variant/50">
-            {children.map((child) => (
+            {childItems.map((child) => (
               <SidebarMenuSubItem key={child.url + child.title}>
                 <SidebarMenuSubButton
                   asChild

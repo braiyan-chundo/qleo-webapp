@@ -7,6 +7,9 @@ import {
   History,
   HelpCircle,
   CalendarDays,
+  CalendarRange,
+  Clock,
+  PartyPopper,
   UserCircle,
   BarChart3,
   Megaphone,
@@ -57,9 +60,22 @@ export const primaryNavItems: NavItem[] = [
   { title: 'Proyectos', url: '/projects', icon: Folder },
   { title: 'Mis tareas', url: '/tasks', icon: ClipboardList },
   { title: 'Notificaciones', url: '/notifications', icon: Bell },
-  // QL-162: el Calendario es visible para TODOS (el MEMBER ve el suyo de solo lectura; el
-  // ADMIN, la administración). La página se ramifica por rol.
-  { title: 'Calendario', url: '/calendar', icon: CalendarDays },
+  {
+    // QL-165: el Calendario pasa a ser un grupo expandible (mismo patrón que "Administración").
+    // El **parent** es visible para TODOS (sin `adminOnly`): el MEMBER lo ve como link plano a su
+    // calendario de solo lectura; el ADMIN lo despliega en sus 4 sub-secciones (todas `adminOnly`).
+    // El filtrado por rol de los hijos lo hace el consumidor (sidebar / bottom nav): si tras filtrar
+    // no queda ningún hijo, el parent se pinta como link plano.
+    title: 'Calendario',
+    url: '/calendar',
+    icon: CalendarDays,
+    children: [
+      { title: 'Calendario', url: '/calendar', icon: CalendarDays, adminOnly: true },
+      { title: 'Festivos', url: '/calendar/festivos', icon: PartyPopper, adminOnly: true },
+      { title: 'Turnos', url: '/calendar/turnos', icon: Clock, adminOnly: true },
+      { title: 'Mallas', url: '/calendar/mallas', icon: CalendarRange, adminOnly: true },
+    ],
+  },
   { title: 'Analíticas', url: '/analytics', icon: BarChart3, adminOnly: true },
   {
     // QL-149: "Administración" pasa a ser un grupo expandible. El padre navega a `/admin`
@@ -136,7 +152,10 @@ export function isNavItemActive(pathname: string, url: string): boolean {
  * `/admin/configuracion`, así que en esa ruta ambos "casan" por `isNavItemActive`; gana el de
  * `url` más largo (el más específico). Así solo un hijo se ilumina a la vez.
  */
-export function activeNavUrl(pathname: string, items: NavItem[]): string | null {
+export function activeNavUrl(
+  pathname: string,
+  items: readonly { url: string }[],
+): string | null {
   let best: string | null = null;
   for (const item of items) {
     if (isNavItemActive(pathname, item.url)) {
@@ -147,10 +166,24 @@ export function activeNavUrl(pathname: string, items: NavItem[]): string | null 
 }
 
 /**
- * Aplana una lista de navegación expandiendo los grupos (`children`) en sus hojas (QL-149).
- * El ítem padre-contenedor se descarta (su `url` ya lo cubre un hijo); los ítems sin hijos se
- * mantienen tal cual. Lo usa el menú "Más" del bottom nav, que es una lista plana.
+ * Aplana una lista de navegación expandiendo los grupos (`children`) en sus hojas (QL-149),
+ * **consciente del rol** (QL-165). Lo usa el menú "Más" del bottom nav, que es una lista plana.
+ *
+ * Por cada grupo se filtran los hijos por rol (`!adminOnly || isAdmin`):
+ * - si quedan hijos visibles → se devuelven esos (el parent-contenedor se descarta, su `url` ya
+ *   la cubre un hijo);
+ * - si NO queda ninguno (p. ej. "Calendario" para un MEMBER, cuyos hijos son todos `adminOnly`)
+ *   → se devuelve el **parent** como link plano, para no perder la sección del menú.
+ *
+ * Los ítems sin hijos se mantienen tal cual. El filtro por `adminOnly` de los ítems de primer
+ * nivel (p. ej. el parent `adminOnly` de "Administración") lo sigue aplicando el consumidor.
  */
-export function flattenNavItems(items: NavItem[]): NavItem[] {
-  return items.flatMap((item) => item.children ?? [item]);
+export function flattenNavItems(items: NavItem[], isAdmin: boolean): NavItem[] {
+  return items.flatMap((item) => {
+    if (!item.children) return [item];
+    const visibleChildren = item.children.filter(
+      (child) => !child.adminOnly || isAdmin,
+    );
+    return visibleChildren.length > 0 ? visibleChildren : [item];
+  });
 }
