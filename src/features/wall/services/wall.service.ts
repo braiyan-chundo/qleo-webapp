@@ -66,10 +66,19 @@ function handleUnauthorized(status: number) {
  */
 type RawWallMessage = Omit<
   WallMessage,
-  'body' | 'deleted' | 'replyTo' | 'reactions' | 'type' | 'systemKind' | 'meta'
+  | 'body'
+  | 'deleted'
+  | 'replyTo'
+  | 'reactions'
+  | 'type'
+  | 'systemKind'
+  | 'meta'
+  | 'isBroadcast'
 > & {
   body: string | null;
   deleted?: boolean;
+  /** (QL-167) Puede faltar en respuestas previas a QL-167 → se asume `false` al normalizar. */
+  isBroadcast?: boolean;
   /** Puede faltar en respuestas de endpoints previos a QL-103 → se asume `null` al normalizar. */
   replyTo?: WallReplyPreview | null;
   /** (QL-147) Puede faltar en respuestas de endpoints previos a QL-147 → se asume `[]` al normalizar. */
@@ -93,6 +102,8 @@ function normalizeWallMessage(raw: RawWallMessage): WallMessage {
   const type: WallMessageType = raw.type ?? 'user';
   const systemKind = raw.systemKind ?? null;
   const meta = raw.meta ?? null;
+  // (QL-167) `isBroadcast` firme (respuestas previas a QL-167 no lo traen → `false`).
+  const isBroadcast = raw.isBroadcast ?? false;
 
   if (raw.deleted) {
     return {
@@ -100,6 +111,7 @@ function normalizeWallMessage(raw: RawWallMessage): WallMessage {
       type,
       systemKind,
       meta,
+      isBroadcast,
       deleted: true,
       body: '',
       mentions: [],
@@ -117,6 +129,7 @@ function normalizeWallMessage(raw: RawWallMessage): WallMessage {
     type,
     systemKind,
     meta,
+    isBroadcast,
     deleted: false,
     body: raw.body ?? '',
     replyTo: raw.replyTo ?? null,

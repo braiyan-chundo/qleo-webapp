@@ -101,6 +101,9 @@ export function buildOptimisticMessage({
     replyTo,
     // (QL-147) Un mensaje aún en vuelo no tiene reacciones; llegarán con el confirmado del POST.
     reactions: [],
+    // (QL-167) El distintivo de difusión lo confirma el backend (detecta `@muro` y lo retira del
+    // body); el optimista arranca en `false` y se reconcilia con el mensaje confirmado del POST.
+    isBroadcast: false,
     createdAt: now,
     updatedAt: now,
     pending: true,

@@ -481,6 +481,14 @@ export function WallMessageItem({
                       : 'rounded-bl-sm bg-surface-container text-on-surface',
                   )}
                 >
+                  {/* (QL-167) Distintivo de difusión (`@muro`): el mensaje disparó push a toda la
+                      organización. Chip con tokens M3, encima del cuerpo. */}
+                  {message.isBroadcast && (
+                    <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-tertiary-container px-2 py-0.5 text-[11px] font-medium text-on-tertiary-container">
+                      <span aria-hidden>📢</span>
+                      Difusión
+                    </span>
+                  )}
                   {/* Cita del mensaje respondido (QL-103): clicable → salta al original. */}
                   {message.replyTo && (
                     <WallReplyQuote

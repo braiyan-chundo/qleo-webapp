@@ -9,7 +9,7 @@ import { useColumns } from '@/features/columns/hooks/use-columns';
 import { useTasks } from '../hooks/use-tasks';
 import type { Task } from '../services/tasks.service';
 import { columnColor } from '../lib/palette';
-import { formatDueDate } from '../lib/deadline';
+import { formatDay } from '../lib/deadline';
 import {
   barGeometry,
   buildHeaderCells,
@@ -117,7 +117,7 @@ export function GanttView({ projectId, filterTasks }: GanttViewProps) {
       <div className="mb-3 flex items-center gap-2 text-sm text-on-surface-variant">
         <CalendarClock className="size-4" />
         <span>
-          {formatDueDate(range.start.toISOString())} — {formatDueDate(range.end.toISOString())}
+          {formatDay(range.start.toISOString())} — {formatDay(range.end.toISOString())}
           {unit === 'week' && ' · vista por semanas'}
         </span>
       </div>
@@ -329,8 +329,8 @@ function UnscheduledRow({ task, onOpen }: UnscheduledRowProps) {
 
 /** Texto legible del rango de fechas de una tarea para el `title`/`aria-label`. */
 function describeRange(task: Task): string {
-  const start = task.startDate ? formatDueDate(task.startDate) : null;
-  const due = task.dueDate ? formatDueDate(task.dueDate) : null;
+  const start = task.startDate ? formatDay(task.startDate) : null;
+  const due = task.dueDate ? formatDay(task.dueDate) : null;
   if (start && due) return `${start} → ${due}`;
   if (due) return `Vence ${due}`;
   if (start) return `Inicia ${start}`;

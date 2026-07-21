@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Archive,
@@ -47,7 +47,6 @@ import { PlannerView } from '@/features/tasks/components/PlannerView';
 import { DiscardedTasksSection } from '@/features/tasks/components/DiscardedTasksSection';
 import { ProjectDocumentsPanel } from '@/features/attachments/components/ProjectDocumentsPanel';
 import { BoardFilterPanel } from '@/features/tasks/components/BoardFilterPanel';
-import { useTasks } from '@/features/tasks/hooks/use-tasks';
 import { useTaskFilters } from '@/features/tasks/hooks/use-task-filters';
 import { projectDot } from '@/features/tasks/lib/palette';
 
@@ -112,10 +111,18 @@ export function ProjectDetailPage() {
   const isAdmin = user?.role === 'ADMIN';
   const { data: project, isLoading, isError, error } = useProject(id);
 
-  // Datos compartidos por las vistas del board (misma caché de Query que consumen dentro).
-  // Se usan aquí para derivar las opciones de filtro (responsables).
-  const { data: tasks } = useTasks(id);
-  const filters = useTaskFilters(tasks);
+  // (QL-169) ¿El usuario ve TODAS las tareas del proyecto? `canManageProject` ya cubre ADMIN de
+  // plataforma + creador + gestor (equivale a `canSeeAll`). El backend aplica la misma regla al
+  // servir `GET /tasks?projectId=`; la UI solo espeja qué filtro mostrar.
+  const canSeeAll = canManageProject(project, user);
+  // (QL-169/QL-52) Opciones del filtro de Responsable = TODOS los miembros del proyecto (no solo
+  // los responsables presentes en las tareas cargadas). `project.members` en el detalle es la
+  // membresía real completa. Las vistas del board cargan sus propias tareas (misma caché).
+  const memberOptions = useMemo(
+    () => (project?.members ?? []).map((m) => ({ userId: m.id, name: m.name })),
+    [project?.members],
+  );
+  const filters = useTaskFilters({ canSeeAll, memberOptions });
 
   const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);

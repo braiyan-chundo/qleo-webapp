@@ -21,6 +21,11 @@ export const taskFormSchema = z.object({
    * `DeadlineSection` del detalle (incl. bloqueo, prórroga y calendario laboral).
    */
   dueDate: z.string().optional(),
+  /**
+   * (QL-166) Hora del deadline (valor `<input type="time">`, `HH:mm`). Opcional: si se elige
+   * fecha sin hora, se serializa a las 18:00 (fin de jornada). Solo aplica con `dueDate`.
+   */
+  dueTime: z.string().optional(),
   /** (P1) Bloquear la edición del deadline por no-Creadores desde el alta. */
   deadlineLocked: z.boolean().optional(),
   /**
@@ -46,6 +51,11 @@ export type TaskFormValues = z.infer<typeof taskFormSchema>;
  */
 export const deadlineExtensionSchema = z.object({
   requestedDate: z.string().min(1, 'Selecciona una fecha propuesta'),
+  /**
+   * (QL-166) Hora propuesta (`<input type="time">`, `HH:mm`). Opcional: vacía → 18:00 al
+   * serializar. Se combina con `requestedDate` en un ISO completo antes de enviar.
+   */
+  requestedTime: z.string().optional(),
   reason: z.string().trim().min(1, 'Explica el motivo de la prórroga'),
 });
 

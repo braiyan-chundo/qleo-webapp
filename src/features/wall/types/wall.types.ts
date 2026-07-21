@@ -128,6 +128,13 @@ export interface WallMessage {
    * usuario logueado.
    */
   reactions: WallReaction[];
+  /**
+   * (QL-167) `true` si el mensaje se envió como **difusión** (`@muro`): el backend detecta el texto
+   * `@muro` en el body, lo **retira** del texto guardado y hace fan-out de push a TODOS los usuarios.
+   * `@muro` NO es una mención de usuario (no entra en `mentions`). El front pinta el distintivo
+   * "📢 Difusión". El servicio lo normaliza a `false` en respuestas previas a QL-167.
+   */
+  isBroadcast: boolean;
   /** ISO8601 (base del cursor de paginación: el `id`/ObjectId ya ordena por tiempo). */
   createdAt: string;
   updatedAt: string;

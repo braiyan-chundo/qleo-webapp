@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { formatFileSize, iconKindFor, notifyAttachmentError } from '@/features/a
 
 import { WallImage } from './WallImage';
 import { WallVoicePlayer } from './WallVoicePlayer';
+import { WallAttachmentViewer } from './WallAttachmentViewer';
 import { isAudioAttachment } from '../lib/wall-audio';
 
 interface WallMessageAttachmentsProps {
@@ -17,11 +19,15 @@ interface WallMessageAttachmentsProps {
 /**
  * Adjuntos de un mensaje del muro (QL-90, §3.25.2). Las **imágenes** se muestran en línea
  * (`WallImage`, blob+token, lazy); las **notas de voz** (QL-104) como reproductor
- * (`WallVoicePlayer`); el resto como **chip descargable** con nombre + tamaño. La descarga reusa
- * el flujo blob+Bearer de `features/attachments` (`useDownloadAttachment`), sin duplicar el fetch.
+ * (`WallVoicePlayer`); el resto como **chip**. (QL-168) Al hacer click en una imagen o en un chip
+ * se abre el **visor** (`WallAttachmentViewer`) en vez de descargar; cada chip conserva además un
+ * botón explícito de **Descargar**. La descarga reusa el flujo blob+Bearer de
+ * `features/attachments` (`useDownloadAttachment`), sin duplicar el fetch.
  */
 export function WallMessageAttachments({ attachments }: WallMessageAttachmentsProps) {
   const download = useDownloadAttachment();
+  // (QL-168) Adjunto abierto en el visor, o `null` si está cerrado.
+  const [viewing, setViewing] = useState<Attachment | null>(null);
 
   if (attachments.length === 0) return null;
 
@@ -55,7 +61,7 @@ export function WallMessageAttachments({ attachments }: WallMessageAttachmentsPr
             <WallImage
               key={attachment.id}
               attachment={attachment}
-              onOpen={() => handleDownload(attachment)}
+              onOpen={() => setViewing(attachment)}
             />
           ))}
         </div>
@@ -69,22 +75,30 @@ export function WallMessageAttachments({ attachments }: WallMessageAttachmentsPr
             return (
               <div
                 key={attachment.id}
-                className="flex max-w-sm items-center gap-2.5 rounded-md border border-outline-variant/40 bg-surface-container-low px-2.5 py-1.5"
+                className="flex max-w-sm items-center gap-1 rounded-md border border-outline-variant/40 bg-surface-container-low pr-1.5"
               >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-container-high">
-                  <AttachmentIcon mimeType={attachment.mimeType} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="truncate text-sm font-medium text-on-surface"
-                    title={attachment.originalName}
-                  >
-                    {attachment.originalName}
-                  </p>
-                  <p className="text-xs tabular-nums text-on-surface-variant">
-                    {formatFileSize(attachment.size)}
-                  </p>
-                </div>
+                {/* (QL-168) Click en el chip → abre el visor (no descarga). */}
+                <button
+                  type="button"
+                  onClick={() => setViewing(attachment)}
+                  title={`Ver ${attachment.originalName}`}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-surface-container"
+                >
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-container-high">
+                    <AttachmentIcon mimeType={attachment.mimeType} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate text-sm font-medium text-on-surface"
+                      title={attachment.originalName}
+                    >
+                      {attachment.originalName}
+                    </p>
+                    <p className="text-xs tabular-nums text-on-surface-variant">
+                      {formatFileSize(attachment.size)}
+                    </p>
+                  </div>
+                </button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -105,6 +119,8 @@ export function WallMessageAttachments({ attachments }: WallMessageAttachmentsPr
           })}
         </div>
       )}
+
+      <WallAttachmentViewer attachment={viewing} onClose={() => setViewing(null)} />
     </div>
   );
 }

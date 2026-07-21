@@ -27,6 +27,7 @@ export function BoardFilterPanel({ filters }: BoardFilterPanelProps) {
     status,
     setStatus,
     assigneeOptions,
+    showAssigneeFilter,
     hasActiveFilters,
     clear,
   } = filters;
@@ -61,21 +62,26 @@ export function BoardFilterPanel({ filters }: BoardFilterPanelProps) {
         />
       </div>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-on-surface-variant">Responsable</span>
-        <NativeSelect
-          value={assigneeId}
-          onChange={(e) => setAssigneeId(e.target.value)}
-          aria-label="Filtrar por responsable"
-        >
-          <NativeSelectOption value="">Todos</NativeSelectOption>
-          {assigneeOptions.map((option) => (
-            <NativeSelectOption key={option.userId} value={option.userId}>
-              {option.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </label>
+      {/* (QL-169) El filtro de Responsable solo se muestra a quien ve todas las tareas del
+          proyecto (ADMIN/creador/gestor). Para un miembro normal el backend ya acota sus
+          tareas, así que el filtro no aplica y se oculta por completo. */}
+      {showAssigneeFilter && (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-on-surface-variant">Responsable</span>
+          <NativeSelect
+            value={assigneeId}
+            onChange={(e) => setAssigneeId(e.target.value)}
+            aria-label="Filtrar por responsable"
+          >
+            <NativeSelectOption value="">Todos</NativeSelectOption>
+            {assigneeOptions.map((option) => (
+              <NativeSelectOption key={option.userId} value={option.userId}>
+                {option.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </label>
+      )}
 
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-on-surface-variant">Estado</span>

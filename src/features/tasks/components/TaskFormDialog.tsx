@@ -37,6 +37,7 @@ import type { Task } from '../services/tasks.service';
 import {
   dateInputToDate,
   dateInputToIso,
+  dateTimeInputToIso,
   dateToDateInput,
   isoToDateInput,
 } from '../lib/deadline';
@@ -58,6 +59,7 @@ const emptyValues: TaskFormValues = {
   labelId: '',
   startDate: '',
   dueDate: '',
+  dueTime: '',
   deadlineLocked: false,
   assigneeId: '',
   collaboratorIds: [],
@@ -136,6 +138,7 @@ export function TaskFormDialog({
         startDate: isoToDateInput(task.startDate),
         // En edición el deadline lo gestiona la DeadlineSection del detalle (no aquí).
         dueDate: '',
+        dueTime: '',
         deadlineLocked: false,
         // En edición los roles NO se tocan aquí (los gestiona el RoleManager del detalle).
         assigneeId: '',
@@ -195,9 +198,11 @@ export function TaskFormDialog({
         (id) => id !== nextAssigneeId && !nextCollaboratorIds.includes(id),
       );
 
-      // (P1/§3.6) Fecha límite opcional en el alta. `deadlineLocked` solo tiene sentido con
-      // una fecha (bloquear un deadline nulo no aporta nada), así que se envía solo si la hay.
-      const dueDate = dateInputToIso(values.dueDate ?? '') ?? undefined;
+      // (P1/§3.6) Fecha límite opcional en el alta. (QL-166) Con hora: fecha + hora → ISO
+      // completo (hora vacía → 18:00). `deadlineLocked` solo tiene sentido con una fecha
+      // (bloquear un deadline nulo no aporta nada), así que se envía solo si la hay.
+      const dueDate =
+        dateTimeInputToIso(values.dueDate ?? '', values.dueTime ?? '') ?? undefined;
       const deadlineLocked = dueDate && values.deadlineLocked ? true : undefined;
 
       createTask.mutate(
@@ -345,19 +350,25 @@ export function TaskFormDialog({
               <Label htmlFor="dueDate" className="text-on-surface">
                 Fecha límite
               </Label>
-              <Controller
-                control={control}
-                name="dueDate"
-                render={({ field }) => (
-                  <DatePicker
-                    id="dueDate"
-                    className="w-full"
-                    value={dateInputToDate(field.value ?? '')}
-                    onChange={(date) => field.onChange(dateToDateInput(date))}
-                    placeholder="Sin fecha límite"
-                  />
+              <div className="flex flex-wrap items-center gap-2">
+                <Controller
+                  control={control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <DatePicker
+                      id="dueDate"
+                      className="w-full sm:flex-1"
+                      value={dateInputToDate(field.value ?? '')}
+                      onChange={(date) => field.onChange(dateToDateInput(date))}
+                      placeholder="Sin fecha límite"
+                    />
+                  )}
+                />
+                {/* (QL-166) Hora del deadline; solo aplica con una fecha elegida. Vacía → 18:00. */}
+                {dueDateValue && (
+                  <Input id="dueTime" type="time" className="h-10 w-32" {...register('dueTime')} />
                 )}
-              />
+              </div>
               {dueDateValue && (
                 <Controller
                   control={control}

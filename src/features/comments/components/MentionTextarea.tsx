@@ -6,7 +6,7 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Megaphone } from 'lucide-react';
 
 import { useUserDirectory } from '@/features/users/hooks/use-users';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
@@ -27,6 +27,25 @@ export interface MentionTextareaHandle {
   insertAtCaret: (text: string) => void;
 }
 
+/**
+ * (QL-167) Entrada **especial** del dropdown de `@` que NO es un usuario: al elegirla inserta un
+ * texto literal (`@<insertName> `) en el body y **no** registra ninguna mención (no llama a
+ * `onMention`), así que su token nunca entra en `mentions`/userIds. La usa el composer del Muro
+ * para ofrecer "@muro — Difusión a todos" al tope de la lista.
+ */
+export interface MentionExtraOption {
+  /** Clave estable para el `key` y la selección. */
+  id: string;
+  /** Texto principal mostrado en la opción. */
+  label: string;
+  /** Descripción secundaria opcional. */
+  description?: string;
+  /** Texto tras la `@` que se inserta literalmente (p. ej. `'muro'` → `@muro `). NO es un userId. */
+  insertName: string;
+  /** Palabra clave (minúsculas) para el typeahead: se muestra si es prefijo de lo escrito tras `@`. */
+  keyword: string;
+}
+
 interface MentionTextareaProps {
   value: string;
   onChange: (value: string) => void;
@@ -35,6 +54,11 @@ interface MentionTextareaProps {
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   /** Se llama al perder el foco el textarea (además del cierre interno del dropdown de menciones). */
   onBlur?: () => void;
+  /**
+   * (QL-167) Entradas especiales (no-usuario) que se muestran al **tope** del dropdown de `@`,
+   * antes de los resultados del directorio. Insertan texto literal sin registrar mención.
+   */
+  extraOptions?: MentionExtraOption[];
   placeholder?: string;
   rows?: number;
   disabled?: boolean;
@@ -56,6 +80,7 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
       onMention,
       onKeyDown,
       onBlur,
+      extraOptions,
       placeholder,
       rows = 3,
       disabled,
@@ -119,6 +144,13 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
     const open = token !== null;
     const { data: users, isLoading } = useUserDirectory(query, { enabled: open });
     const results = open ? (users ?? []) : [];
+    // (QL-167) Entradas especiales que casan con lo escrito tras `@` (prefijo). Van al tope de la
+    // lista; la navegación por teclado las trata como opciones 0..extras.length-1 (antes de los
+    // usuarios). Vacío para todos los consumidores que no pasan `extraOptions` (p. ej. comentarios).
+    const extras = open
+      ? (extraOptions ?? []).filter((o) => o.keyword.startsWith(query.toLowerCase()))
+      : [];
+    const navCount = extras.length + results.length;
 
     const syncToken = (nextValue: string, caret: number | null) => {
       if (caret == null) {
@@ -135,13 +167,7 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
       syncToken(next, caret);
     };
 
-    const select = (mention: CommentMention) => {
-      if (!token) return;
-      const { text, caret } = applyMention(value, token, mention.name);
-      onChange(text);
-      onMention(mention);
-      setToken(null);
-      // Restaura foco y caret tras el reemplazo.
+    const restoreCaret = (caret: number) => {
       requestAnimationFrame(() => {
         const el = textareaRef.current;
         if (el) {
@@ -151,21 +177,48 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
       });
     };
 
+    const select = (mention: CommentMention) => {
+      if (!token) return;
+      const { text, caret } = applyMention(value, token, mention.name);
+      onChange(text);
+      onMention(mention);
+      setToken(null);
+      // Restaura foco y caret tras el reemplazo.
+      restoreCaret(caret);
+    };
+
+    // (QL-167) Inserta el texto literal de una entrada especial (`@<insertName> `) reutilizando
+    // `applyMention`, pero SIN llamar a `onMention`: así el token nunca se registra como mención
+    // y `resolveMentionIds` no lo tratará como userId.
+    const selectExtra = (option: MentionExtraOption) => {
+      if (!token) return;
+      const { text, caret } = applyMention(value, token, option.insertName);
+      onChange(text);
+      setToken(null);
+      restoreCaret(caret);
+    };
+
+    /** Elige la opción resaltada de la lista unificada (extras primero, luego usuarios). */
+    const selectAt = (index: number) => {
+      if (index < extras.length) selectExtra(extras[index]);
+      else select(results[index - extras.length]);
+    };
+
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (open && results.length > 0) {
+      if (open && navCount > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
-          setHighlight((h) => (h + 1) % results.length);
+          setHighlight((h) => (h + 1) % navCount);
           return;
         }
         if (e.key === 'ArrowUp') {
           e.preventDefault();
-          setHighlight((h) => (h - 1 + results.length) % results.length);
+          setHighlight((h) => (h - 1 + navCount) % navCount);
           return;
         }
         if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
-          select(results[highlight]);
+          selectAt(highlight);
           return;
         }
         if (e.key === 'Escape') {
@@ -208,13 +261,43 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
           // Se abre **hacia arriba** (`bottom-full`) porque el composer vive al fondo del muro:
           // hacia abajo la lista quedaba cortada por el borde inferior de la pantalla.
           <div className="absolute bottom-full left-0 z-50 mb-1 w-full min-w-64 max-w-[min(20rem,calc(100vw-2rem))] max-h-56 overflow-y-auto rounded-lg border border-outline-variant/50 bg-surface-container-lowest p-1 shadow-md elevation-2">
+            {/* (QL-167) Entradas especiales (no-usuario) al tope, p. ej. "@muro — Difusión". */}
+            {extras.map((option, index) => (
+              <button
+                key={option.id}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  selectExtra(option);
+                }}
+                onMouseEnter={() => setHighlight(index)}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                  index === highlight
+                    ? 'bg-surface-container-low'
+                    : 'hover:bg-surface-container-low',
+                )}
+              >
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-tertiary-container text-on-tertiary-container">
+                  <Megaphone className="size-3.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-on-surface">{option.label}</span>
+                  {option.description && (
+                    <span className="block truncate text-xs text-on-surface-variant">
+                      {option.description}
+                    </span>
+                  )}
+                </span>
+              </button>
+            ))}
             {isLoading && (
               <div className="flex items-center gap-2 px-2 py-2 text-xs text-on-surface-variant">
                 <Loader2 className="size-3.5 animate-spin" />
                 Buscando…
               </div>
             )}
-            {!isLoading && results.length === 0 && (
+            {!isLoading && results.length === 0 && extras.length === 0 && (
               <p className="px-2 py-2 text-xs text-on-surface-variant">
                 Sin resultados
               </p>
@@ -229,10 +312,10 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
                     e.preventDefault();
                     select({ id: entry.id, name: entry.name, avatarUrl: entry.avatarUrl });
                   }}
-                  onMouseEnter={() => setHighlight(index)}
+                  onMouseEnter={() => setHighlight(extras.length + index)}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
-                    index === highlight
+                    extras.length + index === highlight
                       ? 'bg-surface-container-low'
                       : 'hover:bg-surface-container-low',
                   )}

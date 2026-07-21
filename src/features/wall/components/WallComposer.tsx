@@ -26,10 +26,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { CommentMention } from '@/features/comments/services/comments.service';
 import {
   MentionTextarea,
+  type MentionExtraOption,
   type MentionTextareaHandle,
 } from '@/features/comments/components/MentionTextarea';
 import { resolveMentionIds } from '@/features/comments/lib/mentions';
@@ -51,6 +62,26 @@ import { EmojiPicker } from './EmojiPicker';
 
 /** Límite del backend (§3.25): body de máx 4000 chars. */
 const MAX_LENGTH = 4000;
+
+/**
+ * (QL-167) Detecta `@muro` como palabra en el body (mismo criterio que el backend, `/(^|\s)@muro\b/i`).
+ * Su presencia convierte el mensaje en **difusión**: dispara push a TODA la organización, por eso
+ * se pide confirmación antes de enviar.
+ */
+const BROADCAST_REGEX = /(^|\s)@muro\b/i;
+
+/**
+ * (QL-167) Entrada al tope del autocompletado de `@`: inserta el literal `@muro` (difusión). NO es
+ * una mención de usuario (no entra en `mentions`), lo garantiza `MentionTextarea` al no llamar a
+ * `onMention` para las entradas especiales.
+ */
+const BROADCAST_OPTION: MentionExtraOption = {
+  id: 'wall-broadcast',
+  label: '@muro — Difusión a todos',
+  description: 'Notifica a toda la organización',
+  insertName: 'muro',
+  keyword: 'muro',
+};
 
 /** `accept` para las opciones de imagen/vídeo (galería / foto·vídeo) del menú de adjuntar. */
 const ACCEPT_MEDIA = 'image/*,video/*';
@@ -118,6 +149,8 @@ export function WallComposer({
   const isMobile = useIsMobile();
   const [value, setValue] = useState('');
   const [uploads, setUploads] = useState<PendingUpload[]>([]);
+  // (QL-167) Confirmación previa cuando el body contiene `@muro` (difusión a toda la organización).
+  const [confirmBroadcast, setConfirmBroadcast] = useState(false);
   const editorRef = useRef<MentionTextareaHandle>(null);
 
   // Grabación de nota de voz (QL-104). `sendingVoice` cubre el tramo subir→enviar del audio.
@@ -236,8 +269,7 @@ export function WallComposer({
     [startTyping, stopTyping],
   );
 
-  const submit = () => {
-    if (!canSend) return;
+  const doSend = () => {
     const mentions = resolveMentionIds(trimmed, mentionCandidates.current);
     onSend({
       body: trimmed,
@@ -247,6 +279,21 @@ export function WallComposer({
       replyPreview: replyTo,
     });
     clear();
+  };
+
+  const submit = () => {
+    if (!canSend) return;
+    // (QL-167) `@muro` difunde a TODA la organización (push real): confirmar antes de enviar.
+    if (BROADCAST_REGEX.test(trimmed)) {
+      setConfirmBroadcast(true);
+      return;
+    }
+    doSend();
+  };
+
+  const confirmAndSend = () => {
+    setConfirmBroadcast(false);
+    doSend();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -459,6 +506,7 @@ export function WallComposer({
             onMention={registerMention}
             onKeyDown={handleKeyDown}
             onBlur={stopTyping}
+            extraOptions={[BROADCAST_OPTION]}
             rows={1}
             placeholder="Escribe un mensaje al Muro Corporativo…"
             className="max-h-40 min-h-9 w-full resize-none border-0 bg-transparent px-1 py-1.5 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
@@ -517,6 +565,34 @@ export function WallComposer({
         </span>
         <span className="hidden sm:inline">Enter para enviar</span>
       </div>
+
+      {/* (QL-167) Confirmación de difusión: `@muro` dispara push a TODA la organización. */}
+      <AlertDialog
+        open={confirmBroadcast}
+        onOpenChange={(next) => {
+          if (!next) setConfirmBroadcast(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enviar difusión a todos</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esto enviará una notificación a TODOS los usuarios de la organización. ¿Continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmAndSend();
+              }}
+            >
+              Enviar a todos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

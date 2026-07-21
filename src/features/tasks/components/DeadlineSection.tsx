@@ -6,6 +6,7 @@ import { CalendarClock, Loader2, Lock, LockOpen, Send, TriangleAlert } from 'luc
 
 import { ApiError } from '@/core/api/fetch-client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,11 +23,13 @@ import {
 } from '../schemas/task.schema';
 import type { Task } from '../services/tasks.service';
 import {
+  DEFAULT_DEADLINE_TIME,
   dateInputToDate,
-  dateInputToIso,
+  dateTimeInputToIso,
   dateToDateInput,
   formatDueDate,
   isoToDateInput,
+  isoToTimeInput,
   isOverdue,
 } from '../lib/deadline';
 
@@ -52,16 +55,26 @@ export function DeadlineSection({ task, projectId }: DeadlineSectionProps) {
   const setDeadline = useSetDeadline(projectId, task.id);
 
   const [dateValue, setDateValue] = useState(isoToDateInput(task.dueDate));
+  // (QL-166) Hora del deadline. Precarga la hora real de la `dueDate` existente; si no hay
+  // fecha, arranca en el default de fin de jornada (18:00) como valor listo para usar.
+  const [timeValue, setTimeValue] = useState(
+    isoToTimeInput(task.dueDate) || DEFAULT_DEADLINE_TIME,
+  );
   const [showExtension, setShowExtension] = useState(false);
 
-  // Re-sincroniza el input cuando cambian los datos de la tarea (p. ej. tras guardar).
+  // Re-sincroniza los inputs cuando cambian los datos de la tarea (p. ej. tras guardar).
   useEffect(() => {
     setDateValue(isoToDateInput(task.dueDate));
+    setTimeValue(isoToTimeInput(task.dueDate) || DEFAULT_DEADLINE_TIME);
   }, [task.dueDate]);
 
   const overdue = isOverdue(task.dueDate);
   const editorDisabled = !isCreator && (!canEditRole || task.deadlineLocked);
-  const dirty = dateValue !== isoToDateInput(task.dueDate);
+  // (QL-166) "Sucio" si cambió el día o —habiendo un día elegido— cambió la hora respecto a
+  // la guardada. Con la fecha vacía, la hora sola no cuenta (sin fecha no hay deadline).
+  const savedDate = isoToDateInput(task.dueDate);
+  const savedTime = task.dueDate ? isoToTimeInput(task.dueDate) : DEFAULT_DEADLINE_TIME;
+  const dirty = dateValue !== savedDate || (!!dateValue && timeValue !== savedTime);
 
   // QL-10 (RF-2.2): aviso NO bloqueante de día no laborable. Evalúa la fecha elegida en el
   // editor o, en su defecto, la `dueDate` ya guardada. El backend avisa, no reprograma.
@@ -71,7 +84,7 @@ export function DeadlineSection({ task, projectId }: DeadlineSectionProps) {
 
   const handleSave = () => {
     setDeadline.mutate(
-      { dueDate: dateInputToIso(dateValue) },
+      { dueDate: dateTimeInputToIso(dateValue, timeValue) },
       {
         onSuccess: () => toast.success('Fecha límite actualizada'),
         onError: (err) => handleDeadlineError(err),
@@ -145,6 +158,21 @@ export function DeadlineSection({ task, projectId }: DeadlineSectionProps) {
               disabled={editorDisabled || setDeadline.isPending}
               onChange={(date) => setDateValue(dateToDateInput(date))}
               placeholder="Elegir fecha"
+            />
+          </div>
+          {/* (QL-166) Hora del deadline. Por defecto 18:00 (fin de jornada) si se elige una
+              fecha sin tocar la hora. */}
+          <div className="grid gap-1.5">
+            <Label htmlFor="dueTime" className="text-xs text-on-surface-variant">
+              Hora
+            </Label>
+            <Input
+              id="dueTime"
+              type="time"
+              className="w-32"
+              value={timeValue}
+              disabled={editorDisabled || setDeadline.isPending}
+              onChange={(e) => setTimeValue(e.target.value)}
             />
           </div>
           <Button
@@ -298,12 +326,14 @@ function ExtensionRequestForm({ task, onCancel, onDone }: ExtensionRequestFormPr
     resolver: zodResolver(deadlineExtensionSchema),
     defaultValues: {
       requestedDate: isoToDateInput(task.dueDate),
+      // (QL-166) Precarga la hora real del deadline vigente; sin fecha, el fin de jornada.
+      requestedTime: isoToTimeInput(task.dueDate) || DEFAULT_DEADLINE_TIME,
       reason: '',
     },
   });
 
   const onSubmit = (values: DeadlineExtensionValues) => {
-    const requestedDate = dateInputToIso(values.requestedDate);
+    const requestedDate = dateTimeInputToIso(values.requestedDate, values.requestedTime);
     if (!requestedDate) return;
     requestExtension.mutate(
       { requestedDate, reason: values.reason.trim() },
@@ -332,28 +362,37 @@ function ExtensionRequestForm({ task, onCancel, onDone }: ExtensionRequestFormPr
     >
       <p className="text-xs font-medium text-on-surface">Solicitar prórroga al Creador</p>
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="requestedDate" className="text-xs text-on-surface-variant">
-          Nueva fecha propuesta <span className="text-error">*</span>
-        </Label>
-        <Controller
-          control={control}
-          name="requestedDate"
-          render={({ field }) => (
-            <DatePicker
-              id="requestedDate"
-              className={cn('w-44', errors.requestedDate && 'border-error')}
-              value={dateInputToDate(field.value)}
-              onChange={(date) => field.onChange(dateToDateInput(date))}
-              placeholder="Elegir fecha"
-            />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="grid gap-1.5">
+          <Label htmlFor="requestedDate" className="text-xs text-on-surface-variant">
+            Nueva fecha propuesta <span className="text-error">*</span>
+          </Label>
+          <Controller
+            control={control}
+            name="requestedDate"
+            render={({ field }) => (
+              <DatePicker
+                id="requestedDate"
+                className={cn('w-44', errors.requestedDate && 'border-error')}
+                value={dateInputToDate(field.value)}
+                onChange={(date) => field.onChange(dateToDateInput(date))}
+                placeholder="Elegir fecha"
+              />
+            )}
+          />
+          {errors.requestedDate && (
+            <span className="text-xs font-medium text-error">
+              {errors.requestedDate.message}
+            </span>
           )}
-        />
-        {errors.requestedDate && (
-          <span className="text-xs font-medium text-error">
-            {errors.requestedDate.message}
-          </span>
-        )}
+        </div>
+        {/* (QL-166) Hora propuesta. Vacía → 18:00 al enviar. */}
+        <div className="grid gap-1.5">
+          <Label htmlFor="requestedTime" className="text-xs text-on-surface-variant">
+            Hora
+          </Label>
+          <Input id="requestedTime" type="time" className="w-32" {...register('requestedTime')} />
+        </div>
       </div>
 
       <div className="grid gap-1.5">
