@@ -27,16 +27,18 @@ function handleUnauthorized(status: number) {
 }
 
 /**
- * Sube (o reemplaza) el avatar del propio perfil (`POST /users/me/avatar`, multipart,
- * campo `file`). Usa `fetch` manual porque el `api` fuerza `Content-Type: application/json`;
- * en multipart el navegador debe poner el `boundary`, así que **no** seteamos `Content-Type`.
- * Devuelve el `UserResponseDto` actualizado (con `avatarDownloadUrl` != null).
+ * `POST` de un `multipart/form-data` autenticado a `path` (relativo a la base de la API).
+ *
+ * Usa `fetch` manual porque el `api` fuerza `Content-Type: application/json`; en multipart el
+ * navegador debe poner el `boundary`, así que **no** seteamos `Content-Type`. Desenvuelve el
+ * `{ success, data, error }` igual que el `fetch-client` y lanza `ApiError` con el `error.code`
+ * de negocio (`FILE_TOO_LARGE`, `UNSUPPORTED_FILE_TYPE`…).
+ *
+ * (QL-181) Genérico: lo usan la foto de perfil (`/users/me/avatar`) y el catálogo global de
+ * avatares (`/avatars`), para no duplicar el fetch con token en cada feature.
  */
-export async function uploadAvatarRequest<T>(file: File): Promise<T> {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await fetch(`${BASE_URL}/users/me/avatar`, {
+export async function postMultipart<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: authHeader(),
     body: formData,
@@ -52,6 +54,16 @@ export async function uploadAvatarRequest<T>(file: File): Promise<T> {
 
   const result = await response.json().catch(() => null);
   return (result?.data ?? result) as T;
+}
+
+/**
+ * Sube (o reemplaza) el avatar del propio perfil (`POST /users/me/avatar`, multipart,
+ * campo `file`). Devuelve el `UserResponseDto` actualizado (con `avatarDownloadUrl` != null).
+ */
+export async function uploadAvatarRequest<T>(file: File): Promise<T> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return postMultipart<T>('/users/me/avatar', formData);
 }
 
 /**

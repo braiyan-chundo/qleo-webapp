@@ -11,6 +11,11 @@
  * perfil y las llamadas a `/push/*` son F4 (otra tarea) y NO se implementan aquí.
  */
 import { precacheAndRoute } from 'workbox-precaching'
+import { registerRoute } from 'workbox-routing'
+import { CacheFirst } from 'workbox-strategies'
+import { ExpirationPlugin } from 'workbox-expiration'
+
+import { IMAGE_CACHE_NAME } from './shared/lib/image-cache'
 
 // El contexto de un SW es `ServiceWorkerGlobalScope`, no `Window`.
 declare const self: ServiceWorkerGlobalScope
@@ -18,6 +23,52 @@ declare const self: ServiceWorkerGlobalScope
 // --- Precache del app shell (Workbox) -------------------------------------
 // `self.__WB_MANIFEST` lo inyecta vite-plugin-pwa en build.
 precacheAndRoute(self.__WB_MANIFEST)
+
+// --- Caché persistente de imágenes (QL-182, §3.60) ------------------------
+// El backend sirve `private, max-age=86400, immutable` en los tres endpoints de binarios y la
+// URL identifica al binario (avatar de usuario por `?v=<hash>`; catálogo y adjuntos por id), así
+// que cachear la RESPUESTA ya resuelta 24 h es seguro. Con esto la imagen persiste entre recargas
+// y cierres de app SIN inflar la RAM (los blobs en memoria de TanStack Query siguen a 5 min).
+//
+// Nombre de caché VERSIONADO (`IMAGE_CACHE_NAME`, fuente única compartida con la app): al cerrar
+// sesión la app lo vacía por privacidad (equipo compartido) vía `clearImageCache`.
+//
+// Rutas de binario cacheables. Se hace match por `url.pathname` (no por origen) porque la API
+// puede vivir en otro origen (`VITE_QLEO_API_BASE_URL`).
+const IMAGE_PATH_RE =
+  /^\/(?:users\/[^/]+\/avatar|avatars\/[^/]+\/image|attachments\/[^/]+\/download)$/
+
+// ⚠️ `/attachments/:id/download` también sirve PDF y vídeo de hasta 50 MB (QL-177): NO deben
+// entrar en esta caché de imágenes. El filtro guarda solo respuestas 200 cuyo `Content-Type`
+// empieza por `image/` y cuyo `Content-Length` está por debajo de un techo razonable; lo que no
+// pasa se sirve igual, simplemente no se persiste.
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // ~5 MB
+
+registerRoute(
+  ({ url }) => IMAGE_PATH_RE.test(url.pathname),
+  new CacheFirst({
+    cacheName: IMAGE_CACHE_NAME,
+    plugins: [
+      {
+        // Solo se guarda una imagen 200 por debajo del techo; el resto (PDF/vídeo, errores) se
+        // sirve pero no se cachea. Devolver `null` aquí descarta el almacenamiento.
+        cacheWillUpdate: async ({ response }) => {
+          if (response.status !== 200) return null
+          const type = response.headers.get('Content-Type') ?? ''
+          if (!type.startsWith('image/')) return null
+          const length = Number(response.headers.get('Content-Length') ?? '0')
+          if (length > MAX_IMAGE_BYTES) return null
+          return response
+        },
+      },
+      new ExpirationPlugin({
+        maxAgeSeconds: 86400, // 1 día, alineado con el `max-age` del backend
+        maxEntries: 300,
+        purgeOnQuotaError: true,
+      }),
+    ],
+  }),
+)
 
 // --- Auto-update (equivalente a registerType: 'autoUpdate') ---------------
 // Tomamos el control inmediatamente para que la versión nueva del SW active

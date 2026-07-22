@@ -17,9 +17,20 @@ import { fetchAvatarObjectUrl } from '@/shared/services/avatar.service';
  * cuando su query se **elimina** (tras `gcTime`), que es el único momento seguro.
  */
 
-const AVATAR_GC_TIME = 5 * 60_000; // 5 min: alineado con el Cache-Control del backend.
+// (QL-182, §3.60) Se queda en **5 min a propósito**, aunque el backend cachee la imagen 24 h.
+// Este `gcTime` gobierna cuánto vive el `blob:` (bytes de la imagen) en RAM; la persistencia de 1
+// día la da ahora el Service Worker (caché `qleo-images-v1`), no la memoria. Subirlo a 24 h
+// retendría TODOS los blobs de avatar en RAM un día entero sin ganar nada: el SW ya sirve la
+// imagen sin red, y este caché solo evita re-crear el `blob:` durante una sesión activa.
+const AVATAR_GC_TIME = 5 * 60_000;
 
-/** Clave de query estable por URL de descarga del avatar. */
+/**
+ * Clave de query estable por URL de descarga del avatar.
+ *
+ * (QL-182) La `downloadUrl` llega **versionada** (`…/avatar?v=<hash>`) y se usa **tal cual**,
+ * con el query incluido: eso es lo que hace que cambiar la foto invalide esta entrada por sí
+ * sola (nueva URL → nueva clave → nuevo fetch). No recortar ni normalizar la URL.
+ */
 export function avatarQueryKey(downloadUrl: string) {
   return ['avatar-blob', downloadUrl] as const;
 }

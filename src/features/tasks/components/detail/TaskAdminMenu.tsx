@@ -5,6 +5,7 @@ import {
   ArchiveRestore,
   Loader2,
   MoreVertical,
+  Pencil,
   Trash2,
 } from 'lucide-react';
 
@@ -34,6 +35,7 @@ import {
   useRestoreTask,
 } from '../../hooks/use-tasks';
 import type { Task } from '../../services/tasks.service';
+import { TaskFormDialog } from '../TaskFormDialog';
 
 interface TaskAdminMenuProps {
   task: Task;
@@ -43,8 +45,11 @@ interface TaskAdminMenuProps {
 }
 
 /**
- * (QL-142/QL-143) Menú de acciones **solo-ADMIN** de la vista de tarea (la sección "Solo
+ * (QL-142/QL-143/QL-178) Menú de acciones **solo-ADMIN** de la vista de tarea (la sección "Solo
  * administradores"). Kebab que agrupa:
+ * - **Editar tarea** (§3.58): abre el formulario **completo** (datos, fecha límite con bloqueo
+ *   y participantes) y lo guarda en un único `PATCH` atómico. Un ADMIN puede editar cualquier
+ *   tarea aunque la creara otro.
  * - **Descartar / Restaurar** (papelera reversible, §3.41): saca la tarea del tablero sin
  *   destruirla, o la devuelve. Confirmación ligera al descartar; restaurar es directo.
  * - **Eliminar** (§3.40): hard-delete **irreversible** con cascada (adjuntos, comentarios,
@@ -60,10 +65,17 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
   const restoreTask = useRestoreTask(projectId);
   const deleteTask = useDeleteTask(projectId);
 
+  const [editOpen, setEditOpen] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!isAdmin) return null;
+
+  /**
+   * (QL-178, §3.58) El rol de **solo lectura manda sobre el ADMIN**: un ADMIN que es OBSERVER
+   * de la tarea recibe 403 `READ_ONLY_ROLE` en el PATCH, así que no le pintamos la acción.
+   */
+  const canFullEdit = task.currentUserRole !== 'OBSERVER';
 
   const handleDiscard = () => {
     discardTask.mutate(task.id, {
@@ -120,6 +132,17 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
           <DropdownMenuLabel>Solo administradores</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
+          {/* (QL-178) Formulario completo: datos + fecha límite + participantes en un PATCH. */}
+          {canFullEdit && (
+            <>
+              <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+                <Pencil className="size-4" />
+                Editar tarea
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+
           {task.isDiscarded ? (
             <DropdownMenuItem
               onSelect={handleRestore}
@@ -146,6 +169,18 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* (QL-178) Edición COMPLETA solo-ADMIN. El diálogo gatea sus propias queries por `open`
+          (columnas, proyecto y miembros), así que montarlo cerrado no cuesta peticiones. */}
+      {canFullEdit && (
+        <TaskFormDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          projectId={projectId}
+          task={task}
+          fullEdit
+        />
+      )}
 
       {/* Descartar: confirmación ligera (es reversible desde "Descartadas"). */}
       <AlertDialog

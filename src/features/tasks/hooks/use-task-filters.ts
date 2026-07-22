@@ -106,6 +106,11 @@ export interface UseTaskFiltersResult extends TaskFiltersState {
  * (lo más común es "ver mis tareas"). Es solo el valor inicial: el usuario puede cambiarlo o
  * elegir "Todos". Se respeta el deep-link — si la URL ya trae `resp` (incluso vacío), no se
  * pisa; el default solo aplica cuando el param está **ausente** al montar.
+ *
+ * QL-180: la preselección de QL-156 **se omite para un ADMIN de plataforma**, que entra a
+ * supervisar y por defecto debe ver **todos** los responsables. Es una excepción acotada al rol
+ * `ADMIN`: un creador/gestor de proyecto no-admin conserva la preselección "yo" (decisión
+ * explícita del cliente, no se generaliza a `canSeeAll`).
  */
 export function useTaskFilters(
   { canSeeAll = false, memberOptions }: UseTaskFiltersOptions = {},
@@ -118,6 +123,8 @@ export function useTaskFilters(
 
   const currentUserId = useAuthStore((s) => s.user?.id);
   const currentUserName = useAuthStore((s) => s.user?.name);
+  /** (QL-180) Rol de **plataforma** (no el rol por tarea): un ADMIN no preselecciona nada. */
+  const isPlatformAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
   const [urlParams] = useSearchParams();
 
   /**
@@ -130,6 +137,10 @@ export function useTaskFilters(
    * oculto y no se aplica, así que no tiene sentido preseleccionar nada. Se espera a que
    * `canSeeAll` sea `true` (el proyecto puede tardar en resolverse); si el usuario es un
    * miembro normal, `canSeeAll` nunca pasa a `true` y no se preselecciona.
+   *
+   * (QL-180) Un **ADMIN de plataforma** queda fuera: su default es "Todos". Se marca el ref
+   * igual (one-shot consumido) para que el deep-link y el "Limpiar filtros" se comporten como
+   * para cualquier otro usuario.
    */
   const didInitAssignee = useRef(false);
   useEffect(() => {
@@ -137,10 +148,11 @@ export function useTaskFilters(
     if (!currentUserId) return; // esperamos a tener sesión resuelta
     if (!canSeeAll) return; // miembro normal (o proyecto aún cargando): sin preselección
     didInitAssignee.current = true;
+    if (isPlatformAdmin) return; // (QL-180) el ADMIN arranca viendo TODOS los responsables
     if (!urlParams.has(ASSIGNEE_PARAM)) {
       setAssigneeId(currentUserId);
     }
-  }, [currentUserId, canSeeAll, urlParams, setAssigneeId]);
+  }, [currentUserId, canSeeAll, isPlatformAdmin, urlParams, setAssigneeId]);
 
   const search = committed.toLowerCase();
 

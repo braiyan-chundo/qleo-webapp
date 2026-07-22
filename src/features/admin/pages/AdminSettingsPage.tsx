@@ -1,11 +1,12 @@
 import type { ComponentType } from 'react';
-import { Tags } from 'lucide-react';
+import { Tags, UsersRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BackButton } from '@/shared/components/BackButton';
 import { useQueryParamState } from '@/shared/hooks/use-query-param-state';
 import { LabelCatalogManager } from '@/features/labels/components/LabelCatalogManager';
+import { AvatarCatalogManager } from '@/features/avatars/components/AvatarCatalogManager';
 
 /**
  * Descriptor de un tab de Configuración. El catálogo de tabs es **extensible** (QL-149): añadir
@@ -22,6 +23,8 @@ interface SettingsTab {
 
 const SETTINGS_TABS: readonly SettingsTab[] = [
   { value: 'etiquetas', label: 'Etiquetas', icon: Tags, Component: LabelCatalogManager },
+  // (QL-181, §3.59) Catálogo global de avatares seleccionables.
+  { value: 'avatares', label: 'Avatares', icon: UsersRound, Component: AvatarCatalogManager },
 ] as const;
 
 const DEFAULT_TAB = SETTINGS_TABS[0].value;

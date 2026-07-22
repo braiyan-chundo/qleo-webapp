@@ -19,7 +19,11 @@ import { fetchAvatarObjectUrl } from '@/shared/services/avatar.service';
  * clave y revocación, análoga a `useAuthedAvatar`.
  */
 
-const BLOB_GC_TIME = 5 * 60_000; // 5 min: alineado con el Cache-Control del backend.
+// (QL-182, §3.60) Se queda en **5 min a propósito**, aunque el backend cachee el binario 24 h.
+// Este `gcTime` gobierna cuánto vive el `blob:` (bytes del adjunto) en RAM; la persistencia de 1
+// día la da el Service Worker (caché `qleo-images-v1`, solo imágenes bajo el techo de tamaño),
+// no la memoria. Subirlo retendría todos los blobs de adjunto en RAM 24 h sin ganar nada.
+const BLOB_GC_TIME = 5 * 60_000;
 
 /** Prefijo de la clave de caché; también lo usa la suscripción que revoca los `blob:` URL. */
 const BLOB_KEY_PREFIX = 'attachment-blob';

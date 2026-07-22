@@ -5,6 +5,7 @@ import {
   type UpdateMePayload,
 } from '../services/profile.service';
 import { authKeys } from '@/features/auth/hooks/use-auth';
+import { prepareAvatarUpload } from '@/shared/lib/avatar-file';
 import { useResetAvatarCache } from '@/shared/hooks/use-authed-avatar';
 import { useAuthStore } from '@/store/auth.store';
 import type { User } from '@/store/auth.store';
@@ -66,9 +67,14 @@ export function useChangePassword() {
  * Refresca la sesión, el caché de perfil/auth y **el blob del avatar** tras subir o quitar
  * la foto, para que se refleje al instante en toda la app (topbar, listas, comentarios…).
  * `previousDownloadUrl` es la URL antes del cambio: hay que invalidar el blob viejo además
- * del nuevo (mismo endpoint, ETag distinto tras subir).
+ * del nuevo (mismo endpoint, `?v=` distinto tras subir — QL-182, §3.60).
+ *
+ * (QL-181) Exportado para que "elegir un avatar del catálogo"
+ * (`POST /users/me/avatar/from-catalog`) cierre **exactamente igual**: el backend copia el
+ * binario y emite el mismo evento realtime `user-avatar`, así que el efecto en cliente es el
+ * de una subida normal y no debe divergir.
  */
-function useAvatarMutationCommit() {
+export function useAvatarMutationCommit() {
   const queryClient = useQueryClient();
   const setUser = useAuthStore((s) => s.setUser);
   const resetAvatarCache = useResetAvatarCache();
@@ -84,13 +90,20 @@ function useAvatarMutationCommit() {
   };
 }
 
-/** Sube/reemplaza el avatar del propio perfil. Invalida perfil, sesión y caché del blob. */
+/**
+ * Sube/reemplaza el avatar del propio perfil. Invalida perfil, sesión y caché del blob.
+ *
+ * (QL-181) La imagen se **comprime en cliente** (256×256 WebP) dentro del `mutationFn`, no en
+ * el componente: así ningún llamador puede saltárselo. `prepareAvatarUpload` valida el tipo
+ * antes y el tamaño después de comprimir, y lanza `Error` con el mensaje para el toast.
+ */
 export function useUploadAvatar() {
   const commit = useAvatarMutationCommit();
   const previousDownloadUrl = useAuthStore((s) => s.user?.avatarDownloadUrl);
 
   return useMutation({
-    mutationFn: (file: File) => profileService.uploadAvatar(file),
+    mutationFn: async (file: File) =>
+      profileService.uploadAvatar(await prepareAvatarUpload(file)),
     onSuccess: (user) => commit(user, previousDownloadUrl),
   });
 }

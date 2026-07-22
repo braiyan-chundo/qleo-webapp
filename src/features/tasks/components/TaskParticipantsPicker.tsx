@@ -13,8 +13,17 @@ interface TaskParticipantsPickerProps {
   /** Membresía real del proyecto (`GET /projects/:id/members`, §3.20). */
   members: ProjectMember[] | undefined;
   isLoading: boolean;
-  /** Usuario del token: será el `CREATOR`, así que no es elegible (el backend lo ignoraría). */
-  currentUserId: string | undefined;
+  /**
+   * `CREATOR` de la tarea: **intocable**, así que no es elegible para ningún otro rol (el
+   * backend ignoraría su id en silencio). Al crear es el usuario del token; en la edición
+   * completa (QL-178) es el creador real de la tarea, que puede no ser quien edita.
+   */
+  creatorUserId: string | undefined;
+  /**
+   * (QL-178) Texto de ayuda bajo el selector de Responsable. Por defecto el del alta ("Tú serás
+   * el Creador"); en la edición completa el Creador ya existe y no tiene por qué ser el actor.
+   */
+  assigneeHint?: string;
   /** Id del Responsable elegido; `''` = sin responsable. */
   assigneeId: string;
   /** Ids de los Colaboradores elegidos. */
@@ -85,9 +94,13 @@ function MemberCheckList({
  * (`COLLABORATOR`) y **Observadores** (`OBSERVER`, solo lectura) en el **alta** de una tarea.
  * Los tres son opcionales: sin ellos la tarea nace solo con su `CREATOR`, como siempre.
  *
+ * (QL-178) Se reutiliza tal cual en la **edición completa** de un ADMIN: mismo control, mismas
+ * reglas; solo cambia de dónde salen los valores iniciales (los `assignments` de la tarea) y
+ * quién es el `CREATOR` intocable.
+ *
  * Los candidatos son la **membresía del proyecto** (misma regla que el `RoleManager`: solo se
- * asigna a miembros, no al directorio global). El usuario actual no aparece: al crear ya queda
- * como `CREATOR` y el backend descarta en silencio su id en cualquiera de los tres campos.
+ * asigna a miembros, no al directorio global). El `CREATOR` no aparece: su rol es intocable y
+ * el backend descarta en silencio su id en cualquiera de los tres campos.
  *
  * **Precedencia `ASSIGNEE` > `COLLABORATOR` > `OBSERVER`**: un usuario tiene un solo rol por
  * tarea, así que cada lista retira a quien ya ocupa un rol superior (el Responsable no aparece
@@ -98,7 +111,8 @@ function MemberCheckList({
 export function TaskParticipantsPicker({
   members,
   isLoading,
-  currentUserId,
+  creatorUserId,
+  assigneeHint = 'Solo puede haber un Responsable por tarea. Tú serás el Creador.',
   assigneeId,
   collaboratorIds,
   observerIds,
@@ -107,10 +121,10 @@ export function TaskParticipantsPicker({
   onObserversChange,
   disabled,
 }: TaskParticipantsPickerProps) {
-  // El creador de la tarea (usuario del token) nunca es un candidato.
+  // El creador de la tarea nunca es un candidato: su rol `CREATOR` es intocable.
   const candidates = useMemo(
-    () => (members ?? []).filter((m) => m.id !== currentUserId),
-    [members, currentUserId],
+    () => (members ?? []).filter((m) => m.id !== creatorUserId),
+    [members, creatorUserId],
   );
 
   const selectedCollaborators = useMemo(
@@ -198,9 +212,7 @@ export function TaskParticipantsPicker({
             </NativeSelectOption>
           ))}
         </NativeSelect>
-        <span className="text-xs text-on-surface-variant">
-          Solo puede haber un Responsable por tarea. Tú serás el Creador.
-        </span>
+        <span className="text-xs text-on-surface-variant">{assigneeHint}</span>
       </div>
 
       <div className="grid gap-1.5">

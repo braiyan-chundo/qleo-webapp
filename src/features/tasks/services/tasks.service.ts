@@ -265,7 +265,19 @@ export interface MoveTaskPayload {
   order: number;
 }
 
-/** Body para editar una tarea (§3.7). Todos opcionales; solo el CREATOR puede. */
+/**
+ * Body para editar una tarea (§3.7/§3.58). Todos opcionales.
+ *
+ * (QL-178) `PATCH /tasks/:id` es ahora **atómico y completo**: acepta todo lo que se puede
+ * definir al crear la tarea (incluidos deadline y roles), en una sola llamada, y lo permite al
+ * **CREATOR de la tarea o a un ADMIN de plataforma** (un OBSERVER, aunque sea ADMIN, recibe
+ * 403 `READ_ONLY_ROLE`). Ya no hace falta orquestar `POST/DELETE /tasks/:id/roles` +
+ * `PATCH /tasks/:id/deadline` desde el formulario.
+ *
+ * **Convención de todos los campos:** omitido (`undefined`) = **no toca**; `null` limpia donde
+ * se admite; los arrays **reemplazan** el conjunto entero (`[]` lo vacía, no es un "añadir").
+ * Mandar el formulario completo es válido e idempotente.
+ */
 export interface UpdateTaskPayload {
   title?: string;
   description?: string;
@@ -277,6 +289,22 @@ export interface UpdateTaskPayload {
   labelIds?: string[];
   /** Fecha de inicio ISO; `null` la limpia. */
   startDate?: string | null;
+  /**
+   * (QL-178, §3.58) Fecha límite ISO8601 **con hora** (QL-166); `null` la quita. Un ADMIN puede
+   * moverla aunque esté bloqueada (`deadlineLocked`).
+   */
+  dueDate?: string | null;
+  /** (QL-178, §3.58) Bloqueo del deadline por no-Creadores (RF-2.1). */
+  deadlineLocked?: boolean;
+  /**
+   * (QL-178, §3.58) Responsable **único** (RF-1.2); `null` deja la tarea sin Responsable.
+   * Es un escalar: mandarlo **sustituye** al anterior (no hay 409 por este camino).
+   */
+  assigneeId?: string | null;
+  /** (QL-178, §3.58) **Reemplaza** el conjunto de COLLABORATOR; `[]` los quita todos. */
+  collaboratorIds?: string[];
+  /** (QL-178, §3.58) **Reemplaza** el conjunto de OBSERVER; `[]` los quita todos. */
+  observerIds?: string[];
 }
 
 /** Body para asignar/cambiar el rol por tarea de un usuario (§3.7). Solo el CREATOR. */
@@ -334,6 +362,12 @@ export const tasksService = {
     return api.post<Task>('/tasks', data);
   },
 
+  /**
+   * (QL-178, §3.58) Edita la tarea de forma **atómica**: núcleo + deadline + roles en una sola
+   * llamada. Permitido al CREATOR de la tarea y a un ADMIN de plataforma. Ante cualquier error
+   * la tarea queda **exactamente como estaba** (nada a medias), así que un optimistic update se
+   * puede revertir entero. Ver {@link UpdateTaskPayload} para la semántica de cada campo.
+   */
   update: (id: string, data: UpdateTaskPayload) => {
     return api.patch<Task>(`/tasks/${id}`, data);
   },

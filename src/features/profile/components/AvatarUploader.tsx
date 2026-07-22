@@ -1,53 +1,39 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ImageUp, Loader2, Trash2 } from 'lucide-react';
+import { ImageUp, Images, Loader2, Trash2 } from 'lucide-react';
 
-import { ApiError } from '@/core/api/fetch-client';
 import { Button } from '@/components/ui/button';
 import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
+import { AvatarGalleryDialog } from '@/features/avatars/components/AvatarGalleryDialog';
+import {
+  AVATAR_ACCEPT_ATTR,
+  avatarErrorMessage,
+  validateAvatarType,
+} from '@/shared/lib/avatar-file';
 import type { User } from '@/store/auth.store';
 
 import { useDeleteAvatar, useUploadAvatar } from '../hooks/use-profile';
-import {
-  AVATAR_ACCEPT_ATTR,
-  validateAvatarFile,
-} from '../lib/avatar-file';
 
 interface AvatarUploaderProps {
   user: User;
 }
 
 /**
- * Traduce un fallo de avatar a un toast según §3.15: reacciona al `err.code`
- * (`FILE_TOO_LARGE` / `UNSUPPORTED_FILE_TYPE`), no al texto.
- */
-function notifyAvatarError(err: unknown, fallback: string) {
-  if (err instanceof ApiError) {
-    if (err.code === 'FILE_TOO_LARGE') {
-      toast.error('La imagen supera el límite de 2 MB.');
-      return;
-    }
-    if (err.code === 'UNSUPPORTED_FILE_TYPE') {
-      toast.error('Formato no permitido. Usa PNG, JPG, WEBP o GIF.');
-      return;
-    }
-    toast.error(err.message);
-    return;
-  }
-  toast.error(err instanceof Error ? err.message : fallback);
-}
-
-/**
  * Control de foto de perfil (QL-32, §3.15): preview con `AuthedAvatar` (blob autenticado del
- * avatar subido → URL externa → iniciales), botón para subir (valida 2 MB / imagen en cliente
- * antes de enviar) y botón para quitar. Al éxito, los hooks invalidan perfil + sesión + el
- * caché del blob, así que el cambio se refleja al instante en toda la app.
+ * avatar subido → URL externa → iniciales), botón para **subir** una foto, (QL-181) botón para
+ * **elegir de la galería** del catálogo, y botón para **quitar**. Al éxito, los hooks invalidan
+ * perfil + sesión + el caché del blob, así que el cambio se refleja al instante en toda la app.
+ *
+ * (QL-181) La foto subida se **comprime en cliente** (256×256 WebP) dentro del hook
+ * `useUploadAvatar`; aquí solo se valida el **tipo** antes (el tamaño lo revalida el hook tras
+ * comprimir, por eso el copy ya no vende el límite de 2 MB como el cuello de botella real).
  */
 export function AvatarUploader({ user }: AvatarUploaderProps) {
   const uploadAvatar = useUploadAvatar();
   const deleteAvatar = useDeleteAvatar();
   const inputRef = useRef<HTMLInputElement>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
 
   const hasUploadedAvatar = !!user.avatarDownloadUrl;
   const busy = uploadAvatar.isPending || deleteAvatar.isPending;
@@ -58,15 +44,15 @@ export function AvatarUploader({ user }: AvatarUploaderProps) {
     event.target.value = '';
     if (!file) return;
 
-    const invalid = validateAvatarFile(file);
-    if (invalid) {
-      toast.error(invalid);
+    const invalidType = validateAvatarType(file);
+    if (invalidType) {
+      toast.error(invalidType);
       return;
     }
 
     uploadAvatar.mutate(file, {
       onSuccess: () => toast.success('Foto de perfil actualizada.'),
-      onError: (err) => notifyAvatarError(err, 'No se pudo subir la foto.'),
+      onError: (err) => toast.error(avatarErrorMessage(err, 'No se pudo subir la foto.')),
     });
   };
 
@@ -78,7 +64,7 @@ export function AvatarUploader({ user }: AvatarUploaderProps) {
       },
       onError: (err) => {
         setConfirmRemove(false);
-        notifyAvatarError(err, 'No se pudo quitar la foto.');
+        toast.error(avatarErrorMessage(err, 'No se pudo quitar la foto.'));
       },
     });
   };
@@ -117,6 +103,18 @@ export function AvatarUploader({ user }: AvatarUploaderProps) {
               <ImageUp />
             )}
             {hasUploadedAvatar ? 'Cambiar foto' : 'Subir foto'}
+          </Button>
+
+          {/* (QL-181) Elegir del catálogo global de avatares. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setGalleryOpen(true)}
+            disabled={busy}
+          >
+            <Images />
+            Elegir de la galería
           </Button>
 
           {hasUploadedAvatar &&
@@ -158,9 +156,15 @@ export function AvatarUploader({ user }: AvatarUploaderProps) {
             ))}
         </div>
         <p className="text-xs text-on-surface-variant">
-          PNG, JPG, WEBP o GIF · máx. 2 MB.
+          PNG, JPG, WEBP o GIF. Tu foto se recorta y optimiza automáticamente al subirla.
         </p>
       </div>
+
+      <AvatarGalleryDialog
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+        selectedAvatarId={user.avatarCatalogId}
+      />
     </div>
   );
 }
