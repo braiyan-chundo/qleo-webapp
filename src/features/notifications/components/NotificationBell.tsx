@@ -213,6 +213,7 @@ function NotificationPopoverRow({
       >
         <NotificationAvatar
           actor={notification.actor}
+          type={notification.type}
           className="mt-0.5 shrink-0"
         />
 

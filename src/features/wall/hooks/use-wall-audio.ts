@@ -4,7 +4,7 @@ import { queryClient } from '@/core/query/query-client';
 import { fetchAvatarObjectUrl } from '@/shared/services/avatar.service';
 
 /**
- * Caché de blobs de **notas de voz** del muro (QL-104, §3.25.2). Igual que `useWallImage`: el
+ * Caché de blobs de **notas de voz** del muro (QL-104, §3.25.2). Igual que `useAttachmentBlob`: el
  * binario se sirve por `GET /attachments/:id/download` (requiere `Authorization: Bearer`), así
  * que un `<audio src>` desnudo no funciona; hay que hacer `fetch` con el token y crear un `blob:`
  * URL. Reusa el fetch autenticado genérico (`fetchAvatarObjectUrl`) y añade la caché por

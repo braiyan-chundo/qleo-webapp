@@ -11,10 +11,12 @@ import {
   type CompleteTaskPayload,
   type CreateTaskPayload,
   type MoveTaskPayload,
+  type RejectReviewPayload,
   type RequestDeadlineExtensionPayload,
   type SetDeadlinePayload,
   type Task,
   type UpdateTaskPayload,
+  type ValidateTaskPayload,
 } from '../services/tasks.service';
 
 /**
@@ -424,14 +426,39 @@ export function useRequestReview(projectId: string, taskId: string) {
 /**
  * (QL-145, §3.39) El Creador u Observador da el **visto bueno** que habilita el cierre del
  * Responsable. Solo CREATOR/OBSERVER. Muta la tarea (`reviewStatus` a `VALIDATED`,
- * `validatedAt/By`), así que invalida detalle, listado y "Mis tareas". Puede rechazar con
- * `ApiError` (`TASK_VALIDATION_FORBIDDEN` 403); el componente decide el mensaje.
+ * `validatedAt/By`), así que invalida detalle, listado y "Mis tareas". (QL-171) Acepta un
+ * `comment` opcional (máx 2000) que queda en `validationComment`. Puede rechazar con `ApiError`
+ * (`TASK_VALIDATION_FORBIDDEN` 403); el componente decide el mensaje.
  */
 export function useValidateTask(projectId: string, taskId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => tasksService.validate(taskId),
+    mutationFn: (data?: ValidateTaskPayload) => tasksService.validate(taskId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
+    },
+  });
+}
+
+/**
+ * (QL-171/QL-172) El Creador u Observador **rechaza** la revisión con un motivo obligatorio y,
+ * solo el CREATOR, una nueva fecha límite opcional. Mismos permisos que validar.
+ *
+ * El backend deja `reviewStatus: 'REJECTED'` y **limpia `reviewRequestedAt/By`**, así que el
+ * Responsable vuelve a ver "Solicitar revisión": hay que invalidar el **detalle** (donde vive
+ * ese flujo), el **listado** del proyecto y **"Mis tareas"**. Si venía `newDueDate`, la tarea
+ * cambia también de `dueDate` → esas mismas queries cubren el badge del board y del detalle.
+ * Puede rechazar con `ApiError` (`TASK_VALIDATION_FORBIDDEN` /
+ * `DEADLINE_EXTENSION_CREATOR_ONLY` 403); el componente decide el mensaje.
+ */
+export function useRejectReview(projectId: string, taskId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: RejectReviewPayload) => tasksService.rejectReview(taskId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });

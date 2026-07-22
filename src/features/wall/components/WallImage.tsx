@@ -4,7 +4,7 @@ import { ImageOff, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import type { Attachment } from '@/features/attachments/services/attachments.service';
-import { useWallImage } from '../hooks/use-wall-image';
+import { useAttachmentBlob } from '@/features/attachments/hooks/use-attachment-blob';
 
 interface WallImageProps {
   attachment: Attachment;
@@ -14,7 +14,7 @@ interface WallImageProps {
 
 /**
  * Imagen adjunta renderizada **en línea** en el hilo del muro (QL-90). El binario es privado
- * (`downloadUrl` requiere Bearer), así que se baja con `useWallImage` (fetch+blob) y solo
+ * (`downloadUrl` requiere Bearer), así que se baja con `useAttachmentBlob` (fetch+blob) y solo
  * **cuando entra en el viewport** (`IntersectionObserver` → carga perezosa). El tamaño está
  * acotado (`max-w`/`max-h`) para no romper el layout del chat.
  */
@@ -38,7 +38,11 @@ export function WallImage({ attachment, onOpen }: WallImageProps) {
     return () => observer.disconnect();
   }, [inView]);
 
-  const { data: blobUrl, isLoading, isError } = useWallImage(attachment.downloadUrl, inView);
+  const {
+    data: blobUrl,
+    isLoading,
+    isError,
+  } = useAttachmentBlob(attachment.downloadUrl, inView);
 
   return (
     <button

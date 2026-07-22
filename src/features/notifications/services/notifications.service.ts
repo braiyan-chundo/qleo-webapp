@@ -8,6 +8,8 @@ import type { Paginated } from '@/shared/types/paginated';
  *   agregaron a un proyecto; trae `projectId`, `taskId=null`), `TASK_MOVED` (una tarea en la
  *   que participas cambió de estado), `DEADLINE_APPROACHING` (tu tarea por vencer; noti **del
  *   sistema, `actor=null`**).
+ * - **(QL-171)** `TASK_REVIEW_REJECTED`: el Creador/Observador **rechazó** la revisión de tu
+ *   tarea. Va al **Responsable** y trae el motivo en `reason` (mismo campo que usa la prórroga).
  */
 export type NotificationType =
   | 'MENTION'
@@ -16,7 +18,8 @@ export type NotificationType =
   | 'TASK_ASSIGNED'
   | 'PROJECT_MEMBER_ADDED'
   | 'TASK_MOVED'
-  | 'DEADLINE_APPROACHING';
+  | 'DEADLINE_APPROACHING'
+  | 'TASK_REVIEW_REJECTED';
 
 /**
  * Todos los tipos, en el orden en que se ofrecen en el filtro de la bandeja (QL-137). Es la
@@ -28,6 +31,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'WALL_MENTION',
   'TASK_ASSIGNED',
   'TASK_MOVED',
+  'TASK_REVIEW_REJECTED',
   'DEADLINE_APPROACHING',
   'DEADLINE_EXTENSION_REQUEST',
   'PROJECT_MEMBER_ADDED',
@@ -39,6 +43,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   WALL_MENTION: 'Muro',
   TASK_ASSIGNED: 'Asignaciones',
   TASK_MOVED: 'Cambios de estado',
+  TASK_REVIEW_REJECTED: 'Revisiones rechazadas',
   DEADLINE_APPROACHING: 'Vencimientos',
   DEADLINE_EXTENSION_REQUEST: 'Prórrogas',
   PROJECT_MEMBER_ADDED: 'Proyectos',
@@ -94,7 +99,10 @@ export interface Notification {
   wallMessageId?: string | null;
   /** Fecha propuesta en `DEADLINE_EXTENSION_REQUEST` (QL-09); `null` en otros tipos. */
   requestedDate: string | null;
-  /** Motivo de la solicitud de prórroga (QL-09); `null` en otros tipos. */
+  /**
+   * Motivo: de la solicitud de prórroga (QL-09) y, **(QL-171)**, del rechazo de revisión
+   * (`TASK_REVIEW_REJECTED`, el `rejectionComment` de la tarea). `null` en el resto de tipos.
+   */
   reason: string | null;
   /**
    * Quien la generó (poblado). **`null`** en las notis DEL SISTEMA sin actor humano

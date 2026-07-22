@@ -26,6 +26,29 @@ export function formatWallShortDate(iso: string): string {
   });
 }
 
+/**
+ * (QL-170) Ventana durante la cual el **autor** puede editar o eliminar su mensaje: **5 minutos**
+ * desde `createdAt`. Es la misma constante que aplica el backend (409 `WALL_EDIT_WINDOW_EXPIRED` /
+ * `WALL_DELETE_WINDOW_EXPIRED` al pasarse). Se define **una sola vez** aquí; ningún componente
+ * debe re-declarar el número.
+ */
+export const WALL_MUTATION_WINDOW_MS = 5 * 60 * 1000;
+
+/** Texto único del porqué, para el tooltip/ayuda del menú cuando la ventana ya cerró. */
+export const WALL_MUTATION_WINDOW_HINT = 'Solo dentro de los primeros 5 minutos';
+
+/**
+ * ¿El mensaje sigue dentro de la ventana de 5 min para editarlo/eliminarlo (QL-170)? `now` es
+ * parámetro para poder reevaluarlo con el reloj compartido (`useMinuteTick`) sin depender de
+ * cuándo se montó el componente. Una fecha inválida se trata como **fuera** de ventana: mejor
+ * ocultar una acción que ofrecer una que el backend va a rechazar.
+ */
+export function isWithinWallMutationWindow(createdAt: string, now: number = Date.now()): boolean {
+  const created = new Date(createdAt).getTime();
+  if (Number.isNaN(created)) return false;
+  return now - created <= WALL_MUTATION_WINDOW_MS;
+}
+
 /** Ventana (ms) para agrupar mensajes consecutivos del mismo autor (~5 min, estilo chat). */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 

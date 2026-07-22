@@ -2,8 +2,7 @@ import { ImageOff, Loader2, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import type { Attachment } from '@/features/attachments/services/attachments.service';
-
-import { useWallImage } from '../hooks/use-wall-image';
+import { useAttachmentBlob } from '@/features/attachments/hooks/use-attachment-blob';
 
 interface WallSharedThumbProps {
   attachment: Attachment;
@@ -20,7 +19,7 @@ interface WallSharedThumbProps {
 
 /**
  * Miniatura cuadrada de una imagen de la galería "Archivos compartidos" (QL-96, §3.28). El
- * binario es privado (`downloadUrl` requiere Bearer), así que se baja con `useWallImage`
+ * binario es privado (`downloadUrl` requiere Bearer), así que se baja con `useAttachmentBlob`
  * (fetch+blob, cacheado por URL). La galería es acotada (≤12 items visibles), por eso se
  * carga directamente (`enabled=true`) sin `IntersectionObserver`, a diferencia de `WallImage`.
  *
@@ -35,7 +34,11 @@ export function WallSharedThumb({
   onDelete,
   deleting = false,
 }: WallSharedThumbProps) {
-  const { data: blobUrl, isLoading, isError } = useWallImage(attachment.downloadUrl, true);
+  const {
+    data: blobUrl,
+    isLoading,
+    isError,
+  } = useAttachmentBlob(attachment.downloadUrl, true);
 
   return (
     <div className="relative">

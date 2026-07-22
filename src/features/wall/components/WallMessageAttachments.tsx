@@ -6,10 +6,10 @@ import type { Attachment } from '@/features/attachments/services/attachments.ser
 import { AttachmentIcon } from '@/features/attachments/components/AttachmentIcon';
 import { useDownloadAttachment } from '@/features/attachments/hooks/use-attachments';
 import { formatFileSize, iconKindFor, notifyAttachmentError } from '@/features/attachments/lib/files';
+import { AttachmentViewer } from '@/features/attachments/components/AttachmentViewer';
 
 import { WallImage } from './WallImage';
 import { WallVoicePlayer } from './WallVoicePlayer';
-import { WallAttachmentViewer } from './WallAttachmentViewer';
 import { isAudioAttachment } from '../lib/wall-audio';
 
 interface WallMessageAttachmentsProps {
@@ -20,7 +20,8 @@ interface WallMessageAttachmentsProps {
  * Adjuntos de un mensaje del muro (QL-90, §3.25.2). Las **imágenes** se muestran en línea
  * (`WallImage`, blob+token, lazy); las **notas de voz** (QL-104) como reproductor
  * (`WallVoicePlayer`); el resto como **chip**. (QL-168) Al hacer click en una imagen o en un chip
- * se abre el **visor** (`WallAttachmentViewer`) en vez de descargar; cada chip conserva además un
+ * se abre el **visor** compartido (`AttachmentViewer`, QL-174) en vez de descargar; cada chip
+ * conserva además un
  * botón explícito de **Descargar**. La descarga reusa el flujo blob+Bearer de
  * `features/attachments` (`useDownloadAttachment`), sin duplicar el fetch.
  */
@@ -120,7 +121,7 @@ export function WallMessageAttachments({ attachments }: WallMessageAttachmentsPr
         </div>
       )}
 
-      <WallAttachmentViewer attachment={viewing} onClose={() => setViewing(null)} />
+      <AttachmentViewer attachment={viewing} onClose={() => setViewing(null)} />
     </div>
   );
 }

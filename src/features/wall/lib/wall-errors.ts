@@ -1,6 +1,7 @@
 import { toast } from 'sonner';
 
 import { ApiError } from '@/core/api/fetch-client';
+import { MAX_UPLOAD_LABEL } from '@/features/attachments/lib/files';
 
 /**
  * Traduce cualquier fallo del Muro Corporativo (QL-90, §3.25) a un toast claro reaccionando
@@ -11,6 +12,9 @@ import { ApiError } from '@/core/api/fetch-client';
  * - `WALL_MESSAGE_NOT_EDITABLE` — editar sin ser el autor.
  * - `WALL_MESSAGE_NOT_AUTHOR` — (QL-102) borrar sin ser el autor (ni ADMIN puede).
  * - `WALL_MESSAGE_NOT_FOUND` — el mensaje ya no existe o fue borrado (o el `replyTo` citado).
+ * - **(QL-170)** `WALL_EDIT_WINDOW_EXPIRED` / `WALL_DELETE_WINDOW_EXPIRED` — pasaron los 5 min
+ *   desde `createdAt`. La UI ya deshabilita las acciones, pero el reloj del navegador puede ir
+ *   adelantado respecto al del servidor: el toast explica por qué se rechazó.
  * - `FILE_TOO_LARGE` / `UNSUPPORTED_FILE_TYPE` — límites de la subida de adjuntos.
  */
 export function notifyWallError(err: unknown, fallback: string) {
@@ -31,8 +35,14 @@ export function notifyWallError(err: unknown, fallback: string) {
       case 'WALL_MESSAGE_NOT_FOUND':
         toast.error('El mensaje ya no está disponible.');
         return;
+      case 'WALL_EDIT_WINDOW_EXPIRED':
+        toast.error('Ya no se puede editar: pasaron los 5 minutos desde que se envió.');
+        return;
+      case 'WALL_DELETE_WINDOW_EXPIRED':
+        toast.error('Ya no se puede eliminar: pasaron los 5 minutos desde que se envió.');
+        return;
       case 'FILE_TOO_LARGE':
-        toast.error('El archivo supera el límite de 10 MB.');
+        toast.error(`El archivo supera el límite de ${MAX_UPLOAD_LABEL}.`);
         return;
       case 'UNSUPPORTED_FILE_TYPE':
         toast.error('Tipo de archivo no permitido.');

@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ClipboardEvent,
   type KeyboardEvent,
 } from 'react';
 import { Loader2, Megaphone } from 'lucide-react';
@@ -55,6 +56,11 @@ interface MentionTextareaProps {
   /** Se llama al perder el foco el textarea (además del cierre interno del dropdown de menciones). */
   onBlur?: () => void;
   /**
+   * (QL-175) Pegado en el textarea. El llamador decide si hay ficheros que adjuntar y, solo en
+   * ese caso, hace `preventDefault`; si no lo hace, el pegado de **texto** sigue su curso normal.
+   */
+  onPaste?: (e: ClipboardEvent<HTMLTextAreaElement>) => void;
+  /**
    * (QL-167) Entradas especiales (no-usuario) que se muestran al **tope** del dropdown de `@`,
    * antes de los resultados del directorio. Insertan texto literal sin registrar mención.
    */
@@ -80,6 +86,7 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
       onMention,
       onKeyDown,
       onBlur,
+      onPaste,
       extraOptions,
       placeholder,
       rows = 3,
@@ -252,6 +259,7 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
             window.setTimeout(() => setToken(null), 120);
             onBlur?.();
           }}
+          onPaste={onPaste}
           onKeyDown={handleKeyDown}
         />
 

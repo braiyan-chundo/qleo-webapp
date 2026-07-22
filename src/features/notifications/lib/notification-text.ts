@@ -35,6 +35,12 @@ export function notificationText(notification: Notification): string {
       return `${actor} te agregó a ${project ?? 'un proyecto'}`;
     case 'TASK_MOVED':
       return `${actor} cambió el estado de ${task ?? 'una tarea'}`;
+    case 'TASK_REVIEW_REJECTED': {
+      // (QL-171) El motivo del rechazo viaja en `reason` (el `rejectionComment` de la tarea).
+      const reason = notification.reason?.trim();
+      const base = `${actor} rechazó la revisión de ${task ?? 'una tarea'}`;
+      return reason ? `${base}: ${reason}` : base;
+    }
     case 'DEADLINE_APPROACHING':
       // Noti del sistema (sin actor): se compone sin nombre.
       return task ? `${task} está por vencer` : 'Una de tus tareas está por vencer';

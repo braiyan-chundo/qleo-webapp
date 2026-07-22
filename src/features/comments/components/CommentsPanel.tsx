@@ -1,11 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { Check, Loader2, MessageSquare, Pencil, Send, Trash2, X } from 'lucide-react';
+import { Loader2, MessageSquare, Trash2 } from 'lucide-react';
 
 import { ApiError } from '@/core/api/fetch-client';
 import type { TaskRole } from '@/features/tasks/services/tasks.service';
 import { useAuthStore } from '@/store/auth.store';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
+import { CollapsibleText } from '@/shared/components/CollapsibleText';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -19,16 +20,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-import type { Comment, CommentMention } from '../services/comments.service';
-import {
-  useAddComment,
-  useComments,
-  useDeleteComment,
-  useUpdateComment,
-} from '../hooks/use-comments';
-import { resolveMentionIds } from '../lib/mentions';
+import type { Comment } from '../services/comments.service';
+import { useComments, useDeleteComment } from '../hooks/use-comments';
+import { CommentAttachments } from './CommentAttachments';
+import { CommentComposer } from './CommentComposer';
 import { MentionText } from './MentionText';
-import { MentionTextarea } from './MentionTextarea';
 
 interface CommentsPanelProps {
   task: { id: string; currentUserRole: TaskRole | null };
@@ -55,6 +51,16 @@ function notifyError(err: unknown, fallback: string) {
       toast.error('Tu rol es de solo lectura.');
       return;
     }
+    if (err.code === 'COMMENT_ATTACHMENT_INVALID') {
+      toast.error('No se pudo adjuntar el archivo al comentario. Vuelve a intentarlo.');
+      return;
+    }
+    if (err.code === 'COMMENT_NOT_EDITABLE') {
+      // (QL-176) Los comentarios ya no se editan; la UI no ofrece la acción, pero si llegara
+      // (pestaña vieja abierta) el mensaje debe ser claro.
+      toast.error('Los comentarios no se pueden editar.');
+      return;
+    }
     toast.error(err.message);
     return;
   }
@@ -64,8 +70,11 @@ function notifyError(err: unknown, fallback: string) {
 /**
  * Panel del hilo de comentarios dentro del detalle de tarea (QL-12, §3.9). El hilo se muestra
  * cronológico ascendente (más reciente abajo) con la caja de comentar al final. Deriva `canComment`
- * del rol por tarea (CREATOR/ASSIGNEE/COLLABORATOR) y solo permite editar/borrar comentarios propios
- * (`comment.authorId === user.id`), sin pintar controles que darían 403.
+ * del rol por tarea (CREATOR/ASSIGNEE/COLLABORATOR).
+ *
+ * (QL-176) **Un comentario no se edita**: solo se puede **eliminar** el propio. (QL-174) Cada
+ * comentario puede traer adjuntos, que se abren en el visor compartido. (QL-173) Los cuerpos
+ * largos se recortan con "Leer más".
  */
 export function CommentsPanel({ task }: CommentsPanelProps) {
   const role = task.currentUserRole;
@@ -74,36 +83,8 @@ export function CommentsPanel({ task }: CommentsPanelProps) {
   const currentUserId = useAuthStore((s) => s.user?.id);
 
   const { data: comments, isLoading, isError, error } = useComments(task.id);
-  const addComment = useAddComment(task.id);
-
-  const [draft, setDraft] = useState('');
-  // Candidatos de mención elegidos en el picker. Se filtran al enviar por si el usuario
-  // borró el `@Nombre` del texto (ver `resolveMentionIds`).
-  const mentionCandidates = useRef<CommentMention[]>([]);
-
-  const registerMention = useCallback((mention: CommentMention) => {
-    if (!mentionCandidates.current.some((m) => m.id === mention.id)) {
-      mentionCandidates.current.push(mention);
-    }
-  }, []);
 
   const total = comments?.length ?? 0;
-
-  const handleSubmit = () => {
-    const body = draft.trim();
-    if (!body || addComment.isPending) return;
-    const mentions = resolveMentionIds(body, mentionCandidates.current);
-    addComment.mutate(
-      { body, mentions: mentions.length ? mentions : undefined },
-      {
-        onSuccess: () => {
-          setDraft('');
-          mentionCandidates.current = [];
-        },
-        onError: (err) => notifyError(err, 'No se pudo publicar el comentario'),
-      },
-    );
-  };
 
   return (
     <div className="rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-4 py-3">
@@ -149,35 +130,7 @@ export function CommentsPanel({ task }: CommentsPanelProps) {
         </ul>
       )}
 
-      {canComment && !isError && (
-        <div className="mt-4 space-y-2">
-          <MentionTextarea
-            value={draft}
-            onChange={setDraft}
-            onMention={registerMention}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                handleSubmit();
-              }
-            }}
-            placeholder="Escribe un comentario… usa @ para mencionar"
-            rows={3}
-            disabled={addComment.isPending}
-          />
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSubmit}
-              disabled={!draft.trim() || addComment.isPending}
-            >
-              {addComment.isPending ? <Loader2 className="animate-spin" /> : <Send />}
-              Comentar
-            </Button>
-          </div>
-        </div>
-      )}
+      {canComment && !isError && <CommentComposer taskId={task.id} onError={notifyError} />}
 
       {!canComment && role === 'OBSERVER' && !isError && (
         <p className="mt-3 text-xs text-on-surface-variant">
@@ -194,51 +147,17 @@ interface CommentItemProps {
   isOwn: boolean;
 }
 
-/** Un comentario del hilo: avatar + autor + fecha (+ "editado") + cuerpo, con edición/borrado si es propio. */
+/**
+ * Un comentario del hilo: avatar + autor + fecha (+ "editado") + cuerpo + adjuntos. Si es propio,
+ * ofrece **eliminar** (QL-176: la edición ya no existe; la etiqueta "editado" se conserva porque
+ * es un dato real de comentarios antiguos).
+ */
 function CommentItem({ comment, taskId, isOwn }: CommentItemProps) {
-  const updateComment = useUpdateComment(taskId);
   const deleteComment = useDeleteComment(taskId);
-
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(comment.body);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Menciones ya presentes en el comentario + las nuevas elegidas en esta edición. Se
-  // reenvía el set completo válido (§3.9: PATCH recibe el nuevo set completo).
-  const mentionCandidates = useRef<CommentMention[]>([]);
-
-  const registerMention = useCallback((mention: CommentMention) => {
-    if (!mentionCandidates.current.some((m) => m.id === mention.id)) {
-      mentionCandidates.current.push(mention);
-    }
-  }, []);
 
   const authorName = comment.author?.name ?? 'Usuario';
-
-  const startEdit = () => {
-    setDraft(comment.body);
-    // Siembra los candidatos con las menciones ya pobladas del comentario.
-    mentionCandidates.current = [...comment.mentions];
-    setEditing(true);
-  };
-
-  const commitEdit = () => {
-    const body = draft.trim();
-    if (!body || body === comment.body) {
-      setEditing(false);
-      return;
-    }
-    const mentions = resolveMentionIds(body, mentionCandidates.current);
-    updateComment.mutate(
-      { id: comment.id, data: { body, mentions } },
-      {
-        onSuccess: () => {
-          setEditing(false);
-          toast.success('Comentario actualizado');
-        },
-        onError: (err) => notifyError(err, 'No se pudo editar el comentario'),
-      },
-    );
-  };
+  const attachments = comment.attachments ?? [];
 
   const handleDelete = () => {
     deleteComment.mutate(comment.id, {
@@ -275,18 +194,8 @@ function CommentItem({ comment, taskId, isOwn }: CommentItemProps) {
             <span className="shrink-0 text-xs text-on-surface-variant">· editado</span>
           )}
 
-          {isOwn && !editing && (
+          {isOwn && (
             <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover/comment:opacity-100 focus-within:opacity-100">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                onClick={startEdit}
-                aria-label="Editar comentario"
-              >
-                <Pencil className="size-3.5" />
-              </Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -301,56 +210,16 @@ function CommentItem({ comment, taskId, isOwn }: CommentItemProps) {
           )}
         </div>
 
-        {editing ? (
-          <div className="mt-1.5 space-y-2">
-            <MentionTextarea
-              autoFocus
-              value={draft}
-              onChange={setDraft}
-              onMention={registerMention}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  commitEdit();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  setEditing(false);
-                }
-              }}
-              rows={3}
-              disabled={updateComment.isPending}
-            />
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                onClick={commitEdit}
-                disabled={updateComment.isPending}
-              >
-                {updateComment.isPending ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <Check />
-                )}
-                Guardar
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setEditing(false)}
-                disabled={updateComment.isPending}
-              >
-                <X />
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-0.5 text-sm break-words whitespace-pre-wrap text-on-surface">
+        {/* (QL-173) Cuerpo recortado a ~6 líneas con "Leer más". Las menciones se siguen
+            renderizando con `MentionText`: `CollapsibleText` solo recorta la caja. */}
+        <CollapsibleText fadeFrom="from-surface-container-lowest" className="mt-0.5">
+          <p className="text-sm break-words whitespace-pre-wrap text-on-surface">
             <MentionText body={comment.body} mentions={comment.mentions} />
           </p>
-        )}
+        </CollapsibleText>
+
+        {/* (QL-174) Adjuntos del comentario → visor compartido al hacer click. */}
+        <CommentAttachments attachments={attachments} />
       </div>
 
       <AlertDialog
@@ -365,6 +234,8 @@ function CommentItem({ comment, taskId, isOwn }: CommentItemProps) {
             <AlertDialogDescription>
               ¿Seguro que quieres eliminar este comentario? Esta acción no se puede
               deshacer.
+              {attachments.length > 0 &&
+                ' Los archivos adjuntos seguirán disponibles en los adjuntos de la tarea.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

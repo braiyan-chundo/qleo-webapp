@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ClipboardEvent,
   type KeyboardEvent,
   type RefObject,
 } from 'react';
@@ -45,8 +46,13 @@ import {
 } from '@/features/comments/components/MentionTextarea';
 import { resolveMentionIds } from '@/features/comments/lib/mentions';
 import type { Attachment } from '@/features/attachments/services/attachments.service';
-import { AttachmentIcon } from '@/features/attachments/components/AttachmentIcon';
+import { PendingAttachmentChip } from '@/features/attachments/components/PendingAttachmentChip';
 import { ACCEPT_ATTR, validateFile } from '@/features/attachments/lib/files';
+import { filesFromClipboard } from '@/features/attachments/lib/clipboard';
+import {
+  nextPendingKey,
+  type PendingAttachment,
+} from '@/features/attachments/lib/pending-upload';
 
 import {
   useRemoveWallAttachment,
@@ -115,21 +121,8 @@ interface WallComposerProps {
   onCancelReply?: () => void;
 }
 
-/** Un adjunto en el composer: en subida, subido o fallido. */
-interface PendingUpload {
-  /** Clave local estable (para el keyed render y el borrado del slot). */
-  key: string;
-  name: string;
-  isImage: boolean;
-  /** Object URL local del archivo (solo imágenes) para la miniatura previa. */
-  previewUrl?: string;
-  status: 'uploading' | 'done' | 'error';
-  /** `Attachment` devuelto por la subida previa (presente si `status === 'done'`). */
-  attachment?: Attachment;
-}
-
-let slotCounter = 0;
-const nextKey = () => `wall-upload-${Date.now()}-${(slotCounter += 1)}`;
+/** (QL-174) El slot pendiente y su chip son compartidos con el composer de comentarios. */
+const nextKey = () => nextPendingKey('wall-upload');
 
 /**
  * Barra de escritura del muro (QL-90, rediseño QL-95): barra redondeada con botón **"+"**
@@ -148,7 +141,7 @@ export function WallComposer({
 }: WallComposerProps) {
   const isMobile = useIsMobile();
   const [value, setValue] = useState('');
-  const [uploads, setUploads] = useState<PendingUpload[]>([]);
+  const [uploads, setUploads] = useState<PendingAttachment[]>([]);
   // (QL-167) Confirmación previa cuando el body contiene `@muro` (difusión a toda la organización).
   const [confirmBroadcast, setConfirmBroadcast] = useState(false);
   const editorRef = useRef<MentionTextareaHandle>(null);
@@ -205,12 +198,12 @@ export function WallComposer({
     }
   }, []);
 
-  const patchSlot = useCallback((key: string, patch: Partial<PendingUpload>) => {
+  const patchSlot = useCallback((key: string, patch: Partial<PendingAttachment>) => {
     setUploads((prev) => prev.map((u) => (u.key === key ? { ...u, ...patch } : u)));
   }, []);
 
   const removeSlot = useCallback(
-    (slot: PendingUpload) => {
+    (slot: PendingAttachment) => {
       if (slot.previewUrl) URL.revokeObjectURL(slot.previewUrl);
       // Si ya se subió (adjunto huérfano), lo borramos en el backend (best-effort).
       if (slot.attachment) removeAttachment.mutate(slot.attachment.id);
@@ -219,9 +212,11 @@ export function WallComposer({
     [removeAttachment],
   );
 
-  const handleFiles = (fileList: FileList | null) => {
+  const handleFiles = (fileList: FileList | File[] | null) => {
     if (!fileList || fileList.length === 0) return;
     for (const file of Array.from(fileList)) {
+      // Validación previa en cliente (tamaño 50 MB / MIME de la lista blanca): si no pasa, ni
+      // se intenta la subida. El mensaje distingue tamaño de tipo (QL-175).
       const invalid = validateFile(file);
       if (invalid) {
         toast.error(invalid.message);
@@ -296,6 +291,18 @@ export function WallComposer({
     doSend();
   };
 
+  /**
+   * (QL-175) Pegar desde el portapapeles: si el evento trae ficheros (captura de pantalla,
+   * imagen/vídeo/documento copiado), se adjuntan por el **mismo flujo** que el botón "+" y se
+   * corta el pegado por defecto. Si solo hay texto, no se toca nada: el pegado normal sigue vivo.
+   */
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = filesFromClipboard(e.clipboardData);
+    if (files.length === 0) return;
+    e.preventDefault();
+    handleFiles(files);
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Solo llega aquí cuando el popover de menciones está cerrado (MentionTextarea filtra).
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -366,7 +373,7 @@ export function WallComposer({
       {uploads.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {uploads.map((slot) => (
-            <ComposerAttachment key={slot.key} slot={slot} onRemove={() => removeSlot(slot)} />
+            <PendingAttachmentChip key={slot.key} slot={slot} onRemove={() => removeSlot(slot)} />
           ))}
         </div>
       )}
@@ -506,6 +513,7 @@ export function WallComposer({
             onMention={registerMention}
             onKeyDown={handleKeyDown}
             onBlur={stopTyping}
+            onPaste={handlePaste}
             extraOptions={[BROADCAST_OPTION]}
             rows={1}
             placeholder="Escribe un mensaje al Muro Corporativo…"
@@ -562,6 +570,8 @@ export function WallComposer({
       <div className="flex items-center justify-between px-3 text-[11px] text-on-surface-variant">
         <span>
           Usa <span className="font-semibold">@</span> para mencionar a alguien
+          {/* (QL-175) El pegado de ficheros no es descubrible por sí solo: se anuncia. */}
+          <span className="hidden md:inline"> · pega archivos con Ctrl+V</span>
         </span>
         <span className="hidden sm:inline">Enter para enviar</span>
       </div>
@@ -593,58 +603,6 @@ export function WallComposer({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
-}
-
-interface ComposerAttachmentProps {
-  slot: PendingUpload;
-  onRemove: () => void;
-}
-
-/** Miniatura (imágenes) o chip (archivos) de un adjunto pendiente, con botón de quitar. */
-function ComposerAttachment({ slot, onRemove }: ComposerAttachmentProps) {
-  const uploading = slot.status === 'uploading';
-  const error = slot.status === 'error';
-
-  return (
-    <div className="group/att relative flex items-center gap-2 rounded-md border border-outline-variant/40 bg-surface-container-low p-1 pr-2">
-      {slot.isImage && slot.previewUrl ? (
-        <span className="relative size-11 shrink-0 overflow-hidden rounded">
-          <img src={slot.previewUrl} alt={slot.name} className="size-full object-cover" />
-          {uploading && (
-            <span className="absolute inset-0 flex items-center justify-center bg-surface/70">
-              <Loader2 className="size-4 animate-spin text-primary" />
-            </span>
-          )}
-        </span>
-      ) : (
-        <span className="flex size-9 shrink-0 items-center justify-center rounded bg-surface-container-high">
-          {uploading ? (
-            <Loader2 className="size-4 animate-spin text-on-surface-variant" />
-          ) : (
-            <AttachmentIcon mimeType={slot.isImage ? 'image/*' : 'application/octet-stream'} />
-          )}
-        </span>
-      )}
-
-      <div className="min-w-0 max-w-[9rem]">
-        <p className="truncate text-xs font-medium text-on-surface" title={slot.name}>
-          {slot.name}
-        </p>
-        <p className="text-[11px] text-on-surface-variant">
-          {error ? 'Error' : uploading ? 'Subiendo…' : 'Listo'}
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Quitar ${slot.name}`}
-        className="flex size-5 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant transition-colors hover:bg-error-container hover:text-on-error-container"
-      >
-        <X className="size-3.5" />
-      </button>
     </div>
   );
 }

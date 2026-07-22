@@ -5,13 +5,14 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
+  MessageSquareQuote,
   RotateCcw,
   Send,
   ShieldCheck,
+  ThumbsDown,
 } from 'lucide-react';
 
 import { ApiError } from '@/core/api/fetch-client';
-import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -35,14 +36,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-import {
-  useCompleteTask,
-  useReopenTask,
-  useRequestReview,
-  useValidateTask,
-} from '../hooks/use-tasks';
+import { useCompleteTask, useReopenTask, useRequestReview } from '../hooks/use-tasks';
 import type { Task } from '../services/tasks.service';
 import { formatDateTime } from '../lib/time';
+import { RejectReviewDialog } from './review/RejectReviewDialog';
+import { ValidateReviewDialog } from './review/ValidateReviewDialog';
 
 interface CompletionSectionProps {
   task: Task;
@@ -57,7 +55,11 @@ interface CompletionSectionProps {
  * - **ASSIGNEE** + `NONE` → botón **"Solicitar revisión"** (AlertDialog de confirmación).
  * - **ASSIGNEE** + `REQUESTED` → estado **"En revisión"** (sin poder cerrar).
  * - **ASSIGNEE** + `VALIDATED` → **"Validado por: {name}"** + panel de cierre normal.
- * - **CREATOR** / **OBSERVER** + `REQUESTED` → botón **"Validar"**.
+ * - **(QL-171)** **ASSIGNEE** + `REJECTED` → panel de **rechazo** (motivo, quién y cuándo) y de
+ *   nuevo el botón "Solicitar revisión": el backend limpió `reviewRequestedAt`, así que puede
+ *   corregir y volver a pedirla.
+ * - **CREATOR** / **OBSERVER** + `REQUESTED` → botones **"Validar"** (comentario opcional) y
+ *   **"Rechazar"** (motivo obligatorio; el CREATOR además puede mover la fecha límite, QL-172).
  * - **CREATOR** (y ADMIN de plataforma) cierran directo, sin gate.
  * Si está completada, muestra el banner de cierre con quién/cuándo/resumen y el botón **Reabrir**.
  */
@@ -128,7 +130,12 @@ export function CompletionSection({ task, projectId }: CompletionSectionProps) {
           </div>
 
           {task.validatedAt && task.validatedBy && (
-            <ValidatedByLine name={task.validatedBy.name} at={task.validatedAt} className="mt-2" />
+            <ValidatedByLine
+              name={task.validatedBy.name}
+              at={task.validatedAt}
+              comment={task.validationComment}
+              className="mt-2"
+            />
           )}
 
           <div className="mt-3 rounded-md bg-surface-container-lowest/70 px-3 py-2">
@@ -177,27 +184,34 @@ export function CompletionSection({ task, projectId }: CompletionSectionProps) {
     );
   }
 
-  // ---- Tarea NO completada: acciones según rol + estado de validación (QL-145) ----
+  // ---- Tarea NO completada: acciones según rol + estado de validación (QL-145/QL-171) ----
   const reviewStatus = task.reviewStatus;
   // El Responsable que no es Creador ni ADMIN de plataforma necesita el visto bueno para cerrar.
   const assigneeGated = isAssignee && !isPlatformAdmin;
   // ¿Ve el panel de cierre? CREATOR/ADMIN sin gate; el ASSIGNEE gateado solo si ya está VALIDATED.
   const canSeeClosePanel =
     isCreator || (isAssignee && (isPlatformAdmin || reviewStatus === 'VALIDATED'));
-  // El Creador/Observador puede validar cuando el Responsable ya solicitó revisión.
+  // El Creador/Observador puede validar o rechazar cuando el Responsable ya solicitó revisión.
   const showValidate = canValidate && reviewStatus === 'REQUESTED';
+  // (QL-171) El rechazo se muestra a cualquier participante de la tarea: el Responsable para
+  // corregir, y el resto para saber por qué volvió atrás.
+  const showRejected = reviewStatus === 'REJECTED' && !!role;
+  // (QL-171) Tras un rechazo el backend limpia `reviewRequestedAt` ⇒ el Responsable vuelve a
+  // poder solicitar revisión (`NONE` de siempre, o `REJECTED`).
+  const showRequestReview =
+    assigneeGated && (reviewStatus === 'NONE' || reviewStatus === 'REJECTED');
 
   // Roles sin nada que hacer aquí (COLLABORATOR, u OBSERVER sin revisión pendiente).
-  if (!showValidate && !canSeeClosePanel && !assigneeGated) return null;
+  if (!showValidate && !showRejected && !canSeeClosePanel && !assigneeGated) return null;
 
   return (
     <>
       <div className="space-y-3">
-        {showValidate && <ValidatePanel task={task} projectId={projectId} />}
+        {showValidate && <ReviewDecisionPanel task={task} projectId={projectId} />}
 
-        {assigneeGated && reviewStatus === 'NONE' && (
-          <RequestReviewPanel task={task} projectId={projectId} />
-        )}
+        {showRejected && <RejectedPanel task={task} />}
+
+        {showRequestReview && <RequestReviewPanel task={task} projectId={projectId} />}
 
         {assigneeGated && reviewStatus === 'REQUESTED' && <InReviewPanel />}
 
@@ -207,6 +221,7 @@ export function CompletionSection({ task, projectId }: CompletionSectionProps) {
               <ValidatedByLine
                 name={task.validatedBy.name}
                 at={task.validatedAt}
+                comment={task.validationComment}
                 className="mb-2"
               />
             )}
@@ -341,49 +356,94 @@ function InReviewPanel() {
 }
 
 /**
- * (QL-145) Panel del Creador/Observador cuando el Responsable solicitó revisión: botón
- * **"Validar"** que da el visto bueno para habilitar el cierre.
+ * (QL-145 + QL-171) Panel del Creador/Observador cuando el Responsable solicitó revisión:
+ * **"Validar"** (visto bueno, con comentario opcional) y **"Rechazar"** (motivo obligatorio y,
+ * solo para el CREATOR, nueva fecha límite). Ambas acciones abren su diálogo.
  */
-function ValidatePanel({ task, projectId }: ReviewPanelProps) {
-  const validateTask = useValidateTask(projectId, task.id);
-
-  const handleValidate = () => {
-    validateTask.mutate(undefined, {
-      onSuccess: () => {
-        toast.success('Tarea validada. El responsable ya puede cerrarla.');
-      },
-      onError: (err) => {
-        if (err instanceof ApiError && err.code === 'TASK_VALIDATION_FORBIDDEN') {
-          toast.error('Solo el creador o un observador pueden validar la tarea.');
-          return;
-        }
-        toast.error(err instanceof Error ? err.message : 'No se pudo validar la tarea');
-      },
-    });
-  };
+function ReviewDecisionPanel({ task, projectId }: ReviewPanelProps) {
+  const [validateOpen, setValidateOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const isCreator = task.currentUserRole === 'CREATOR';
 
   return (
-    <section className="rounded-lg border border-primary/30 bg-primary-container/50 px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-on-primary-container">
-            <ShieldCheck className="size-4" />
-            Revisión solicitada
+    <>
+      <section className="rounded-lg border border-primary/30 bg-primary-container/50 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-on-primary-container">
+              <ShieldCheck className="size-4" />
+              Revisión solicitada
+            </p>
+            <p className="mt-0.5 text-xs text-on-primary-container/80">
+              El responsable pide tu visto bueno para poder cerrar la tarea.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setRejectOpen(true)}
+            >
+              <ThumbsDown />
+              Rechazar
+            </Button>
+            <Button type="button" size="sm" onClick={() => setValidateOpen(true)}>
+              <BadgeCheck />
+              Validar
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <ValidateReviewDialog
+        open={validateOpen}
+        onOpenChange={setValidateOpen}
+        task={task}
+        projectId={projectId}
+      />
+      <RejectReviewDialog
+        open={rejectOpen}
+        onOpenChange={setRejectOpen}
+        task={task}
+        projectId={projectId}
+        isCreator={isCreator}
+      />
+    </>
+  );
+}
+
+interface RejectedPanelProps {
+  task: Task;
+}
+
+/**
+ * (QL-171) Estado **rechazado**: motivo, quién y cuándo. Se pinta mientras `reviewStatus` sea
+ * `REJECTED`; en cuanto el Responsable vuelve a solicitar revisión el estado pasa a `REQUESTED`
+ * y este panel desaparece.
+ */
+function RejectedPanel({ task }: RejectedPanelProps) {
+  return (
+    <section className="rounded-lg border border-error/30 bg-error-container/50 px-4 py-3">
+      <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-on-error-container">
+        <ThumbsDown className="size-4" />
+        Revisión rechazada
+      </p>
+      <p className="mt-0.5 text-xs text-on-error-container/80">
+        {task.rejectedBy?.name ? `Por ${task.rejectedBy.name}` : 'Rechazada'}
+        {task.rejectedAt && ` · ${formatDateTime(task.rejectedAt)}`}
+      </p>
+      {task.rejectionComment?.trim() && (
+        <div className="mt-2 rounded-md bg-surface-container-lowest/70 px-3 py-2">
+          <p className="inline-flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
+            <MessageSquareQuote className="size-3.5" />
+            Motivo
           </p>
-          <p className="mt-0.5 text-xs text-on-primary-container/80">
-            El responsable pide tu visto bueno para poder cerrar la tarea.
+          <p className="mt-1 text-sm whitespace-pre-wrap text-on-surface">
+            {task.rejectionComment}
           </p>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          onClick={handleValidate}
-          disabled={validateTask.isPending}
-        >
-          {validateTask.isPending ? <Loader2 className="animate-spin" /> : <BadgeCheck />}
-          Validar
-        </Button>
-      </div>
+      )}
     </section>
   );
 }
@@ -391,22 +451,27 @@ function ValidatePanel({ task, projectId }: ReviewPanelProps) {
 interface ValidatedByLineProps {
   name: string;
   at: string;
+  /** (QL-171) Comentario opcional de quien validó (`validationComment`), o `null`. */
+  comment?: string | null;
   className?: string;
 }
 
-/** (QL-145) Línea "Validado por: {name} · {fecha}". Se pinta cuando existe `validatedAt`. */
-function ValidatedByLine({ name, at, className }: ValidatedByLineProps) {
+/**
+ * (QL-145) Línea "Validado por: {name} · {fecha}". Se pinta cuando existe `validatedAt`.
+ * (QL-171) Si quien validó dejó comentario, se muestra debajo.
+ */
+function ValidatedByLine({ name, at, comment, className }: ValidatedByLineProps) {
   return (
-    <p
-      className={cn(
-        'inline-flex flex-wrap items-center gap-1.5 text-xs font-medium text-tertiary',
-        className,
+    <div className={className}>
+      <p className="inline-flex flex-wrap items-center gap-1.5 text-xs font-medium text-tertiary">
+        <BadgeCheck className="size-3.5" />
+        Validado por: {name}
+        <span className="font-normal text-on-surface-variant">· {formatDateTime(at)}</span>
+      </p>
+      {comment?.trim() && (
+        <p className="mt-1 text-sm whitespace-pre-wrap text-on-surface-variant">{comment}</p>
       )}
-    >
-      <BadgeCheck className="size-3.5" />
-      Validado por: {name}
-      <span className="font-normal text-on-surface-variant">· {formatDateTime(at)}</span>
-    </p>
+    </div>
   );
 }
 

@@ -10,24 +10,28 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import type { Attachment } from '@/features/attachments/services/attachments.service';
-import { useDownloadAttachment } from '@/features/attachments/hooks/use-attachments';
-import { formatFileSize, notifyAttachmentError } from '@/features/attachments/lib/files';
 
-import { useWallImage } from '../hooks/use-wall-image';
+import type { Attachment } from '../services/attachments.service';
+import { useAttachmentBlob } from '../hooks/use-attachment-blob';
+import { useDownloadAttachment } from '../hooks/use-attachments';
+import { formatFileSize, notifyAttachmentError } from '../lib/files';
 
 /**
- * Visor de adjuntos del Muro (QL-168, §3.25.2). Al hacer click en un adjunto de un mensaje se
- * abre este visor **en vez de descargar**: previsualiza imagen, vídeo, PDF, Markdown y texto;
- * cualquier otro formato muestra "No se puede previsualizar" + descarga. Siempre ofrece además
- * un botón de **Descargar**.
+ * Visor de adjuntos (QL-168 en el muro; **generalizado en QL-174**). Al hacer click en un adjunto
+ * se abre este visor **en vez de descargar**: previsualiza imagen, vídeo, PDF, Markdown y texto;
+ * cualquier otro formato muestra "No se puede previsualizar" + descarga. Siempre ofrece además un
+ * botón de **Descargar**.
+ *
+ * Vive en `features/attachments` (el feature dueño del recurso) porque lo consumen **dos** sitios:
+ * los adjuntos de un mensaje del muro (`WallMessageAttachments`) y los de un comentario de tarea
+ * (`CommentAttachments`). Antes era `features/wall/components/WallAttachmentViewer`.
  *
  * El binario es privado (`GET /attachments/:id/download` requiere `Authorization: Bearer`), así
- * que NO se puede usar `<img src>`/`<iframe src>` directo con `downloadUrl`. Se reutiliza
- * `useWallImage` (mismo patrón que `WallImage`): baja el binario autenticado, lo cachea por
- * `downloadUrl` como `blob:` URL y lo **revoca** al salir de la caché (evita fugas de memoria).
- * Para Markdown/texto se lee ese `blob:` local con `fetch().text()` (sin segunda descarga
- * autenticada). No hay renderer de Markdown en el repo → se muestra el texto crudo en `<pre>`.
+ * que NO se puede usar `<img src>`/`<iframe src>` directo con `downloadUrl`. Se usa
+ * `useAttachmentBlob`: baja el binario autenticado, lo cachea por `downloadUrl` como `blob:` URL
+ * y lo **revoca** al salir de la caché (evita fugas de memoria). Para Markdown/texto se lee ese
+ * `blob:` local con `fetch().text()` (sin segunda descarga autenticada). No hay renderer de
+ * Markdown en el repo → se muestra el texto crudo en `<pre>`.
  */
 
 type PreviewKind = 'image' | 'video' | 'pdf' | 'markdown' | 'text' | 'unsupported';
@@ -66,14 +70,14 @@ function kindLabel(kind: PreviewKind, mimeType: string): string {
   }
 }
 
-interface WallAttachmentViewerProps {
+interface AttachmentViewerProps {
   /** Adjunto a previsualizar; `null` = visor cerrado (el componente vive montado siempre). */
   attachment: Attachment | null;
   /** Cierra el visor (Escape / backdrop / botón). */
   onClose: () => void;
 }
 
-export function WallAttachmentViewer({ attachment, onClose }: WallAttachmentViewerProps) {
+export function AttachmentViewer({ attachment, onClose }: AttachmentViewerProps) {
   const open = attachment != null;
   const kind = attachment ? previewKindFor(attachment) : 'unsupported';
   const needsBlob = open && kind !== 'unsupported';
@@ -83,7 +87,7 @@ export function WallAttachmentViewer({ attachment, onClose }: WallAttachmentView
     data: blobUrl,
     isLoading,
     isError,
-  } = useWallImage(attachment?.downloadUrl, needsBlob);
+  } = useAttachmentBlob(attachment?.downloadUrl, needsBlob);
 
   // Markdown/texto: se leen del `blob:` local (ya autenticado y cacheado) a texto plano.
   const needsText = kind === 'markdown' || kind === 'text';

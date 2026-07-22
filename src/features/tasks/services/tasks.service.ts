@@ -33,6 +33,12 @@ export interface TaskValidatedBy {
   name: string;
 }
 
+/** Usuario que **rechazó** la revisión de una tarea (QL-171). */
+export interface TaskRejectedBy {
+  id: string;
+  name: string;
+}
+
 /** ADMIN que descartó una tarea (QL-142, §3.41). */
 export interface TaskDiscardedBy {
   id: string;
@@ -40,10 +46,16 @@ export interface TaskDiscardedBy {
 }
 
 /**
- * Estado del visto bueno para cerrar una tarea (QL-145, §3.39):
- * `NONE` nadie pidió · `REQUESTED` el Responsable solicitó revisión · `VALIDATED` ya validada.
+ * Estado del visto bueno para cerrar una tarea (QL-145, §3.39; `REJECTED` en QL-171):
+ * `NONE` nadie pidió · `REQUESTED` el Responsable solicitó revisión · `VALIDATED` ya validada ·
+ * `REJECTED` el Creador/Observador **rechazó** la revisión (con motivo obligatorio).
+ *
+ * Precedencia del backend al derivarlo: `validatedAt` → `VALIDATED`; si no, `reviewRequestedAt`
+ * → `REQUESTED`; si no, `rejectedAt` → `REJECTED`; si no, `NONE`. Tras un rechazo el backend
+ * limpia `reviewRequestedAt/By`, así que el Responsable puede corregir y **volver a pedir**
+ * revisión (y entonces el estado vuelve a `REQUESTED`).
  */
-export type ReviewStatus = 'NONE' | 'REQUESTED' | 'VALIDATED';
+export type ReviewStatus = 'NONE' | 'REQUESTED' | 'VALIDATED' | 'REJECTED';
 
 /** DTO de respuesta del backend para una tarea (QL-07/QL-08, §3.7). */
 export interface Task {
@@ -93,6 +105,14 @@ export interface Task {
   validatedAt: string | null;
   /** (QL-145, §3.39) Quién dio el visto bueno, o `null`. Para pintar "Validado por: {name}". */
   validatedBy: TaskValidatedBy | null;
+  /** (QL-171) Comentario **opcional** que dejó quien validó, o `null`. */
+  validationComment: string | null;
+  /** (QL-171) ISO8601 del rechazo de la revisión, o `null` si nunca se rechazó. */
+  rejectedAt: string | null;
+  /** (QL-171) Quién rechazó la revisión, o `null`. */
+  rejectedBy: TaskRejectedBy | null;
+  /** (QL-171) Motivo del rechazo (obligatorio al rechazar), o `null`. */
+  rejectionComment: string | null;
   /**
    * (QL-62, §3.22) Timing automático por columna (independiente del cierre RF-2.5):
    * `startedAt` = 1ª vez que se movió a la columna `isStart`; `finishedAt` = último cruce a
@@ -158,6 +178,23 @@ export interface TimeStatus {
 /** Body para cerrar una tarea (QL-17, §3.13). `summary` opcional en el payload. */
 export interface CompleteTaskPayload {
   summary?: string;
+}
+
+/** Body del visto bueno (QL-171). `comment` es **opcional** (máx 2000); el POST admite ir sin body. */
+export interface ValidateTaskPayload {
+  comment?: string;
+}
+
+/**
+ * Body del **rechazo** de la revisión (QL-171/QL-172). `comment` es **obligatorio** (máx 2000).
+ *
+ * ⚠️ `newDueDate` (ISO8601) solo lo acepta el **CREATOR**: si lo manda un OBSERVER el backend
+ * responde 403 `DEADLINE_EXTENSION_CREATOR_ONLY` y **el rechazo tampoco se aplica**. Por eso la
+ * UI oculta el selector de fecha a los no-creadores en vez de deshabilitarlo.
+ */
+export interface RejectReviewPayload {
+  comment: string;
+  newDueDate?: string;
 }
 
 /** Filtros del listado del tablero (§3.7). El endpoint **no pagina**. */
@@ -381,9 +418,22 @@ export const tasksService = {
 
   /**
    * El Creador u Observador da el **visto bueno** que habilita el cierre (QL-145, §3.39). Solo
-   * CREATOR/OBSERVER (si no → 403 `TASK_VALIDATION_FORBIDDEN`). Devuelve el `Task`.
+   * CREATOR/OBSERVER (si no → 403 `TASK_VALIDATION_FORBIDDEN`). (QL-171) Admite un `comment`
+   * **opcional**; sin payload se comporta como antes. Devuelve el `Task`.
    */
-  validate: (id: string) => {
-    return api.post<Task>(`/tasks/${id}/validate`);
+  validate: (id: string, data?: ValidateTaskPayload) => {
+    return api.post<Task>(`/tasks/${id}/validate`, data);
+  },
+
+  /**
+   * (QL-171/QL-172) El Creador u Observador **rechaza** la revisión con un motivo obligatorio y,
+   * si es el CREATOR, opcionalmente mueve la fecha límite. Mismos permisos que validar (si no →
+   * 403 `TASK_VALIDATION_FORBIDDEN`); `newDueDate` enviado por un no-creador → 403
+   * `DEADLINE_EXTENSION_CREATOR_ONLY` **sin aplicar el rechazo**. El backend limpia
+   * `reviewRequestedAt/By` para que el Responsable pueda corregir y volver a solicitar revisión.
+   * Devuelve el `Task` con `reviewStatus: 'REJECTED'`.
+   */
+  rejectReview: (id: string, data: RejectReviewPayload) => {
+    return api.post<Task>(`/tasks/${id}/reject-review`, data);
   },
 };

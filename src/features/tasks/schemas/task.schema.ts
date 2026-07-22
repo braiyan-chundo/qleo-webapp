@@ -60,3 +60,40 @@ export const deadlineExtensionSchema = z.object({
 });
 
 export type DeadlineExtensionValues = z.infer<typeof deadlineExtensionSchema>;
+
+/** Tope de caracteres del comentario de validación/rechazo (mismo que el backend). */
+export const REVIEW_COMMENT_MAX = 2000;
+
+/**
+ * (QL-171/QL-172) Esquema del diálogo de **rechazo** de la revisión. El motivo es
+ * **obligatorio** (el backend también lo exige) y la nueva fecha límite es opcional y **solo se
+ * ofrece al CREATOR**: si un no-creador enviara `newDueDate`, el backend responde 403
+ * `DEADLINE_EXTENSION_CREATOR_ONLY` y ni siquiera aplicaría el rechazo.
+ */
+export const rejectReviewSchema = z.object({
+  comment: z
+    .string()
+    .trim()
+    .min(1, 'Explica por qué rechazas la revisión')
+    .max(REVIEW_COMMENT_MAX, `Máximo ${REVIEW_COMMENT_MAX} caracteres`),
+  /** Valor de `<input type="date">` (`YYYY-MM-DD`); vacío = no cambiar la fecha. */
+  newDueDate: z.string().optional(),
+  /** (QL-166) Hora del nuevo deadline (`HH:mm`); vacía → 18:00 al serializar. */
+  newDueTime: z.string().optional(),
+});
+
+export type RejectReviewValues = z.infer<typeof rejectReviewSchema>;
+
+/**
+ * (QL-171) Esquema del diálogo de **validación**: el comentario es **opcional** (queda en
+ * `validationComment`), solo acotado en longitud.
+ */
+export const validateReviewSchema = z.object({
+  comment: z
+    .string()
+    .trim()
+    .max(REVIEW_COMMENT_MAX, `Máximo ${REVIEW_COMMENT_MAX} caracteres`)
+    .optional(),
+});
+
+export type ValidateReviewValues = z.infer<typeof validateReviewSchema>;

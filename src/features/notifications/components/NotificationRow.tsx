@@ -92,7 +92,11 @@ export function NotificationRow({
         onClick={handleOpen}
         className="flex min-w-0 flex-1 items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-surface-container/60"
       >
-        <NotificationAvatar actor={notification.actor} className="mt-0.5 shrink-0" />
+        <NotificationAvatar
+          actor={notification.actor}
+          type={notification.type}
+          className="mt-0.5 shrink-0"
+        />
 
         <div className="min-w-0 flex-1">
           <p className="text-sm text-on-surface">{notificationText(notification)}</p>

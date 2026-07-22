@@ -16,6 +16,8 @@ import {
 
 import { useAuthStore } from '@/store/auth.store';
 import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
+import { CollapsibleText } from '@/shared/components/CollapsibleText';
+import { useMinuteTick } from '@/shared/hooks/use-minute-tick';
 import type { CommentMention } from '@/features/comments/services/comments.service';
 import { MentionTextarea } from '@/features/comments/components/MentionTextarea';
 import { resolveMentionIds } from '@/features/comments/lib/mentions';
@@ -39,7 +41,11 @@ import {
 import { cn } from '@/lib/utils';
 
 import { wallMessageAnchorId, type WallFeedItem, type WallUserFeedItem } from '../lib/wall-feed';
-import { formatWallTime } from '../lib/wall-dates';
+import {
+  formatWallTime,
+  isWithinWallMutationWindow,
+  WALL_MUTATION_WINDOW_HINT,
+} from '../lib/wall-dates';
 import { describeWallMessageDeletion } from '../lib/wall-attachments';
 import {
   useDeleteWallMessage,
@@ -102,6 +108,11 @@ export function WallMessageItem({
   // (QL-102) Borrar es SOLO del autor: ni ADMIN puede borrar mensajes ajenos. El backend valida
   // (403 `WALL_MESSAGE_NOT_AUTHOR`); aquí solo mostramos la acción a quien puede usarla.
   const canDelete = isOwn && !pending;
+  // (QL-170) Editar y eliminar caducan a los **5 min** de `createdAt`. El estado depende del
+  // **reloj**, no de los datos: se reevalúa con el tick compartido (un solo `setInterval` para
+  // toda la app) para que un mensaje recién enviado deje de ser editable sin recargar.
+  const now = useMinuteTick(canEdit || canDelete);
+  const withinMutationWindow = isWithinWallMutationWindow(createdAt, now);
   // (QL-103) Responder está disponible sobre cualquier mensaje vivo ya confirmado (no optimista):
   // se cita por id, así que no aplica a un mensaje en vuelo ni a una lápida.
   const canReply = !!onReply && !pending && !message.deleted;
@@ -177,6 +188,8 @@ export function WallMessageItem({
   }, []);
 
   const startEdit = () => {
+    // (QL-170) Guarda dura: fuera de la ventana ni siquiera se abre el editor.
+    if (!withinMutationWindow) return;
     setDraft(body);
     mentionCandidates.current = [...resolve(mentions)];
     setEditing(true);
@@ -260,8 +273,15 @@ export function WallMessageItem({
             {isPinned ? 'Desfijar' : 'Fijar'}
           </DropdownMenuItem>
         )}
+        {/* (QL-170) Editar/Eliminar solo dentro de los 5 min. Pasada la ventana se dejan
+            **visibles pero deshabilitados** con el motivo debajo: ocultarlas sin más haría
+            pensar que la app perdió la acción. */}
         {canEdit && (
-          <DropdownMenuItem onSelect={startEdit}>
+          <DropdownMenuItem
+            onSelect={startEdit}
+            disabled={!withinMutationWindow}
+            title={withinMutationWindow ? undefined : WALL_MUTATION_WINDOW_HINT}
+          >
             <Pencil />
             Editar
           </DropdownMenuItem>
@@ -270,10 +290,17 @@ export function WallMessageItem({
           <DropdownMenuItem
             variant="destructive"
             onSelect={() => setConfirmDelete(true)}
+            disabled={!withinMutationWindow}
+            title={withinMutationWindow ? undefined : WALL_MUTATION_WINDOW_HINT}
           >
             <Trash2 />
             Eliminar
           </DropdownMenuItem>
+        )}
+        {(canEdit || canDelete) && !withinMutationWindow && (
+          <p className="px-2 py-1.5 text-[11px] leading-tight text-on-surface-variant">
+            {WALL_MUTATION_WINDOW_HINT}
+          </p>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -497,10 +524,19 @@ export function WallMessageItem({
                       className="mb-1.5"
                     />
                   )}
+                  {/* (QL-173) Cuerpo recortado a ~6 líneas con "Leer más". El contenido se pasa
+                      intacto a `CollapsibleText` (menciones incluidas): solo se recorta la caja.
+                      El degradado arranca del mismo token de fondo que la burbuja. */}
                   {body.length > 0 && (
-                    <p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
-                      <WallMentionText body={body} mentions={mentions} />
-                    </p>
+                    <CollapsibleText
+                      fadeFrom={
+                        isOwn ? 'from-surface-container-high' : 'from-surface-container'
+                      }
+                    >
+                      <p className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
+                        <WallMentionText body={body} mentions={mentions} />
+                      </p>
+                    </CollapsibleText>
                   )}
                   {attachments.length > 0 && (
                     <WallMessageAttachments attachments={attachments} />

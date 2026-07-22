@@ -1,4 +1,5 @@
 import { api } from '@/core/api/fetch-client';
+import type { Attachment } from '@/features/attachments/services/attachments.service';
 
 /** Autor poblado de un comentario (§3.9). Puede venir ausente si el backend no lo puebla. */
 export interface CommentAuthor {
@@ -32,21 +33,25 @@ export interface Comment {
   author?: CommentAuthor;
   /** Usuarios @mencionados válidos, poblados (QL-13). `[]` si no hay. */
   mentions: CommentMention[];
+  /**
+   * **(QL-174)** Adjuntos del comentario, ya **expandidos** (`[]` si no hay). Son adjuntos de la
+   * TAREA (`scope: 'task'`) referenciados desde el comentario: por eso salen también en el panel
+   * de Adjuntos de la tarea y **borrar el comentario NO borra el archivo** (decisión de producto).
+   */
+  attachments: Attachment[];
 }
 
 /** Body para crear un comentario (§3.9). `mentions` = userIds @mencionados (QL-13). */
 export interface CreateCommentPayload {
+  /** **Obligatorio**: no existe el comentario solo-adjunto (decisión del cliente, QL-174). */
   body: string;
   mentions?: string[];
-}
-
-/**
- * Body para editar un comentario (§3.9). El backend setea `editedAt`. `mentions` es el
- * **nuevo set completo** de userIds; el backend solo notifica a los nuevos (QL-13).
- */
-export interface UpdateCommentPayload {
-  body: string;
-  mentions?: string[];
+  /**
+   * **(QL-174)** Ids de adjuntos **ya subidos** a la tarea (`POST /tasks/:taskId/attachments`)
+   * que se referencian desde este comentario. Si alguno no es vinculable → 400
+   * `COMMENT_ATTACHMENT_INVALID`.
+   */
+  attachmentIds?: string[];
 }
 
 export const commentsService = {
@@ -58,10 +63,10 @@ export const commentsService = {
     return api.post<Comment>(`/tasks/${taskId}/comments`, data);
   },
 
-  update: (id: string, data: UpdateCommentPayload) => {
-    return api.patch<Comment>(`/comments/${id}`, data);
-  },
-
+  /**
+   * (QL-176) **No hay edición de comentarios**: el `PATCH /comments/:id` responde siempre 403
+   * `COMMENT_NOT_EDITABLE`, así que el front ni lo ofrece ni lo llama. El **borrado** sigue igual.
+   */
   remove: (id: string) => {
     return api.delete<Comment>(`/comments/${id}`);
   },

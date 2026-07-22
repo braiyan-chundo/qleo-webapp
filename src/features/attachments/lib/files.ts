@@ -8,12 +8,18 @@ import { toast } from 'sonner';
 
 import { ApiError } from '@/core/api/fetch-client';
 
-/** Límite de subida, alineado con `MAX_UPLOAD_BYTES` del backend (10 MB). */
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+/**
+ * Límite de subida, alineado con `MAX_UPLOAD_BYTES` del backend. (QL-175) Subió de 10 a **50 MB**
+ * al admitirse vídeo; es el mismo tope para tarea, proyecto y muro.
+ */
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+/** Etiqueta legible del tope de subida, para no repetir el número en cada mensaje. */
+export const MAX_UPLOAD_LABEL = '50 MB';
 
 /**
- * Lista blanca de tipos MIME permitidos (§3.11): PDF, imágenes, Office, texto y zip.
- * Se usa para el `accept` del input y para la validación previa en cliente.
+ * Lista blanca de tipos MIME permitidos (§3.11): PDF, imágenes, **vídeo** (QL-175), Office,
+ * texto y zip. Se usa para el `accept` del input y para la validación previa en cliente.
  */
 export const ALLOWED_MIME_TYPES: readonly string[] = [
   'application/pdf',
@@ -21,6 +27,9 @@ export const ALLOWED_MIME_TYPES: readonly string[] = [
   'image/jpeg',
   'image/gif',
   'image/webp',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
@@ -36,11 +45,18 @@ export const ALLOWED_MIME_TYPES: readonly string[] = [
 export const ACCEPT_ATTR = ALLOWED_MIME_TYPES.join(',');
 
 /** Categoría de icono a pintar según el `mimeType`. */
-export type AttachmentIconKind = 'image' | 'pdf' | 'file';
+export type AttachmentIconKind = 'image' | 'video' | 'pdf' | 'file';
 
-/** Deriva la categoría de icono desde el `mimeType` (imagen / PDF / archivo genérico). */
+/**
+ * Deriva la categoría de icono desde el `mimeType` (imagen / **vídeo** / PDF / archivo genérico).
+ *
+ * ⚠️ `'video'` es nuevo (QL-175). Los consumidores que separan "imagen" de "lo demás" (p. ej.
+ * `WallMessageAttachments`, que pinta las imágenes en línea) siguen funcionando: un vídeo cae en
+ * el grupo de archivos, con su chip y su visor.
+ */
 export function iconKindFor(mimeType: string): AttachmentIconKind {
   if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
   if (mimeType === 'application/pdf') return 'pdf';
   return 'file';
 }
@@ -67,11 +83,17 @@ export type ClientValidationError =
  */
 export function validateFile(file: File): ClientValidationError | null {
   if (file.size > MAX_UPLOAD_BYTES) {
-    return { code: 'FILE_TOO_LARGE', message: 'El archivo supera el límite de 10 MB' };
+    return {
+      code: 'FILE_TOO_LARGE',
+      message: `«${file.name}» supera el límite de ${MAX_UPLOAD_LABEL}`,
+    };
   }
   // Si el navegador no reporta tipo, deja pasar y confía en el backend.
   if (file.type && !ALLOWED_MIME_TYPES.includes(file.type)) {
-    return { code: 'UNSUPPORTED_FILE_TYPE', message: 'Tipo de archivo no permitido' };
+    return {
+      code: 'UNSUPPORTED_FILE_TYPE',
+      message: `Tipo de archivo no permitido (${file.type})`,
+    };
   }
   return null;
 }
@@ -102,7 +124,7 @@ export function timeAgo(iso: string): string {
 export function notifyAttachmentError(err: unknown, fallback: string) {
   if (err instanceof ApiError) {
     if (err.code === 'FILE_TOO_LARGE') {
-      toast.error('El archivo supera el límite de 10 MB');
+      toast.error(`El archivo supera el límite de ${MAX_UPLOAD_LABEL}`);
       return;
     }
     if (err.code === 'UNSUPPORTED_FILE_TYPE') {

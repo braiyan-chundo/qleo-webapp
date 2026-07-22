@@ -1,4 +1,4 @@
-import { Archive, BadgeCheck, CheckCircle2 } from 'lucide-react';
+import { Archive, BadgeCheck, CheckCircle2, ThumbsDown } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -72,6 +72,14 @@ export function TaskDetailHeader({
             <Badge className="bg-tertiary-container text-on-tertiary-container">
               <BadgeCheck className="size-3.5" />
               Validado por: {task.validatedBy.name}
+            </Badge>
+          )}
+          {/* QL-171: la revisión fue rechazada y aún no se ha vuelto a solicitar. El motivo
+              completo vive en la sección de cierre (`CompletionSection`). */}
+          {task.reviewStatus === 'REJECTED' && (
+            <Badge className="bg-error-container text-on-error-container">
+              <ThumbsDown className="size-3.5" />
+              Revisión rechazada
             </Badge>
           )}
           {task.currentUserRole && (
