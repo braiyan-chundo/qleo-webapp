@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ImagePlus, Loader2, Pencil, Trash2, UsersRound } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -39,16 +40,25 @@ export function AvatarCatalogManager() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const [renaming, setRenaming] = useState<CatalogAvatar | null>(null);
   const [deleting, setDeleting] = useState<CatalogAvatar | null>(null);
 
   const avatars = data ?? [];
 
-  const handleFilesPicked = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilesPicked = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     // Permite volver a elegir los mismos archivos después.
     event.target.value = '';
-    if (files.length === 0) return;
+    void uploadFiles(files);
+  };
+
+  /**
+   * Sube un lote de archivos: fuente única para el `<input type="file">` y el arrastrar-soltar.
+   * Ignora una llamada vacía o si ya hay una subida en curso (no se solapan lotes).
+   */
+  const uploadFiles = async (files: File[]) => {
+    if (files.length === 0 || uploading) return;
 
     // Estado inicial del lote (clave estable con el índice, el nombre puede repetirse).
     const items: BatchItem[] = files.map((file, i) => ({
@@ -104,8 +114,39 @@ export function AvatarCatalogManager() {
     }
   };
 
+  /**
+   * Arrastrar-soltar sobre la zona. `onDragOver` DEBE hacer `preventDefault` en cada evento o el
+   * navegador rechaza el drop (comportamiento por defecto = abrir el archivo). `dragActive` solo
+   * pinta el resaltado; se ignora el arrastre mientras hay una subida en curso.
+   */
+  const handleDragOver = (event: React.DragEvent) => {
+    if (uploading) return;
+    event.preventDefault();
+    if (!dragActive) setDragActive(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    // Solo se apaga al salir de verdad de la zona, no al pasar por un hijo (los eventos de
+    // dragleave burbujean desde los descendientes).
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setDragActive(false);
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    setDragActive(false);
+    if (uploading) return;
+    const files = Array.from(event.dataTransfer.files ?? []);
+    void uploadFiles(files);
+  };
+
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-on-surface">Catálogo de avatares</h2>
@@ -132,6 +173,28 @@ export function AvatarCatalogManager() {
           Subir avatares
         </Button>
       </div>
+
+      {/* Zona de arrastrar-soltar. Todo el panel acepta el drop (handlers en el contenedor
+          raíz), pero esta franja es la señal visible y también abre el selector al pulsarla. */}
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className={cn(
+          'flex w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-6 py-8 text-center transition-colors disabled:opacity-60',
+          dragActive
+            ? 'border-primary bg-primary-container/40 text-on-primary-container'
+            : 'border-outline-variant/60 bg-surface-container-low text-on-surface-variant hover:bg-surface-container',
+        )}
+      >
+        <ImagePlus className="size-6" />
+        <span className="text-sm font-medium">
+          {dragActive
+            ? 'Suelta las imágenes para subirlas'
+            : 'Arrastra imágenes aquí o pulsa para elegir'}
+        </span>
+        <span className="text-xs">PNG, JPG, WEBP o GIF · varias a la vez</span>
+      </button>
 
       {/* Progreso del lote en curso (o su resumen al terminar). */}
       {batch.length > 0 && (
