@@ -43,6 +43,15 @@ export interface User {
    */
   canCreateProjects?: boolean;
   /**
+   * QL-184: permiso de plataforma para usar el **panel de IA** (default **`true`**, al revés que
+   * `canCreateProjects`). Un ADMIN lo **revoca** a un MEMBER desde la administración de usuarios.
+   *
+   * Ojo: **no** es el permiso efectivo. Un ADMIN siempre puede usar la IA aunque el flag falte o
+   * sea `false`, y los usuarios antiguos sin el campo salen con acceso. Para decidir en la UI usa
+   * `canUseAi()` de `@/shared/lib/permissions` (que resuelve el `?? true`), nunca este campo suelto.
+   */
+  canUseAi?: boolean;
+  /**
    * QL-153: token de la paleta curada para el color primary en modo **claro**. `null`/ausente
    * = genérico (sin preferencia). El backend solo persiste la clave (string corto, p. ej.
    * `'violet'`); el mapeo token→tokens Material 3 lo posee el front (`features/profile/lib/theme-palette`).

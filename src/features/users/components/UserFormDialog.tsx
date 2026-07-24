@@ -53,6 +53,8 @@ const createDefaults: CreateUserFormValues = {
   jobTitle: '',
   // QL-127: por defecto los miembros NO pueden crear proyectos.
   canCreateProjects: false,
+  // QL-184: por defecto los miembros SÍ pueden usar la IA (default invertido).
+  canUseAi: true,
 };
 
 interface CanCreateProjectsFieldProps {
@@ -92,6 +94,36 @@ function CanCreateProjectsField({ value, onChange, role }: CanCreateProjectsFiel
   );
 }
 
+/**
+ * Control del permiso de usar el panel de IA (QL-184). Compartido por el alta y la edición.
+ *
+ * Espejo de `CanCreateProjectsField` con el default invertido: el permiso viene **activado** y el
+ * ADMIN lo revoca. Con rol ADMIN se fuerza a "marcado + deshabilitado": el flag no le aplica (un
+ * ADMIN siempre puede usar la IA). Solo se pinta el valor forzado; el valor real del formulario no
+ * se toca, así que al volver a MEMBER reaparece tal cual estaba.
+ */
+function CanUseAiField({ value, onChange, role }: CanCreateProjectsFieldProps) {
+  const isAdmin = role === 'ADMIN';
+
+  return (
+    <div className="grid gap-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low px-4 py-3">
+      <label className="flex items-center gap-2.5 text-sm font-medium text-on-surface">
+        <Switch
+          checked={isAdmin || value}
+          disabled={isAdmin}
+          onCheckedChange={onChange}
+        />
+        Puede usar la IA
+      </label>
+      <p className="text-xs text-on-surface-variant">
+        {isAdmin
+          ? 'Los administradores siempre pueden usar el panel de IA.'
+          : 'Si está desactivado, no verá ni podrá usar el panel de IA.'}
+      </p>
+    </div>
+  );
+}
+
 /** Traduce un fallo de la API a un toast (409 = email duplicado). */
 function reportError(err: unknown) {
   if (err instanceof ApiError && err.status === 409) {
@@ -121,6 +153,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       jobTitle: '',
       password: '',
       canCreateProjects: false,
+      canUseAi: true,
     },
   });
 
@@ -136,6 +169,8 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
         jobTitle: user.jobTitle ?? '',
         password: '',
         canCreateProjects: user.canCreateProjects ?? false,
+        // QL-184: default activado; ausente en usuarios antiguos = con acceso.
+        canUseAi: user.canUseAi ?? true,
       });
     } else {
       createForm.reset(createDefaults);
@@ -157,6 +192,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       role: values.role,
       jobTitle: values.jobTitle?.trim() || undefined,
       canCreateProjects: values.canCreateProjects,
+      canUseAi: values.canUseAi,
     };
     createMutation.mutate(dto, {
       onSuccess: () => {
@@ -176,6 +212,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       status: values.status,
       jobTitle: values.jobTitle?.trim() || undefined,
       canCreateProjects: values.canCreateProjects,
+      canUseAi: values.canUseAi,
       ...(values.password ? { password: values.password } : {}),
     };
     updateMutation.mutate(
@@ -300,6 +337,18 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
               )}
             />
 
+            <Controller
+              control={editForm.control}
+              name="canUseAi"
+              render={({ field }) => (
+                <CanUseAiField
+                  value={!!field.value}
+                  onChange={field.onChange}
+                  role={editRole}
+                />
+              )}
+            />
+
             <div className="grid gap-1.5">
               <Label htmlFor="password" className="text-on-surface">
                 Nueva contraseña
@@ -409,6 +458,18 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
               name="canCreateProjects"
               render={({ field }) => (
                 <CanCreateProjectsField
+                  value={!!field.value}
+                  onChange={field.onChange}
+                  role={createRole}
+                />
+              )}
+            />
+
+            <Controller
+              control={createForm.control}
+              name="canUseAi"
+              render={({ field }) => (
+                <CanUseAiField
                   value={!!field.value}
                   onChange={field.onChange}
                   role={createRole}

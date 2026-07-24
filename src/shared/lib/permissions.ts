@@ -22,3 +22,21 @@ import type { User } from '@/store/auth.store';
 export function canCreateProjects(user: User | null | undefined): boolean {
   return user?.role === 'ADMIN' || !!user?.canCreateProjects;
 }
+
+/**
+ * ¿El usuario puede usar el **panel de IA**? (QL-184)
+ *
+ * El permiso efectivo es `role === 'ADMIN' || (canUseAi ?? true)`:
+ * - **ADMIN siempre puede**, el flag no le aplica (el backend ni lo consulta para él).
+ * - Un MEMBER puede **por defecto**: el default es activado (al revés que `canCreateProjects`).
+ *   Solo un ADMIN lo **revoca** explícitamente (`PATCH /users/:id { canUseAi: false }`).
+ *
+ * El **`?? true`** es deliberado: los usuarios creados antes del campo no lo tienen en Mongo y el
+ * backend los resuelve con acceso, así que el front debe tratar la ausencia como `true`.
+ *
+ * Es la **única fuente** de esta regla en el front; refleja el `AiAccessGuard` del backend, que
+ * responde 403 `AI_ACCESS_DENIED` si no se cumple. (El cableado al nav del panel llega en QL-190.)
+ */
+export function canUseAi(user: User | null | undefined): boolean {
+  return user?.role === 'ADMIN' || (user?.canUseAi ?? true);
+}

@@ -18,6 +18,12 @@ export interface UserSummary {
    * `@/shared/lib/permissions`. No viene en `GET /users/directory` (superficie mínima).
    */
   canCreateProjects?: boolean;
+  /**
+   * QL-184: permiso de plataforma para usar el panel de IA (default `true`). Un ADMIN lo revoca
+   * poniéndolo en `false`. Si el campo no viene (usuario antiguo), trátalo como `true`. Resolver el
+   * permiso efectivo con `canUseAi()` de `@/shared/lib/permissions`. No viene en `GET /users/directory`.
+   */
+  canUseAi?: boolean;
   createdAt: string;
 }
 
@@ -41,6 +47,8 @@ export interface CreateUserDto {
   jobTitle?: string;
   /** QL-127: otorga el permiso de crear proyectos al alta (default `false` en el backend). */
   canCreateProjects?: boolean;
+  /** QL-184: permiso de usar el panel de IA al alta (default `true` en el backend si se omite). */
+  canUseAi?: boolean;
 }
 
 /** DTO de actualización de usuario (§3.2, `PATCH /users/:id`). Todos opcionales. */
@@ -53,6 +61,8 @@ export interface UpdateUserDto {
   status?: 'ACTIVE' | 'INACTIVE';
   /** QL-127: otorga o revoca el permiso de crear proyectos. */
   canCreateProjects?: boolean;
+  /** QL-184: otorga (`true`) o revoca (`false`) el permiso de usar el panel de IA. */
+  canUseAi?: boolean;
 }
 
 /** Filtros de listado de usuarios (§3.2). Solo `ADMIN` puede consultarlo. */
