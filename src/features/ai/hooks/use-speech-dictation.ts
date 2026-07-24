@@ -1,16 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { isCoarsePointerDevice } from '@/shared/lib/device';
+
 /**
  * Dictado por voz (QL-191) sobre la Web Speech API del navegador. Es un método de ENTRADA
  * puramente cliente: el navegador transcribe voz→texto y el resultado se anexa al composer para
  * que el usuario lo revise y envíe con el flujo normal. No sale audio de la máquina ni pasa por
  * el backend; por eso vive como estado local y no en TanStack Query.
  *
- * Móvil (QL-191 bugfix): en Chrome de Android el reconocimiento con `continuous: true` **termina
- * solo** tras una pausa corta aunque el usuario siga hablando. Aquí se reinicia automáticamente en
- * `onend` manteniendo `recording === true` (sin parpadeos), con guarda anti-bucle. Si el micrófono
- * entra en conflicto (`audio-capture` o cortes encadenados) se marca `canVisualize = false` para que
- * el visualizador suelte SU stream: la transcripción manda sobre la onda.
+ * Móvil (QL-191 bugfix 2) — el motor de Chrome en Android NO finaliza los resultados cuando
+ * `continuous = true`: la sesión se queda abierta pero no llega ningún `isFinal`, así que no
+ * aterriza nada de texto. El patrón canónico (el de las librerías de referencia) es:
+ *
+ *   `continuous = false` + `interimResults = true` + auto-reinicio en `onend`.
+ *
+ * Así CADA frase cierra su sesión con su resultado final y el bucle de reinicio da la sensación de
+ * dictado continuo. Se aplica en todas las plataformas (en escritorio funciona igual de bien) para
+ * no mantener dos comportamientos distintos.
+ *
+ * Consecuencia importante: con `continuous = false` los `onend` son CONSTANTES Y NORMALES, y las
+ * sesiones de menos de un segundo son habituales en los silencios. Por eso las guardas anti-bucle
+ * NO cuentan reinicios: solo cuentan finales anómalos (`onerror` real) y aplican un tope por TIEMPO
+ * sin oír nada. Ver `MAX_ANOMALOUS_ENDS` y `SILENT_TIMEOUT_MS`.
  *
  * Los tipos de la Web Speech API no están en el `lib.dom` estándar, así que se declaran aquí con
  * interfaces propias (sin `any`) y se accede a la clase con un cast tipado del `window`.
@@ -98,20 +109,26 @@ function mapDictationError(code: string): DictationError {
   }
 }
 
-/** Una sesión más corta que esto cuenta como "corte" para la guarda anti-bucle. */
-const RAPID_SESSION_MS = 1000;
-/** Cortes encadenados tolerados antes de rendirse de verdad. */
-const MAX_RAPID_RESTARTS = 4;
 /**
- * Reinicios seguidos SIN transcripción tolerados. Acota el bucle cuando el fallo es persistente
- * (p. ej. `audio-capture` cada dos segundos) o el usuario dejó el micro abierto en silencio; se
- * reinicia a cero en cuanto entra texto, así que un dictado real nunca lo alcanza.
+ * Finales ANÓMALOS seguidos tolerados antes de rendirse. Anómalo = `onerror` que no sea `no-speech`
+ * ni `aborted` (p. ej. `audio-capture`, `network`). Un `onend` limpio NO cuenta: con
+ * `continuous = false` es el final normal de cada frase. El contador se pone a cero en cuanto llega
+ * cualquier texto, así que un dictado real jamás lo alcanza.
  */
-const MAX_BARREN_RESTARTS = 8;
-/** A partir de este nº de cortes se sospecha conflicto de micrófono y se suelta la onda. */
-const CONFLICT_RESTART_THRESHOLD = 2;
-/** Respiro antes de reanudar: `start()` inmediato dentro de `onend` es inestable en Android. */
+const MAX_ANOMALOUS_ENDS = 10;
+/** `start()` lanzando de forma consecutiva: a la tercera se asume que el motor no va a arrancar. */
+const MAX_START_FAILURES = 3;
+/**
+ * Tope de seguridad por TIEMPO (no por número de reinicios): si pasa este rato sin que llegue NADA
+ * —ni final ni provisional— se corta el bucle con el aviso de "no se escuchó nada". Cualquier texto
+ * reinicia la cuenta, de modo que un dictado real solo lo alcanza si el micro se quedó abierto y
+ * olvidado un minuto entero.
+ */
+const SILENT_TIMEOUT_MS = 60_000;
+/** Respiro entre frases: `start()` inmediato dentro de `onend` es inestable en Android. */
 const RESTART_DELAY_MS = 120;
+/** Respiro mayor cuando el reinicio viene de un fallo, para no encadenar reintentos en caliente. */
+const ANOMALOUS_RESTART_DELAY_MS = 600;
 
 interface UseSpeechDictationOptions {
   /** BCP-47 del reconocimiento (p. ej. `'es-CO'`). */
@@ -128,7 +145,11 @@ interface UseSpeechDictation {
   /** Texto provisional del motor (aún no final), para que se VEA que está transcribiendo. */
   interim: string;
   error: DictationError | null;
-  /** `false` cuando hay conflicto de micrófono: el visualizador debe soltar su stream. */
+  /**
+   * `false` cuando el visualizador NO debe abrir su propio micrófono: siempre en dispositivos
+   * táctiles (en Android el segundo consumidor degrada el reconocimiento) y en escritorio cuando el
+   * motor reporta `audio-capture`. La onda pasa a modo sintético: la transcripción manda.
+   */
   canVisualize: boolean;
   /** Alterna: arranca un reconocimiento nuevo o detiene el activo. */
   toggle: () => void;
@@ -143,15 +164,20 @@ export function useSpeechDictation({
   const [recording, setRecording] = useState(false);
   const [interim, setInterim] = useState('');
   const [error, setError] = useState<DictationError | null>(null);
-  const [canVisualize, setCanVisualize] = useState(true);
+  // En táctil arranca ya en `false`: el micro es solo para el reconocimiento. Una vez degradado no
+  // se vuelve a subir en toda la vida de la página (reintentar es arriesgar la transcripción).
+  const [canVisualize, setCanVisualize] = useState(() => !isCoarsePointerDevice());
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   // `true` cuando la parada la pidió el usuario (o un fallo definitivo): bloquea el auto-reinicio.
   const userStoppedRef = useRef(false);
   const restartTimerRef = useRef(0);
-  const sessionStartedAtRef = useRef(0);
-  const rapidRestartsRef = useRef(0);
-  const barrenRestartsRef = useRef(0);
+  // Finales anómalos consecutivos y fallos consecutivos de `start()`: las dos únicas señales de
+  // fallo real. Cualquier texto transcrito las pone a cero.
+  const anomalousEndsRef = useRef(0);
+  const startFailuresRef = useRef(0);
+  // Instante del último texto recibido (final O provisional): base del tope por tiempo.
+  const lastTranscriptAtRef = useRef(0);
   // Texto provisional vivo: si el motor muere sin finalizarlo, se vuelca igual al composer.
   const interimRef = useRef('');
   const lastFinalRef = useRef('');
@@ -176,14 +202,15 @@ export function useSpeechDictation({
     const recognition = recognitionRef.current;
     if (!recognition) return;
     if (hadPendingRestart) {
-      // Se pulsó justo entre dos reinicios: no hay sesión viva que emita `onend`, se cierra a mano.
+      // Se pulsó justo entre dos frases: no hay sesión viva que emita `onend`, se cierra a mano.
+      // Con `continuous = false` esta ventana se da a menudo, así que el caso importa.
       recognition.abort();
       recognitionRef.current = null;
       setRecording(false);
       setInterim('');
       return;
     }
-    recognition.stop(); // el resto lo resuelve `onend`
+    recognition.stop(); // el resto lo resuelve `onend` (y `stop` deja finalizar la última frase)
   }, [clearRestartTimer]);
 
   const toggle = useCallback(() => {
@@ -197,15 +224,18 @@ export function useSpeechDictation({
     if (!Recognition) return;
 
     userStoppedRef.current = false;
-    rapidRestartsRef.current = 0;
-    barrenRestartsRef.current = 0;
+    anomalousEndsRef.current = 0;
+    startFailuresRef.current = 0;
+    lastTranscriptAtRef.current = Date.now();
     interimRef.current = '';
     lastFinalRef.current = '';
     setInterim('');
 
     const recognition = new Recognition();
     recognition.lang = langRef.current;
-    recognition.continuous = true;
+    // Ver la cabecera: `false` es lo que hace que Android emita resultados finales. El dictado
+    // continuo lo da el bucle de reinicio de `onend`, no esta bandera.
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
@@ -219,15 +249,30 @@ export function useSpeechDictation({
       setInterim('');
     };
 
-    /** Arranca (o reanuda) la sesión marcando el instante para la guarda anti-bucle. */
+    /** Programa la siguiente frase. La guarda evita reanudar una sesión ya descartada. */
+    const scheduleRestart = (delayMs: number) => {
+      clearRestartTimer();
+      restartTimerRef.current = window.setTimeout(() => {
+        restartTimerRef.current = 0;
+        if (userStoppedRef.current || recognitionRef.current !== recognition) return;
+        beginSession();
+      }, delayMs);
+    };
+
+    /** Arranca (o reanuda) la sesión. Un `start()` que lanza se reintenta, no mata el dictado. */
     const beginSession = () => {
-      sessionStartedAtRef.current = Date.now();
       try {
         recognition.start();
+        startFailuresRef.current = 0;
       } catch (err) {
         // `InvalidStateError` = ya estaba corriendo: la sesión sigue viva, no hay nada que hacer.
         if (err instanceof DOMException && err.name === 'InvalidStateError') return;
-        finish({ message: 'No se pudo iniciar el dictado.', blocking: false });
+        startFailuresRef.current += 1;
+        if (startFailuresRef.current >= MAX_START_FAILURES) {
+          finish({ message: 'No se pudo iniciar el dictado.', blocking: false });
+          return;
+        }
+        scheduleRestart(ANOMALOUS_RESTART_DELAY_MS);
       }
     };
 
@@ -237,14 +282,16 @@ export function useSpeechDictation({
       interimRef.current = '';
       setInterim('');
       if (!pending) return;
-      // Evita duplicar si el motor ya emitió exactamente ese texto como final.
-      if (lastFinalRef.current.endsWith(pending)) return;
+      // Dedupe deliberadamente CONSERVADOR: solo se descarta si el último final es exactamente ese
+      // texto. Entre sesiones el motor resetea `results`, así que un `endsWith` daría falsos
+      // positivos y se perdería transcripción legítima; mejor un duplicado raro que perderla.
+      if (lastFinalRef.current === pending) return;
       onTranscriptRef.current(pending);
     };
 
     recognition.onstart = () => {
-      sessionStartedAtRef.current = Date.now();
       setError(null);
+      // Idempotente: en los reinicios ya vale `true`, React descarta el re-render y no parpadea.
       setRecording(true);
     };
 
@@ -259,27 +306,41 @@ export function useSpeechDictation({
         else interimChunk += result[0].transcript;
       }
 
-      interimRef.current = interimChunk;
-      setInterim(interimChunk.trim());
+      const finalText = finalChunk.trim();
+      const interimText = interimChunk.trim();
 
-      const trimmed = finalChunk.trim();
-      if (!trimmed) return;
-      lastFinalRef.current = trimmed;
-      // Hubo transcripción real: esto no es un bucle de cortes, se perdonan los reinicios previos.
-      rapidRestartsRef.current = 0;
-      barrenRestartsRef.current = 0;
-      onTranscriptRef.current(trimmed);
+      // Cualquier señal de voz —aunque sea provisional— reinicia el tope por tiempo.
+      if (finalText || interimText) lastTranscriptAtRef.current = Date.now();
+
+      if (interimText) {
+        interimRef.current = interimText;
+        setInterim(interimText);
+      } else if (finalText) {
+        // El motor cerró la frase: lo provisional ya está contenido en el final, se descarta.
+        interimRef.current = '';
+        setInterim('');
+      }
+      // Con ambos vacíos NO se toca el provisional: un `onresult` sin contenido no puede borrar
+      // texto que todavía está pendiente de finalizarse o de volcarse.
+
+      if (!finalText) return;
+      lastFinalRef.current = finalText;
+      // Hubo transcripción real: lo anterior no era un fallo, se perdonan los intentos fallidos.
+      anomalousEndsRef.current = 0;
+      startFailuresRef.current = 0;
+      onTranscriptRef.current(finalText);
     };
 
     recognition.onerror = (event) => {
       switch (event.error) {
         case 'no-speech':
         case 'aborted':
-          // Cierres normales (silencio o detención manual): `onend` decide si reanuda.
+          // Cierres NORMALES (silencio o detención manual). No cuentan como fallo: `onend` reanuda.
           return;
         case 'audio-capture':
           // Otro consumidor tiene el micrófono: se suelta la onda y se sigue transcribiendo.
           setCanVisualize(false);
+          anomalousEndsRef.current += 1;
           setError(mapDictationError(event.error));
           return;
         case 'not-allowed':
@@ -289,6 +350,7 @@ export function useSpeechDictation({
           finish(PERMISSION_ERROR);
           return;
         default:
+          anomalousEndsRef.current += 1;
           setError(mapDictationError(event.error));
       }
     };
@@ -303,16 +365,10 @@ export function useSpeechDictation({
         return;
       }
 
-      // Android corta la sesión tras una pausa corta: se reanuda para que el usuario no lo note.
-      const elapsed = Date.now() - sessionStartedAtRef.current;
-      rapidRestartsRef.current = elapsed < RAPID_SESSION_MS ? rapidRestartsRef.current + 1 : 0;
-
-      if (rapidRestartsRef.current >= CONFLICT_RESTART_THRESHOLD) {
-        // Cortes encadenados = casi siempre pelea por el micrófono: la onda es lo prescindible.
-        setCanVisualize(false);
-      }
-
-      if (rapidRestartsRef.current >= MAX_RAPID_RESTARTS) {
+      // Con `continuous = false` el motor cierra la sesión al terminar cada frase (y tras cada
+      // silencio). Es el caso NORMAL: se reanuda sin contarlo como fallo. Solo se abandona por
+      // fallos anómalos encadenados o por llevar demasiado tiempo sin oír absolutamente nada.
+      if (anomalousEndsRef.current >= MAX_ANOMALOUS_ENDS) {
         finish({
           message: 'El dictado se interrumpió. Vuelve a pulsar el micrófono para continuar.',
           blocking: false,
@@ -320,8 +376,7 @@ export function useSpeechDictation({
         return;
       }
 
-      barrenRestartsRef.current += 1; // `onresult` lo pone a cero en cuanto llega texto
-      if (barrenRestartsRef.current >= MAX_BARREN_RESTARTS) {
+      if (Date.now() - lastTranscriptAtRef.current >= SILENT_TIMEOUT_MS) {
         finish({
           message: 'El dictado se detuvo porque no se escuchó nada. Pulsa el micrófono para retomarlo.',
           blocking: false,
@@ -329,14 +384,13 @@ export function useSpeechDictation({
         return;
       }
 
-      clearRestartTimer();
-      restartTimerRef.current = window.setTimeout(() => {
-        restartTimerRef.current = 0;
-        if (userStoppedRef.current || recognitionRef.current !== recognition) return;
-        beginSession();
-      }, RESTART_DELAY_MS);
+      scheduleRestart(
+        anomalousEndsRef.current > 0 ? ANOMALOUS_RESTART_DELAY_MS : RESTART_DELAY_MS,
+      );
     };
 
+    // Se registra ANTES de arrancar: si `beginSession` acaba en `finish`, este debe poder anular la
+    // referencia (si se asignara después, se resucitaría una sesión ya cerrada).
     recognitionRef.current = recognition;
     beginSession();
   }, [clearRestartTimer, stop]);

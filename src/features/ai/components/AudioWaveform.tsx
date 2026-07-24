@@ -5,10 +5,12 @@ interface AudioWaveformProps {
   /** Mientras sea `true`, la onda está viva (con datos del micrófono o sintética). */
   active: boolean;
   /**
-   * `false` para NO abrir un segundo consumidor del micrófono (conflicto con el reconocimiento en
-   * móvil): la onda pasa a un pulso sintético y la transcripción se queda con el micro.
+   * `false` para NO abrir un segundo consumidor del micrófono: la onda pasa a un pulso sintético y
+   * la transcripción se queda con el micro. Es OBLIGATORIO (sin valor por defecto) a propósito: en
+   * móvil abrir un segundo micro rompe el reconocimiento, así que quien monta la onda tiene que
+   * decidirlo explícitamente. La decisión vive en `useSpeechDictation().canVisualize`.
    */
-  capture?: boolean;
+  capture: boolean;
   className?: string;
 }
 
@@ -18,10 +20,11 @@ interface AudioWaveformProps {
  * micrófono en rojo mientras graba). El componente consume `useAudioLevels`, así que el re-render
  * a ~60fps queda confinado a este subárbol (no re-renderiza todo el composer).
  *
- * Nunca se queda plana: si no hay datos reales (permiso denegado, `AudioContext` suspendido o
- * degradación por conflicto) el hook devuelve una onda sintética para que se siga viendo actividad.
+ * Nunca se queda plana: si no hay datos reales (permiso denegado, `AudioContext` suspendido,
+ * dispositivo táctil o degradación por conflicto) el hook devuelve una onda sintética para que se
+ * siga viendo actividad mientras se dicta.
  */
-export function AudioWaveform({ active, capture = true, className }: AudioWaveformProps) {
+export function AudioWaveform({ active, capture, className }: AudioWaveformProps) {
   const { levels } = useAudioLevels({ active, capture });
 
   return (

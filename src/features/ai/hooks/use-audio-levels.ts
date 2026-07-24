@@ -10,9 +10,11 @@ import { useEffect, useState } from 'react';
  * - En Android/iOS el `AudioContext` nace **suspendido** y el analizador devuelve ceros (onda plana)
  *   hasta que se llama a `resume()` tras un gesto del usuario. Se crea y se reanuda al principio del
  *   efecto, que corre en la cadena del click que activó el dictado (no se difiere a un timeout).
- * - El segundo consumidor del micrófono puede pelearse con el reconocimiento de voz. Con
- *   `capture: false` el hook NO abre el micrófono y devuelve una onda **sintética**: se prioriza la
- *   transcripción y el usuario sigue viendo actividad.
+ * - El segundo consumidor del micrófono se pelea con el reconocimiento de voz: en Android basta para
+ *   que deje de transcribir. Con `capture: false` el hook NO abre el micrófono y devuelve una onda
+ *   **sintética**: se prioriza la transcripción y el usuario sigue viendo actividad. Quién decide ese
+ *   `false` no es este hook (que es genérico) sino `useSpeechDictation().canVisualize`, que lo pone
+ *   en cuanto detecta un dispositivo táctil o un conflicto real de micrófono.
  *
  * Devuelve `barCount` alturas normalizadas (0..1) y `capturing` (si los datos son reales). Degrada a
  * la onda sintética si `getUserMedia` falla (permiso denegado / micrófono ocupado) o el navegador no
