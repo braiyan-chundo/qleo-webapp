@@ -27,6 +27,7 @@ import { QleoMark } from '@/shared/components/QleoLogo';
 import { BetaBadge } from '@/shared/components/BetaBadge';
 import { NavBadge } from '@/shared/components/NavBadge';
 import { useAuthStore } from '@/store/auth.store';
+import { canUseAi } from '@/shared/lib/permissions';
 import { useWallUnreadCount } from '@/features/wall/hooks/use-wall';
 import { useProjects } from '@/features/projects/hooks/use-projects';
 import type { ProjectListParams } from '@/features/projects/services/projects.service';
@@ -103,15 +104,17 @@ function activeProjectId(pathname: string): string | null {
 
 export function AppSidebar() {
   const { pathname } = useLocation();
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
+  // (QL-190) Gate del "Asistente IA": ADMIN o MEMBER no revocado (default activado).
+  const aiAllowed = canUseAi(user);
   const { count: wallUnread } = useWallUnreadCount();
 
-  const visibleNavItems = primaryNavItems.filter(
-    (item) => !item.adminOnly || isAdmin,
-  );
-  const visibleFooterItems = footerNavItems.filter(
-    (item) => !item.adminOnly || isAdmin,
-  );
+  const isNavItemVisible = (item: NavItem) =>
+    (!item.adminOnly || isAdmin) && (!item.requiresAi || aiAllowed);
+
+  const visibleNavItems = primaryNavItems.filter(isNavItemVisible);
+  const visibleFooterItems = footerNavItems.filter(isNavItemVisible);
 
   return (
     <Sidebar

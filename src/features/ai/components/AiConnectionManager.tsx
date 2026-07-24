@@ -54,6 +54,20 @@ function formatDateTime(iso: string | null): string {
   });
 }
 
+/** Formatea un epoch en **segundos** (`resetsAt` del rate limit) a fecha/hora local corta; `—` si no es válido. */
+function formatEpochSeconds(epoch: number | null | undefined): string {
+  if (epoch == null) return '—';
+  const date = new Date(epoch * 1000);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 interface ConnectedViewProps {
   config: AiConfigResponse;
   onDisconnect: () => void;
@@ -62,11 +76,12 @@ interface ConnectedViewProps {
 /** Estado conectado: cuenta, quién/cuándo la enlazó, uso y botón de desconexión. */
 function ConnectedView({ config, onDisconnect }: ConnectedViewProps) {
   const usedPercent = config.rateLimits?.primary?.usedPercent;
+  const resetsAt = config.rateLimits?.primary?.resetsAt ?? null;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-tertiary/30 bg-surface-container-low px-4 py-3">
-        <div className="flex size-11 items-center justify-center rounded-full bg-primary-container text-primary">
+        <div className="flex size-11 items-center justify-center rounded-full bg-primary text-on-primary">
           <Sparkles className="size-5" />
         </div>
         <div className="min-w-0">
@@ -92,7 +107,7 @@ function ConnectedView({ config, onDisconnect }: ConnectedViewProps) {
         )}
       </div>
 
-      <dl className="grid gap-4 rounded-xl border border-outline-variant/50 bg-surface-container-low px-4 py-3 text-sm sm:grid-cols-2">
+      <dl className="grid gap-4 rounded-xl border border-outline-variant/50 bg-surface-container-low px-4 py-3 text-sm sm:grid-cols-3">
         <div className="grid gap-0.5">
           <dt className="text-xs font-medium text-on-surface-variant">Conectada por</dt>
           <dd className="text-on-surface">{config.connectedBy?.name ?? '—'}</dd>
@@ -100,6 +115,10 @@ function ConnectedView({ config, onDisconnect }: ConnectedViewProps) {
         <div className="grid gap-0.5">
           <dt className="text-xs font-medium text-on-surface-variant">Fecha de conexión</dt>
           <dd className="text-on-surface">{formatDateTime(config.connectedAt)}</dd>
+        </div>
+        <div className="grid gap-0.5">
+          <dt className="text-xs font-medium text-on-surface-variant">Restablecimiento de tokens</dt>
+          <dd className="text-on-surface">{formatEpochSeconds(resetsAt)}</dd>
         </div>
       </dl>
 
@@ -158,7 +177,7 @@ function DisconnectedView({
       )}
 
       <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant/60 bg-surface-container-low px-6 py-16 text-center">
-        <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-primary-container text-primary">
+        <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-primary text-on-primary">
           <Plug className="size-7" />
         </div>
         <h3 className="text-lg font-semibold text-on-surface">IA no conectada</h3>

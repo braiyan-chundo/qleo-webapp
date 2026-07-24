@@ -16,6 +16,7 @@ import { AdminSettingsPage } from '@/features/admin/pages/AdminSettingsPage';
 import { AuditLogPage } from '@/features/audit/pages/AuditLogPage';
 import { AnalyticsPage } from '@/features/analytics/pages/AnalyticsPage';
 import { CalendarPage } from '@/features/work-calendar/pages/CalendarPage';
+import { AiPage } from '@/features/ai/pages/AiPage';
 import { SessionGate } from '@/shared/components/SessionGate';
 import { PublicOnlyRoute } from '@/shared/components/PublicOnlyRoute';
 import { AdminRoute } from '@/shared/components/AdminRoute';
@@ -57,6 +58,10 @@ function App() {
                   element={<TaskDetailPage />}
                 />
                 <Route path="/tasks" element={<MyTasksPage />} />
+                {/* Panel de IA (QL-190): autenticado; el acceso lo gatea `GET /ai/status`
+                    (canal `canUseAi`; ADMIN siempre pasa). El nav se oculta con `canUseAi()`,
+                    pero la seguridad real la impone el `AiAccessGuard` del backend. */}
+                <Route path="/ia" element={<AiPage />} />
                 {/* Resolutor de push `/tasks/:taskId` → ruta anidada real (§3.10/§3.17).
                     Va antes del comodín `*`; distinto segmento que `/tasks`, no colisiona. */}
                 <Route path="/tasks/:taskId" element={<TaskRedirectPage />} />

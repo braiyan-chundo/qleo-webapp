@@ -102,4 +102,11 @@ class FetchClient {
   }
 }
 
-export const api = new FetchClient(import.meta.env.VITE_QLEO_API_BASE_URL || '/api');
+/**
+ * URL base de la API (`VITE_QLEO_API_BASE_URL`, `/api` en dev). Exportada para los pocos
+ * consumidores que necesitan hacer `fetch` crudo en vez de pasar por `api` — hoy solo el stream
+ * SSE de `/ai/chat` (QL-190), que va con `Authorization` + cuerpo POST y no cabe en `EventSource`.
+ */
+export const API_BASE_URL = import.meta.env.VITE_QLEO_API_BASE_URL || '/api';
+
+export const api = new FetchClient(API_BASE_URL);

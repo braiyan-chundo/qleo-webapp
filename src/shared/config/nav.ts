@@ -12,6 +12,7 @@ import {
   Megaphone,
   Users,
   SlidersHorizontal,
+  Sparkles,
 } from 'lucide-react';
 
 /**
@@ -34,6 +35,12 @@ export interface NavItem {
   icon: NavIcon;
   /** Si es true, solo se muestra a usuarios con rol de plataforma `ADMIN`. */
   adminOnly?: boolean;
+  /**
+   * (QL-190) Si es true, solo se muestra a quien puede usar la IA (`canUseAi()`: ADMIN o MEMBER no
+   * revocado). El consumidor aplica el gate; ocultarlo es cosmético — la seguridad la impone el
+   * `AiAccessGuard` del backend.
+   */
+  requiresAi?: boolean;
   /** Si está, el consumidor pinta un badge numérico junto al ítem (QL-91). */
   badge?: NavBadgeKind;
   /**
@@ -56,6 +63,8 @@ export const primaryNavItems: NavItem[] = [
   { title: 'Muro', url: '/muro', icon: Megaphone, badge: 'wall' },
   { title: 'Proyectos', url: '/projects', icon: Folder },
   { title: 'Mis tareas', url: '/tasks', icon: ClipboardList },
+  // (QL-190) Asistente de IA. Gateado por `canUseAi()` en los consumidores del nav.
+  { title: 'Asistente IA', url: '/ia', icon: Sparkles, requiresAi: true },
   { title: 'Notificaciones', url: '/notifications', icon: Bell },
   {
     // Calendario = **una sola ruta** `/calendar` (link plano para todos). Revierte la variante

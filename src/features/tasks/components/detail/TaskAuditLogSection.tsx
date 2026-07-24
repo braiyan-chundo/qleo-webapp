@@ -1,4 +1,4 @@
-import { History } from 'lucide-react';
+import { History, Sparkles } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -167,6 +167,15 @@ export function TaskAuditLogSection({ taskId }: TaskAuditLogSectionProps) {
                     />
                     <div className="flex shrink-0 items-center gap-3">
                       <Badge variant={meta.variant}>{meta.label}</Badge>
+                      {/* (QL-188/§3.64) Marca sutil cuando la mutación la ejecutó el asistente. */}
+                      {log.origin === 'AI' && (
+                        <span
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary"
+                          title="Ejecutada por el asistente de IA tras tu confirmación"
+                        >
+                          <Sparkles className="size-3" aria-hidden />· vía asistente
+                        </span>
+                      )}
                       <time className="text-xs text-on-surface-variant tabular-nums">
                         {formatDateTime(log.createdAt)}
                       </time>

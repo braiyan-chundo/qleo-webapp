@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sheet';
 import { NavBadge } from '@/shared/components/NavBadge';
 import { useAuthStore } from '@/store/auth.store';
+import { canUseAi } from '@/shared/lib/permissions';
 import { useWallUnreadCount } from '@/features/wall/hooks/use-wall';
 import {
   bottomNavItems,
@@ -33,7 +34,10 @@ import {
  */
 export function BottomNav() {
   const { pathname } = useLocation();
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
+  // (QL-190) Gate del "Asistente IA" en el menú "Más".
+  const aiAllowed = canUseAi(user);
   const { count: wallUnread } = useWallUnreadCount();
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -42,7 +46,7 @@ export function BottomNav() {
   // el parent como link plano, así que el MEMBER conserva la sección. El filtro externo por
   // `adminOnly` sigue quitando los parents solo-ADMIN (p. ej. Administración) del menú de un MEMBER.
   const menuItems = flattenNavItems(allNavItems, isAdmin).filter(
-    (item) => !item.adminOnly || isAdmin,
+    (item) => (!item.adminOnly || isAdmin) && (!item.requiresAi || aiAllowed),
   );
 
   // Un único ítem activo a la vez: el de `url` más específica que casa con la ruta (resuelve el
