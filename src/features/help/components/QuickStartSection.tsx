@@ -30,7 +30,7 @@ const QUICK_STEPS: { title: string; body: ReactNode }[] = [
   },
   {
     title: 'Crea tareas',
-    body: 'Pulsa «Nueva tarea» o el «+» de una columna. Asigna un Responsable (único), Colaboradores y, si aplica, una fecha límite.',
+    body: 'Pulsa «Nueva tarea» o el «+» de una columna. El Responsable (único) viene preseleccionado contigo; cámbialo si es otra persona, y añade Colaboradores y, si aplica, una fecha límite.',
   },
   {
     title: 'Trabaja en el tablero',

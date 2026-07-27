@@ -29,8 +29,14 @@ export const taskFormSchema = z.object({
   /** (P1) Bloquear la edición del deadline por no-Creadores desde el alta. */
   deadlineLocked: z.boolean().optional(),
   /**
-   * (QL-123) Responsable (ASSIGNEE) elegido en el **alta**; `''` = sin responsable.
-   * Solo se usa al crear: en edición los roles se gestionan con el `RoleManager` del detalle.
+   * (QL-123) Responsable (ASSIGNEE) elegido en el **alta**.
+   *
+   * (QL-192) **Nunca hay tarea sin Responsable**: el formulario lo preselecciona con el usuario
+   * actual (que puede cambiarlo por otra persona) y, si aun así llegara vacío, el backend pone
+   * al creador. `''` es solo el hueco transitorio mientras cargan los miembros — no un estado
+   * elegible—, y por eso el campo sigue siendo `optional()` sin validación extra.
+   * Un mismo `userId` puede ser CREATOR y ASSIGNEE a la vez: aquí no hay nada que deduplicar,
+   * porque el creador no se envía en `collaboratorIds`/`observerIds`.
    */
   assigneeId: z.string().optional(),
   /** (QL-123) Colaboradores (COLLABORATOR) elegidos en el **alta**. Vacío = ninguno. */

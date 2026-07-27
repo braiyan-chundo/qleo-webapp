@@ -8,7 +8,8 @@ import {
 } from '@/shared/hooks/use-query-param-state';
 import { useAuthStore } from '@/store/auth.store';
 
-import type { Task, TaskAssignment } from '../services/tasks.service';
+import type { Task } from '../services/tasks.service';
+import { assigneeOf } from '../lib/roles';
 
 /** Filtro por estado de cierre de la tarea, compartido por las vistas del board. */
 export type TaskStatusFilter = 'all' | 'active' | 'completed';
@@ -24,11 +25,6 @@ const ALL = '';
 const SEARCH_PARAM = 'q';
 const ASSIGNEE_PARAM = 'resp';
 const STATUS_PARAM = 'estado';
-
-/** El ASSIGNEE (Responsable único, RF-1.2) de una tarea, si existe. */
-function assigneeOf(task: Task): TaskAssignment | undefined {
-  return task.assignments.find((a) => a.role === 'ASSIGNEE');
-}
 
 /** Estado de los filtros del board, ya persistido en la URL. */
 export interface TaskFiltersState {

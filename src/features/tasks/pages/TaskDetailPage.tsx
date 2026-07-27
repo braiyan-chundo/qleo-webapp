@@ -11,6 +11,7 @@ import { CommentsPanel } from '@/features/comments/components/CommentsPanel';
 import { AttachmentsPanel } from '@/features/attachments/components/AttachmentsPanel';
 
 import { useTask } from '../hooks/use-tasks';
+import { userHasRole } from '../lib/roles';
 import { CompletionSection } from '../components/CompletionSection';
 import { DeadlineSection } from '../components/DeadlineSection';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
@@ -87,7 +88,9 @@ export function TaskDetailPage() {
     );
   }
 
-  const isCreator = task.currentUserRole === 'CREATOR';
+  // (QL-192) Ser además Responsable no le quita al Creador sus acciones de dueño: el rol se
+  // comprueba contra `assignments`, no contra el escalar `currentUserRole`.
+  const isCreator = userHasRole(task.assignments, user?.id, 'CREATOR');
   const isAdmin = user?.role === 'ADMIN';
   // (QL-141) Columna actual + su posición ordenada (para el color estable del chip).
   const columnIndex = columns?.findIndex((c) => c.id === task.columnId) ?? -1;

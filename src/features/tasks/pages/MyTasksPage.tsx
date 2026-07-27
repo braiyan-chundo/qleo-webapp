@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { useProjects } from '@/features/projects/hooks/use-projects';
 import type { Project } from '@/features/projects/types/project';
 import { BackButton } from '@/shared/components/BackButton';
+import { useAuthStore } from '@/store/auth.store';
 import {
   useQueryParamSearch,
   useQueryParamState,
@@ -23,11 +24,23 @@ import {
 import { useMyTasks } from '../hooks/use-tasks';
 import type { Task, TaskRole } from '../services/tasks.service';
 import { projectDot } from '../lib/palette';
-import { TASK_ROLE_BADGE_CLASS, TASK_ROLE_LABEL } from '../lib/roles';
+import { TASK_ROLE_BADGE_CLASS, TASK_ROLE_LABEL, rolesOfUser } from '../lib/roles';
 import { formatDueDate, isDueToday, isOverdue } from '../lib/deadline';
 
 /** Valor sentinela para "todos los roles" en el select (los roles reales nunca son vacíos). */
 const ALL_ROLES = '';
+
+/**
+ * (QL-192) TODOS mis roles en la tarea. Se derivan de `assignments` porque `currentUserRole` es
+ * un escalar y no puede expresar el doble rol Creador+Responsable: filtrando por él, una tarea
+ * que creé y me autoasigné desaparecería de uno de los dos filtros. Cae en `currentUserRole`
+ * mientras la sesión no está resuelta.
+ */
+function myRolesIn(task: Task, userId: string | undefined): TaskRole[] {
+  const roles = rolesOfUser(task.assignments, userId);
+  if (roles.length > 0) return roles;
+  return task.currentUserRole ? [task.currentUserRole] : [];
+}
 
 /** Filtro por estado de cierre de la tarea. */
 type StatusFilter = 'all' | 'pending' | 'completed';
@@ -56,6 +69,7 @@ interface ProjectGroup {
  */
 export function MyTasksPage() {
   const navigate = useNavigate();
+  const currentUserId = useAuthStore((s) => s.user?.id);
   const { data: tasks, isLoading, isError, error } = useMyTasks();
   // Trae los proyectos para resolver nombre/código por `projectId` (el endpoint de
   // tareas solo trae `projectId`). `limit: 50` es el máximo que admite `GET /projects`.
@@ -82,12 +96,16 @@ export function MyTasksPage() {
       if (debouncedSearch && !task.title.toLowerCase().includes(debouncedSearch)) {
         return false;
       }
-      if (roleFilter && task.currentUserRole !== roleFilter) return false;
+      // (QL-192) Contra TODOS mis roles: una tarea que creé y me autoasigné sale tanto en
+      // "Creador" como en "Responsable" (y una sola vez, porque el filtro es por tarea).
+      if (roleFilter && !myRolesIn(task, currentUserId).includes(roleFilter)) {
+        return false;
+      }
       if (statusFilter === 'pending' && task.isCompleted) return false;
       if (statusFilter === 'completed' && !task.isCompleted) return false;
       return true;
     });
-  }, [tasks, debouncedSearch, roleFilter, statusFilter]);
+  }, [tasks, debouncedSearch, roleFilter, statusFilter, currentUserId]);
 
   // Agrupa por proyecto conservando el orden de aparición (mantiene el `dueDate` asc global).
   const groups = useMemo<ProjectGroup[]>(() => {
@@ -340,8 +358,11 @@ interface TaskRowProps {
   emphasize?: boolean;
 }
 
-/** Fila de tarea: título + estado de cierre, mi rol y fecha límite. Click abre el detalle. */
+/** Fila de tarea: título + estado de cierre, mis roles y fecha límite. Click abre el detalle. */
 function TaskRow({ task, onOpen, project, emphasize }: TaskRowProps) {
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  // (QL-192) Puedo tener dos roles en la misma tarea (Creador y Responsable): se pintan ambos.
+  const roles = myRolesIn(task, currentUserId);
   const overdue = isOverdue(task.dueDate) && !task.isCompleted;
   const dueToday = !overdue && !task.isCompleted && isDueToday(task.dueDate);
   const dotClass = projectDot(project?.color);
@@ -389,10 +410,14 @@ function TaskRow({ task, onOpen, project, emphasize }: TaskRowProps) {
           )}
         </div>
 
-        {task.currentUserRole && (
-          <Badge className={cn('shrink-0', TASK_ROLE_BADGE_CLASS[task.currentUserRole])}>
-            {TASK_ROLE_LABEL[task.currentUserRole]}
-          </Badge>
+        {roles.length > 0 && (
+          <span className="flex shrink-0 flex-wrap justify-end gap-1">
+            {roles.map((role) => (
+              <Badge key={role} className={cn(TASK_ROLE_BADGE_CLASS[role])}>
+                {TASK_ROLE_LABEL[role]}
+              </Badge>
+            ))}
+          </span>
         )}
 
         <div className="flex w-40 shrink-0 items-center justify-end gap-1.5">

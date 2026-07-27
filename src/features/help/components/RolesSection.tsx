@@ -35,7 +35,7 @@ const TASK_ROLES: { label: string; badgeClass: string; desc: string }[] = [
   {
     label: 'Responsable',
     badgeClass: 'bg-tertiary-container text-on-tertiary-container',
-    desc: 'Único encargado de sacar la tarea adelante y cerrarla. Solo puede haber uno por tarea.',
+    desc: 'Único encargado de sacar la tarea adelante y cerrarla. Solo puede haber uno por tarea, y siempre lo hay: puede ser el propio Creador (es lo que se asigna por defecto).',
   },
   {
     label: 'Colaborador',

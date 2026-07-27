@@ -4,9 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { LabelChip } from '@/features/labels/components/LabelChip';
 import type { Column } from '@/features/columns/services/columns.service';
+import { useAuthStore } from '@/store/auth.store';
 
 import type { Task } from '../../services/tasks.service';
-import { TASK_ROLE_BADGE_CLASS, TASK_ROLE_LABEL } from '../../lib/roles';
+import { TASK_ROLE_BADGE_CLASS, formatRoles, rolesOfUser } from '../../lib/roles';
 import { columnColor } from '../../lib/palette';
 
 interface TaskDetailHeaderProps {
@@ -46,6 +47,19 @@ export function TaskDetailHeader({
   className,
 }: TaskDetailHeaderProps) {
   const TitleTag = titleAs;
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  /**
+   * (QL-192) Mis roles en la tarea. Se derivan de `assignments` en vez de leer el escalar
+   * `currentUserRole`: un Creador que además es Responsable ostenta LOS DOS y el badge debe
+   * decirlo. Si aún no hay sesión resuelta, se cae en `currentUserRole`.
+   */
+  const myRoles = rolesOfUser(task.assignments, currentUserId);
+  const roles =
+    myRoles.length > 0
+      ? myRoles
+      : task.currentUserRole
+        ? [task.currentUserRole]
+        : [];
 
   return (
     <div className={className}>
@@ -82,9 +96,10 @@ export function TaskDetailHeader({
               Revisión rechazada
             </Badge>
           )}
-          {task.currentUserRole && (
-            <Badge className={cn(TASK_ROLE_BADGE_CLASS[task.currentUserRole])}>
-              Tu rol: {TASK_ROLE_LABEL[task.currentUserRole]}
+          {roles.length > 0 && (
+            <Badge className={cn(TASK_ROLE_BADGE_CLASS[roles[0]])}>
+              {roles.length > 1 ? 'Tus roles: ' : 'Tu rol: '}
+              {formatRoles(roles)}
             </Badge>
           )}
           {actions}

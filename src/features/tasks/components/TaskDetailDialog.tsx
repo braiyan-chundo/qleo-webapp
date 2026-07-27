@@ -15,6 +15,7 @@ import { useColumns } from '@/features/columns/hooks/use-columns';
 
 import { useTask } from '../hooks/use-tasks';
 import { formatDueDate, isOverdue } from '../lib/deadline';
+import { assigneeOf, userHasRole } from '../lib/roles';
 import { CompletionSection } from './CompletionSection';
 import { TaskDetailHeader } from './detail/TaskDetailHeader';
 import { TaskDescription } from './detail/TaskDescription';
@@ -47,7 +48,12 @@ export function TaskDetailDialog({
   const columnIndex = columns?.findIndex((c) => c.id === task?.columnId) ?? -1;
   const column = columnIndex >= 0 ? columns?.[columnIndex] : undefined;
 
-  const assignee = task?.assignments.find((a) => a.role === 'ASSIGNEE')?.user;
+  const assignment = task ? assigneeOf(task) : undefined;
+  const assignee = assignment?.user;
+  // (QL-192) El Responsable puede ser el propio Creador: se dice en la misma ficha en vez de
+  // pintarlo dos veces.
+  const assigneeIsCreator =
+    !!task && userHasRole(task.assignments, assignment?.userId, 'CREATOR');
   const overdue = task ? isOverdue(task.dueDate) && !task.isCompleted : false;
 
   const openFullView = () => {
@@ -129,6 +135,11 @@ export function TaskDetailDialog({
                 <p className="mt-1 truncate text-sm font-medium text-on-surface">
                   {assignee?.name ?? 'Sin responsable'}
                 </p>
+                {assigneeIsCreator && (
+                  <p className="truncate text-xs text-on-surface-variant">
+                    También es el Creador
+                  </p>
+                )}
               </div>
             </div>
 

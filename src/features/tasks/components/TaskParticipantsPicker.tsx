@@ -14,9 +14,10 @@ interface TaskParticipantsPickerProps {
   members: ProjectMember[] | undefined;
   isLoading: boolean;
   /**
-   * `CREATOR` de la tarea: **intocable**, así que no es elegible para ningún otro rol (el
-   * backend ignoraría su id en silencio). Al crear es el usuario del token; en la edición
-   * completa (QL-178) es el creador real de la tarea, que puede no ser quien edita.
+   * `CREATOR` de la tarea. Su rol es **intocable**, así que no es elegible como Colaborador ni
+   * como Observador (el backend ignoraría su id en silencio). (QL-192) Sí es elegible como
+   * **Responsable**: el Creador puede asumir su propia tarea. Al crear es el usuario del token;
+   * en la edición completa (QL-178) es el creador real, que puede no ser quien edita.
    */
   creatorUserId: string | undefined;
   /**
@@ -24,8 +25,16 @@ interface TaskParticipantsPickerProps {
    * el Creador"); en la edición completa el Creador ya existe y no tiene por qué ser el actor.
    */
   assigneeHint?: string;
-  /** Id del Responsable elegido; `''` = sin responsable. */
+  /**
+   * Id del Responsable elegido. (QL-192) `''` solo aparece como estado transitorio (miembros aún
+   * sin cargar, o una tarea antigua que nació sin Responsable): **no es un valor elegible**.
+   */
   assigneeId: string;
+  /**
+   * (QL-192) Nombre del Responsable actual, para conservarlo como opción si ya no figura en la
+   * membresía del proyecto (tarea antigua, o alguien a quien sacaron del proyecto).
+   */
+  assigneeFallbackName?: string;
   /** Ids de los Colaboradores elegidos. */
   collaboratorIds: string[];
   /** (QL-138) Ids de los Observadores elegidos. */
@@ -99,21 +108,26 @@ function MemberCheckList({
  * quién es el `CREATOR` intocable.
  *
  * Los candidatos son la **membresía del proyecto** (misma regla que el `RoleManager`: solo se
- * asigna a miembros, no al directorio global). El `CREATOR` no aparece: su rol es intocable y
- * el backend descarta en silencio su id en cualquiera de los tres campos.
+ * asigna a miembros, no al directorio global). El `CREATOR` no aparece como Colaborador ni como
+ * Observador: ese rol suyo es intocable y el backend descarta en silencio su id ahí.
  *
- * **Precedencia `ASSIGNEE` > `COLLABORATOR` > `OBSERVER`**: un usuario tiene un solo rol por
- * tarea, así que cada lista retira a quien ya ocupa un rol superior (el Responsable no aparece
- * como Colaborador; ni el Responsable ni los Colaboradores aparecen como Observadores). La UI
- * **refleja** la regla en vez de delegarla al dedupe silencioso del backend, que dejaría al
- * usuario creyendo que marcó algo que no se va a aplicar.
+ * (QL-192) El `CREATOR` **sí** aparece en el selector de Responsable —puede asumir su propia
+ * tarea— y ese selector **no ofrece "sin responsable"**: toda tarea tiene Responsable, así que
+ * dejar de serlo pasa por nombrar a otra persona, nunca por vaciar el campo.
+ *
+ * **Precedencia `ASSIGNEE` > `COLLABORATOR` > `OBSERVER`** para el resto: cada lista retira a
+ * quien ya ocupa un rol superior (el Responsable no aparece como Colaborador; ni el Responsable
+ * ni los Colaboradores aparecen como Observadores). La UI **refleja** la regla en vez de
+ * delegarla al dedupe silencioso del backend, que dejaría al usuario creyendo que marcó algo
+ * que no se va a aplicar.
  */
 export function TaskParticipantsPicker({
   members,
   isLoading,
   creatorUserId,
-  assigneeHint = 'Solo puede haber un Responsable por tarea. Tú serás el Creador.',
+  assigneeHint = 'Toda tarea tiene un único Responsable. Viene preseleccionado contigo (serás el Creador); elige a otra persona si no vas a serlo tú.',
   assigneeId,
+  assigneeFallbackName,
   collaboratorIds,
   observerIds,
   onAssigneeChange,
@@ -121,7 +135,25 @@ export function TaskParticipantsPicker({
   onObserversChange,
   disabled,
 }: TaskParticipantsPickerProps) {
-  // El creador de la tarea nunca es un candidato: su rol `CREATOR` es intocable.
+  /**
+   * (QL-192) Candidatos a **Responsable**: todos los miembros, incluido el Creador. Si el
+   * Responsable actual ya no figura en la membresía (edición de una tarea antigua), se conserva
+   * como opción para no perder el valor seleccionado al abrir el formulario.
+   */
+  const assigneeCandidates = useMemo(() => {
+    const list = members ?? [];
+    if (!assigneeId || list.some((m) => m.id === assigneeId)) return list;
+    return [
+      ...list,
+      {
+        id: assigneeId,
+        name: assigneeFallbackName ?? 'Responsable actual',
+        avatarDownloadUrl: null,
+      },
+    ];
+  }, [members, assigneeId, assigneeFallbackName]);
+
+  // El creador de la tarea nunca es candidato a Colaborador/Observador: su rol es intocable.
   const candidates = useMemo(
     () => (members ?? []).filter((m) => m.id !== creatorUserId),
     [members, creatorUserId],
@@ -149,6 +181,7 @@ export function TaskParticipantsPicker({
   );
 
   const noCandidates = !isLoading && candidates.length === 0;
+  const noAssigneeCandidates = !isLoading && assigneeCandidates.length === 0;
 
   /**
    * Al elegir Responsable se retira del resto de roles: `ASSIGNEE` gana a todo. Hace falta
@@ -195,18 +228,23 @@ export function TaskParticipantsPicker({
         <NativeSelect
           id="assigneeId"
           className="w-full [&>select]:h-10"
-          disabled={disabled || isLoading || noCandidates}
+          disabled={disabled || isLoading || noAssigneeCandidates}
           value={assigneeId}
           onChange={(e) => handleAssigneeChange(e.target.value)}
         >
-          <NativeSelectOption value="">
-            {isLoading
-              ? 'Cargando miembros…'
-              : noCandidates
-                ? 'Sin otros miembros en el proyecto'
-                : 'Sin responsable'}
-          </NativeSelectOption>
-          {candidates.map((member) => (
+          {/* (QL-192) "Sin responsable" ya no es un estado posible: el hueco vacío solo existe
+              mientras cargan los miembros (o en una tarea antigua sin Responsable) y está
+              deshabilitado para que no se pueda volver a él. */}
+          {!assigneeId && (
+            <NativeSelectOption value="" disabled>
+              {isLoading
+                ? 'Cargando miembros…'
+                : noAssigneeCandidates
+                  ? 'Sin miembros en el proyecto'
+                  : 'Selecciona un Responsable'}
+            </NativeSelectOption>
+          )}
+          {assigneeCandidates.map((member) => (
             <NativeSelectOption key={member.id} value={member.id}>
               {member.name}
             </NativeSelectOption>

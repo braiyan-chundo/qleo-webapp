@@ -32,8 +32,9 @@ import {
 } from '@/shared/hooks/use-query-param-state';
 
 import { useTasks } from '../hooks/use-tasks';
-import type { Task, TaskAssignment } from '../services/tasks.service';
+import type { Task } from '../services/tasks.service';
 import { formatDueDate, isOverdue } from '../lib/deadline';
+import { assigneeOf } from '../lib/roles';
 import {
   buildCsvFilename,
   buildTasksCsv,
@@ -46,14 +47,6 @@ interface TaskListViewProps {
   projectId: string;
   /** Código del proyecto, para nombrar el CSV exportado. */
   projectCode?: string;
-}
-
-/** Valor sentinela para "sin responsable" en el select (los ids reales nunca son vacíos). */
-const NO_ASSIGNEE = '__none__';
-
-/** El ASSIGNEE (Responsable único, RF-1.2) de una tarea, si existe. */
-function assigneeOf(task: Task): TaskAssignment | undefined {
-  return task.assignments.find((a) => a.role === 'ASSIGNEE');
 }
 
 type SortKey = 'status' | 'title' | 'dueDate';
@@ -120,14 +113,9 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
         return false;
       }
       if (columnFilter && task.columnId !== columnFilter) return false;
-      if (assigneeFilter) {
-        const assignee = assigneeOf(task);
-        if (assigneeFilter === NO_ASSIGNEE) {
-          if (assignee) return false;
-        } else if (assignee?.userId !== assigneeFilter) {
-          return false;
-        }
-      }
+      // (QL-192) Ya no existe "sin responsable": toda tarea tiene uno, así que el filtro solo
+      // compara contra un userId concreto.
+      if (assigneeFilter && assigneeOf(task)?.userId !== assigneeFilter) return false;
       return true;
     });
 
@@ -251,7 +239,6 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
             aria-label="Filtrar por responsable"
           >
             <NativeSelectOption value="">Todos</NativeSelectOption>
-            <NativeSelectOption value={NO_ASSIGNEE}>Sin responsable</NativeSelectOption>
             {assigneeOptions.map((o) => (
               <NativeSelectOption key={o.userId} value={o.userId}>
                 {o.name}

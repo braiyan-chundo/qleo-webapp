@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 import { useCheckDate } from '@/features/work-calendar/hooks/use-work-calendar';
+import { useAuthStore } from '@/store/auth.store';
 
 import { DatePicker } from '@/components/ui/date-picker';
 
@@ -32,6 +33,7 @@ import {
   isoToTimeInput,
   isOverdue,
 } from '../lib/deadline';
+import { effectiveTaskRole } from '../lib/roles';
 
 interface DeadlineSectionProps {
   task: Task;
@@ -39,15 +41,17 @@ interface DeadlineSectionProps {
 }
 
 /**
- * Sección "Fecha límite" del detalle de tarea (QL-09, RF-2.1). El gating depende de
- * `task.currentUserRole` y `task.deadlineLocked`:
+ * Sección "Fecha límite" del detalle de tarea (QL-09, RF-2.1). El gating depende del rol
+ * **efectivo** del usuario (QL-192: un Creador autoasignado manda como CREATOR, no como
+ * ASSIGNEE) y de `task.deadlineLocked`:
  * - CREATOR: edita la fecha y togglea el bloqueo.
  * - ASSIGNEE/COLLABORATOR: editan la fecha si NO está bloqueada; si lo está, ven aviso y el
  *   botón "Solicitar prórroga".
  * - OBSERVER / no participante: solo lectura.
  */
 export function DeadlineSection({ task, projectId }: DeadlineSectionProps) {
-  const role = task.currentUserRole;
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  const role = effectiveTaskRole(task, currentUserId);
   const isCreator = role === 'CREATOR';
   const canEditRole = role === 'ASSIGNEE' || role === 'COLLABORATOR';
   const canRequestExtension = task.deadlineLocked && canEditRole;

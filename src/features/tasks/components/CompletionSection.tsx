@@ -38,6 +38,7 @@ import {
 
 import { useCompleteTask, useReopenTask, useRequestReview } from '../hooks/use-tasks';
 import type { Task } from '../services/tasks.service';
+import { effectiveTaskRole } from '../lib/roles';
 import { formatDateTime } from '../lib/time';
 import { RejectReviewDialog } from './review/RejectReviewDialog';
 import { ValidateReviewDialog } from './review/ValidateReviewDialog';
@@ -62,9 +63,14 @@ interface CompletionSectionProps {
  *   **"Rechazar"** (motivo obligatorio; el CREATOR además puede mover la fecha límite, QL-172).
  * - **CREATOR** (y ADMIN de plataforma) cierran directo, sin gate.
  * Si está completada, muestra el banner de cierre con quién/cuándo/resumen y el botón **Reabrir**.
+ *
+ * (QL-192) El rol que gobierna todo esto es el **efectivo**: un Creador que se autoasignó la
+ * tarea manda como CREATOR y cierra directo — no tiene sentido que se pida revisión a sí mismo.
+ * Es la misma precedencia que aplica el backend (`ROLE_PRECEDENCE` en `tasks.service.ts`).
  */
 export function CompletionSection({ task, projectId }: CompletionSectionProps) {
-  const role = task.currentUserRole;
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  const role = effectiveTaskRole(task, currentUserId);
   const isPlatformAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
 
   const isCreator = role === 'CREATOR';
@@ -363,7 +369,10 @@ function InReviewPanel() {
 function ReviewDecisionPanel({ task, projectId }: ReviewPanelProps) {
   const [validateOpen, setValidateOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
-  const isCreator = task.currentUserRole === 'CREATOR';
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  // (QL-192) Solo el CREATOR puede mover la fecha límite al rechazar; serlo además Responsable
+  // no se lo quita, así que se comprueba contra `assignments`, no contra `currentUserRole`.
+  const isCreator = effectiveTaskRole(task, currentUserId) === 'CREATOR';
 
   return (
     <>

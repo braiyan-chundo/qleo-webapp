@@ -16,13 +16,14 @@ import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 
 import { LabelChip } from '@/features/labels/components/LabelChip';
 
-import type { Task, TaskAssignment } from '../services/tasks.service';
+import type { Task } from '../services/tasks.service';
 import {
   formatDueDate,
   formatDueDateShort,
   isDueToday,
   isOverdue,
 } from '../lib/deadline';
+import { formatRoles, participantsAssigneeFirst } from '../lib/roles';
 
 interface TaskCardProps {
   task: Task;
@@ -30,18 +31,6 @@ interface TaskCardProps {
 }
 
 const MAX_AVATARS = 3;
-
-/**
- * Ordena los participantes poniendo al **Responsable** (ASSIGNEE, único por RF-1.2) primero,
- * para que sea el avatar que siempre sobrevive al recorte de `MAX_AVATARS`. El resto conserva
- * su orden original.
- */
-function assigneeFirst(assignments: TaskAssignment[]): TaskAssignment[] {
-  const idx = assignments.findIndex((a) => a.role === 'ASSIGNEE');
-  if (idx <= 0) return assignments;
-  const assignee = assignments[idx];
-  return [assignee, ...assignments.filter((_, i) => i !== idx)];
-}
 
 /**
  * Card compacta de una tarea (estilo Trello): pill de categoría opcional, título con estado
@@ -58,7 +47,9 @@ function assigneeFirst(assignments: TaskAssignment[]): TaskAssignment[] {
  * cronómetro) vive en la vista de tarea, a un click de distancia.
  */
 export function TaskCard({ task, onClick }: TaskCardProps) {
-  const participants = assigneeFirst(task.assignments);
+  // (QL-192) Una ficha por PERSONA: el Creador que además es Responsable trae dos entradas en
+  // `assignments` y saldría dos veces (y contaría doble en el "+N") si se mapeara en crudo.
+  const participants = participantsAssigneeFirst(task.assignments);
   const visible = participants.slice(0, MAX_AVATARS);
   const extra = participants.length - visible.length;
 
@@ -119,19 +110,20 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
       <div className="mt-3 flex items-center justify-between gap-2">
         {participants.length > 0 ? (
           <AvatarGroup>
-            {visible.map((a) => {
-              const name = a.user?.name ?? a.userId;
-              const isAssignee = a.role === 'ASSIGNEE';
+            {visible.map((p) => {
+              const name = p.user?.name ?? p.userId;
+              const isAssignee = p.roles.includes('ASSIGNEE');
               return (
                 <AuthedAvatar
-                  key={a.userId}
+                  key={p.userId}
                   size="sm"
                   // El anillo del grupo (`ring-background`) gana por especificidad al ser un
                   // selector de hijo directo: `!` lo sobrescribe para marcar al Responsable.
                   className={cn(isAssignee && 'ring-tertiary!')}
-                  title={isAssignee ? `${name} · Responsable` : name}
-                  avatarDownloadUrl={a.user?.avatarDownloadUrl}
-                  avatarUrl={a.user?.avatarUrl}
+                  // (QL-192) Todos sus roles: "Ana · Creador · Responsable".
+                  title={`${name} · ${formatRoles(p.roles)}`}
+                  avatarDownloadUrl={p.user?.avatarDownloadUrl}
+                  avatarUrl={p.user?.avatarUrl}
                   name={name}
                 />
               );

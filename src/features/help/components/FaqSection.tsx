@@ -22,6 +22,10 @@ const FAQS: { q: string; a: ReactNode; adminOnly?: boolean }[] = [
     a: 'No. Cada tarea tiene un único Responsable para dejar clara la rendición de cuentas. Sí puedes añadir varios Colaboradores.',
   },
   {
+    q: '¿Puedo ser Responsable de una tarea que he creado yo?',
+    a: 'Sí, y de hecho es lo que pasa por defecto: al crear una tarea el Responsable viene preseleccionado contigo. Si prefieres que sea otra persona, cámbialo en el mismo formulario. Una tarea nunca se queda sin Responsable: para dejar de serlo tienes que asignar a otra persona.',
+  },
+  {
     q: '¿Por qué no veo el botón «Nuevo proyecto»?',
     a: (
       <>

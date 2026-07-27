@@ -34,6 +34,7 @@ import { useCreateTask, useUpdateTask } from '../hooks/use-tasks';
 import { TaskParticipantsPicker } from './TaskParticipantsPicker';
 import { taskFormSchema, type TaskFormValues } from '../schemas/task.schema';
 import type { Task } from '../services/tasks.service';
+import { assigneeOf } from '../lib/roles';
 import {
   dateInputToDate,
   dateInputToIso,
@@ -137,6 +138,7 @@ export function TaskFormDialog({
   // abierto y cuando el picker se va a renderizar — en el alta, y (QL-178) en la edición
   // completa del ADMIN. En la edición reducida del CREATOR los roles los lleva el RoleManager.
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const currentUserName = useAuthStore((s) => s.user?.name);
   const { data: members, isLoading: membersLoading } = useProjectMembers(
     open && showFullFields ? projectId : undefined,
   );
@@ -148,6 +150,9 @@ export function TaskFormDialog({
   const creatorUserId = isFullEdit
     ? task?.assignments.find((a) => a.role === 'CREATOR')?.userId
     : currentUserId;
+
+  /** (QL-192) Responsable actual de la tarea (para conservarlo como opción en la edición). */
+  const currentAssignee = task ? assigneeOf(task) : undefined;
 
   const createTask = useCreateTask(projectId);
   const updateTask = useUpdateTask(projectId);
@@ -187,9 +192,8 @@ export function TaskFormDialog({
         dueDate: fullEdit ? isoToDateInput(task.dueDate) : '',
         dueTime: fullEdit ? isoToTimeInput(task.dueDate) : '',
         deadlineLocked: fullEdit ? task.deadlineLocked : false,
-        assigneeId: fullEdit
-          ? (task.assignments.find((a) => a.role === 'ASSIGNEE')?.userId ?? '')
-          : '',
+        // (QL-192) En la EDICIÓN no se toca el Responsable: se muestra el que la tarea tenga.
+        assigneeId: fullEdit ? (assigneeOf(task)?.userId ?? '') : '',
         collaboratorIds: fullEdit ? userIdsWithRole(task, 'COLLABORATOR') : [],
         observerIds: fullEdit ? userIdsWithRole(task, 'OBSERVER') : [],
       });
@@ -199,14 +203,19 @@ export function TaskFormDialog({
         // Preselección explícita: la columna concreta si se abrió desde "+ Añadir tarea" de
         // una columna; si no, la Backlog. '' solo si aún no cargaron las columnas.
         columnId: presetColumnId ?? backlogColumnId ?? '',
+        // (QL-192) El Responsable arranca en el usuario actual: toda tarea nace con uno y, si
+        // no se elige a nadie, el backend pone al creador. Preseleccionarlo hace VISIBLE lo que
+        // va a pasar en vez de que se descubra después; sigue siendo editable antes de guardar.
+        assigneeId: currentUserId ?? '',
       });
     }
-  }, [open, task, fullEdit, presetColumnId, backlogColumnId, reset]);
+  }, [open, task, fullEdit, presetColumnId, backlogColumnId, currentUserId, reset]);
 
   /**
-   * (QL-123/QL-138) Aplica la precedencia `ASSIGNEE > COLLABORATOR > OBSERVER` al payload: un
-   * usuario tiene UN rol por tarea. La UI ya lo refleja al elegir, pero se vuelve a imponer
-   * aquí para que el payload no dependa del orden en que se tocaron los controles.
+   * (QL-123/QL-138) Aplica la precedencia `ASSIGNEE > COLLABORATOR > OBSERVER` al payload: fuera
+   * del par Creador+Responsable (QL-192), un usuario tiene UN rol por tarea. La UI ya lo refleja
+   * al elegir, pero se vuelve a imponer aquí para que el payload no dependa del orden en que se
+   * tocaron los controles.
    */
   const resolveRoles = (values: TaskFormValues) => {
     const assigneeId_ = values.assigneeId || null;
@@ -481,10 +490,14 @@ export function TaskFormDialog({
               creatorUserId={creatorUserId}
               assigneeHint={
                 isFullEdit
-                  ? 'Solo puede haber un Responsable por tarea. El Creador no se puede cambiar.'
+                  ? 'Toda tarea tiene un único Responsable: para cambiarlo, elige a otra persona. El Creador no se puede cambiar.'
                   : undefined
               }
               assigneeId={assigneeId}
+              // (QL-192) Mientras cargan los miembros el selector ya trae un valor (el usuario
+              // actual en el alta, el Responsable real en la edición): sin este nombre se vería
+              // un genérico durante ese instante.
+              assigneeFallbackName={currentAssignee?.user?.name ?? currentUserName}
               collaboratorIds={collaboratorIds}
               observerIds={observerIds}
               onAssigneeChange={(id) => setValue('assigneeId', id)}

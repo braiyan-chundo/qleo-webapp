@@ -41,7 +41,7 @@ const TASK_FEATURES: HelpFeature[] = [
   {
     icon: <Users className="size-4 text-primary" />,
     term: 'Responsable y Colaboradores',
-    desc: 'Un único Responsable rinde cuentas del cierre; los Colaboradores apoyan. Se eligen entre los miembros del proyecto.',
+    desc: 'Un único Responsable rinde cuentas del cierre; los Colaboradores apoyan. Se eligen entre los miembros del proyecto. Toda tarea tiene Responsable: por defecto, quien la crea.',
   },
   {
     icon: <CalendarClock className="size-4 text-primary" />,

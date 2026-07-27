@@ -159,7 +159,11 @@ export function useCreateTask(projectId: string) {
   });
 }
 
-/** Edita una tarea (solo CREATOR) e invalida listado y detalle. */
+/**
+ * Edita una tarea (CREATOR o ADMIN) e invalida listado y detalle. (QL-178) El PATCH es completo
+ * y puede cambiar los **participantes**, así que invalida también "Mis tareas": quien entra o
+ * sale de la tarea la gana o la pierde en esa pantalla.
+ */
 export function useUpdateTask(projectId: string) {
   const queryClient = useQueryClient();
 
@@ -169,6 +173,7 @@ export function useUpdateTask(projectId: string) {
     onSuccess: (_task, { id }) => {
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
     },
   });
 }

@@ -14,7 +14,15 @@ export interface TaskAssignmentUser {
   avatarDownloadUrl?: string | null;
 }
 
-/** Vínculo usuario↔tarea con su rol (§3.7). `user` solo viene poblado en el detalle. */
+/**
+ * Vínculo usuario↔tarea con su rol (§3.7). `user` solo viene poblado en el detalle.
+ *
+ * ⚠️ (QL-192) `assignments[]` puede traer **DOS entradas con el mismo `userId`**: una `CREATOR`
+ * y otra `ASSIGNEE`, cuando el Creador es además el Responsable de su propia tarea. Es la misma
+ * persona con doble rol, así que **nunca** se renderiza `assignments.map(...)` en crudo (saldría
+ * duplicada y los contadores de participantes irían mal): se agrupa por persona con
+ * `taskParticipants()` de `lib/roles`.
+ */
 export interface TaskAssignment {
   userId: string;
   role: TaskRole;
@@ -83,7 +91,13 @@ export interface Task {
   /** Si el Creador bloqueó la edición de la fecha por no-Creadores (QL-09, §3.7). */
   deadlineLocked: boolean;
   assignments: TaskAssignment[];
-  /** Rol del usuario del token en esta tarea (o `null` si no participa). Gobierna la UI. */
+  /**
+   * Rol del usuario del token en esta tarea (o `null` si no participa).
+   *
+   * ⚠️ (QL-192) Es un **escalar** y no puede expresar el doble rol Creador+Responsable. Para
+   * decidir permisos usa `effectiveTaskRole(task, userId)` de `lib/roles`, que deriva el rol de
+   * mayor poder desde `assignments` con la misma precedencia que el backend.
+   */
   currentUserRole: TaskRole | null;
   /** Fecha de cierre ISO, o `null` si no está completada (QL-17, §3.13). */
   completedAt: string | null;
@@ -235,7 +249,11 @@ export interface CreateTaskPayload {
   /**
    * (QL-123) Responsable (`ASSIGNEE`) desde el alta. Debe ser **miembro del proyecto**
    * (si no → 400 `USER_NOT_PROJECT_MEMBER` y la tarea NO se crea). Responsable **único**
-   * (RF-1.2). Si es el propio creador el backend lo ignora (conserva su rol `CREATOR`).
+   * (RF-1.2).
+   *
+   * (QL-192) Puede ser el **propio creador**: ya no se descarta, y entonces la tarea nace con
+   * dos entradas en `assignments` para él (`CREATOR` + `ASSIGNEE`). Si se **omite**, el backend
+   * pone al creador: ninguna tarea nace sin Responsable.
    */
   assigneeId?: string;
   /**
@@ -297,8 +315,12 @@ export interface UpdateTaskPayload {
   /** (QL-178, §3.58) Bloqueo del deadline por no-Creadores (RF-2.1). */
   deadlineLocked?: boolean;
   /**
-   * (QL-178, §3.58) Responsable **único** (RF-1.2); `null` deja la tarea sin Responsable.
-   * Es un escalar: mandarlo **sustituye** al anterior (no hay 409 por este camino).
+   * (QL-178, §3.58) Responsable **único** (RF-1.2). Es un escalar: mandarlo **sustituye** al
+   * anterior (no hay 409 `SINGLE_ASSIGNEE_REQUIRED` por este camino, a diferencia de
+   * `POST /tasks/:id/roles`), así que es el camino a usar para **reasignar** el Responsable.
+   *
+   * (QL-192) `null` ya **no** deja la tarea sin Responsable: recae en el Creador. Para dejar de
+   * serlo hay que nombrar a otra persona, y por eso la UI no ofrece un "sin responsable".
    */
   assigneeId?: string | null;
   /** (QL-178, §3.58) **Reemplaza** el conjunto de COLLABORATOR; `[]` los quita todos. */
