@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   AlertDialog,
@@ -25,6 +26,7 @@ import {
 } from '../hooks/use-ai-config';
 import type { AiConfigResponse, AiConnectResponse } from '../services/ai-config.service';
 import { AiConnectDialog } from './AiConnectDialog';
+import { AiModelSelector } from './AiModelSelector';
 
 /** Traduce un fallo de la API a un mensaje legible, reaccionando al `code` semántico (§ códigos). */
 function messageForError(err: unknown): string {
@@ -278,6 +280,13 @@ export function AiConnectionManager() {
           retrying={isFetching}
         />
       )}
+
+      {/*
+        El selector de modelo (QL-194) va fuera del bloque de conexión a propósito: su endpoint
+        nunca da 503 y hay que poder ver/arreglar la configuración incluso con el motor caído.
+      */}
+      <Separator className="my-2" />
+      <AiModelSelector />
 
       <AiConnectDialog
         connect={connectData}

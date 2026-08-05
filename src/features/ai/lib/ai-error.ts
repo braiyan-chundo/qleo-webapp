@@ -1,9 +1,9 @@
 import { ApiError } from '@/core/api/fetch-client';
 
 /**
- * Mensajes legibles por **código** de error de IA (§ códigos de §3.62/§3.63/§3.64). Centralizados
- * para que el chat, las acciones y el gate hablen el mismo idioma. Un código no listado cae al
- * mensaje del backend.
+ * Mensajes legibles por **código** de error de IA (§ códigos de §3.62/§3.63/§3.64/§3.67).
+ * Centralizados para que el chat, las acciones, el gate y el selector de modelo hablen el mismo
+ * idioma. Un código no listado cae al mensaje del backend.
  */
 const CODE_MESSAGES: Record<string, string> = {
   AI_ENGINE_UNAVAILABLE:
@@ -16,6 +16,14 @@ const CODE_MESSAGES: Record<string, string> = {
     'La propuesta caducó o ya no está disponible. Vuelve a pedirla en el chat.',
   AI_ACTION_FORBIDDEN: 'No puedes confirmar esta acción.',
   AI_ACTION_IN_PROGRESS: 'La acción ya se está ejecutando. Espera un momento.',
+  // QL-194 — modelo de IA (§3.67).
+  AI_MODEL_UNKNOWN:
+    'Ese modelo no está en el listado. Elige uno de la lista o añádelo primero.',
+  AI_MODEL_ALREADY_LISTED: 'Ese modelo ya está en el listado; búscalo más abajo.',
+  AI_MODEL_NOT_LISTED:
+    'Ese modelo no se puede quitar: lo publica el motor de IA, no lo añadió un administrador.',
+  AI_MODEL_IN_USE:
+    'No puedes quitar el modelo que está activo. Elige primero otro modelo (o "Automático") y vuelve a intentarlo.',
 };
 
 const THROTTLE_MESSAGE =

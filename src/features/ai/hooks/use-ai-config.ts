@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { aiConfigService } from '../services/ai-config.service';
+import type { AiModelState } from '../services/ai-config.service';
 
 /**
  * Hooks de datos de la **conexión IA** (QL-185). Todo pasa por TanStack Query: el estado vivo de la
@@ -8,9 +9,13 @@ import { aiConfigService } from '../services/ai-config.service';
  * Zustand. Contrato: `docs/integracion/05-ia.md`.
  */
 
-/** Claves de query del feature IA. Una sola: el estado de la conexión de plataforma. */
+/**
+ * Claves de query del feature IA. `models` cuelga de `config` a propósito: `GET /ai/config` embebe
+ * el mismo `AiModelState`, así que invalidar `config` por prefijo arrastra también al selector.
+ */
 export const aiKeys = {
   config: ['ai', 'config'] as const,
+  models: ['ai', 'config', 'models'] as const,
 };
 
 interface UseAiConfigOptions {
@@ -61,5 +66,65 @@ export function useDisconnectAi() {
       queryClient.setQueryData(aiKeys.config, config);
       queryClient.invalidateQueries({ queryKey: aiKeys.config });
     },
+  });
+}
+
+/* ── QL-194 · modelo de IA (§3.67) ─────────────────────────────────────────────────────────── */
+
+/**
+ * Siembra la respuesta de una mutación de modelo (que ya es el `AiModelState` actualizado) y
+ * revalida `GET /ai/config`, que embebe el mismo objeto en `model`.
+ *
+ * La invalidación va con `exact: true` para no arrastrar por prefijo a `aiKeys.models`: acabamos
+ * de sembrarla con la verdad recién llegada y un refetch inmediato solo añadiría una petición.
+ */
+function useSeedModelState() {
+  const queryClient = useQueryClient();
+
+  return (state: AiModelState) => {
+    queryClient.setQueryData(aiKeys.models, state);
+    queryClient.invalidateQueries({ queryKey: aiKeys.config, exact: true });
+  };
+}
+
+/**
+ * Estado del modelo (`GET /ai/config/models`). A diferencia de `useAiConfig`, **no depende de que
+ * la conexión esté OK**: el endpoint nunca da 503, así que el selector se puede pintar (y arreglar)
+ * con el motor de IA caído.
+ */
+export function useAiModels() {
+  return useQuery({
+    queryKey: aiKeys.models,
+    queryFn: () => aiConfigService.getModels(),
+  });
+}
+
+/** Elige el modelo activo (`PATCH /ai/config/model`). `null` = automático (el del plan). */
+export function useSetAiModel() {
+  const seed = useSeedModelState();
+
+  return useMutation({
+    mutationFn: (model: string | null) => aiConfigService.setModel(model),
+    onSuccess: seed,
+  });
+}
+
+/** Añade un id al listado manual (`POST /ai/config/models`). **No lo activa**: eso es un PATCH aparte. */
+export function useAddAiModel() {
+  const seed = useSeedModelState();
+
+  return useMutation({
+    mutationFn: (model: string) => aiConfigService.addModel(model),
+    onSuccess: seed,
+  });
+}
+
+/** Quita un modelo del listado manual (`DELETE /ai/config/models/:id`). */
+export function useRemoveAiModel() {
+  const seed = useSeedModelState();
+
+  return useMutation({
+    mutationFn: (id: string) => aiConfigService.removeModel(id),
+    onSuccess: seed,
   });
 }
