@@ -11,6 +11,13 @@ export const profileFormSchema = z.object({
   name: z.string().trim().min(1, 'El nombre es obligatorio'),
   jobTitle: z.string().trim().optional(),
   avatarUrl: z.string().trim().optional(),
+  /**
+   * QL-193 (§3.66): día civil `'YYYY-MM-DD'`, o `''` si no hay fecha. El formulario guarda
+   * **la cadena que se enviará**, no un `Date`, para que no haya ninguna conversión a UTC
+   * entre lo que el usuario elige y lo que viaja al backend. Las reglas de fondo (no futura,
+   * ≥1900) las valida el backend y llegan como `error.code`.
+   */
+  birthDate: z.string().optional(),
 });
 
 export type ProfileFormValues = z.infer<typeof profileFormSchema>;

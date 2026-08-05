@@ -2,6 +2,8 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 
 import {
   workCalendarService,
+  type Birthday,
+  type BirthdaysParams,
   type CreateHolidayDto,
   type Holiday,
   type HolidaysParams,
@@ -22,6 +24,9 @@ export const calendarKeys = {
   holidays: () => [...calendarKeys.all, 'holidays'] as const,
   holidayList: (params?: HolidaysParams) =>
     [...calendarKeys.holidays(), params ?? {}] as const,
+  birthdays: () => [...calendarKeys.all, 'birthdays'] as const,
+  birthdayList: (params?: BirthdaysParams) =>
+    [...calendarKeys.birthdays(), params ?? {}] as const,
   config: () => [...calendarKeys.all, 'config'] as const,
 };
 
@@ -66,6 +71,54 @@ export function useHolidaysForYears(years: number[]) {
     isLoading: results.some((r) => r.isLoading),
     isError: results.some((r) => r.isError),
   };
+}
+
+/**
+ * (QL-193, §3.66) Cumpleaños del año indicado. Cambian rara vez (solo si alguien edita su fecha)
+ * → `staleTime` alto, igual que los festivos.
+ */
+export function useBirthdays(params?: BirthdaysParams) {
+  return useQuery({
+    queryKey: calendarKeys.birthdayList(params),
+    queryFn: () => workCalendarService.listBirthdays(params),
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+/**
+ * (QL-193) Cumpleaños de **varios años**, unidos en una lista. Se consulta **por `year`** y no por
+ * rango `from/to` por dos motivos: el endpoint rechaza rangos de más de 366 días (400), y la fecha
+ * de celebración depende del año — quien nació un 29 de febrero se felicita el 28 en los años no
+ * bisiestos, así que el backend tiene que resolverla año por año.
+ */
+export function useBirthdaysForYears(years: number[]) {
+  const results = useQueries({
+    queries: years.map((year) => ({
+      queryKey: calendarKeys.birthdayList({ year }),
+      queryFn: () => workCalendarService.listBirthdays({ year }),
+      staleTime: 30 * 60 * 1000,
+    })),
+  });
+
+  return {
+    birthdays: results.flatMap((r) => r.data ?? []),
+    isLoading: results.some((r) => r.isLoading),
+    isError: results.some((r) => r.isError),
+  };
+}
+
+/**
+ * Indexa los cumpleaños por día (`'YYYY-MM-DD'`). **Es una lista por día, no uno solo**: varias
+ * personas pueden cumplir el mismo día y perder a alguien sería un fallo silencioso.
+ */
+export function groupBirthdaysByDate(birthdays: Birthday[]): Map<string, Birthday[]> {
+  const map = new Map<string, Birthday[]>();
+  for (const birthday of birthdays) {
+    const bucket = map.get(birthday.date);
+    if (bucket) bucket.push(birthday);
+    else map.set(birthday.date, [birthday]);
+  }
+  return map;
 }
 
 /** (QL-68) Config del calendario laboral (fines de semana, país, festivos automáticos). */

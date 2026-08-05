@@ -65,10 +65,25 @@ export type WallMessageType = 'user' | 'system';
  * Metadatos de un mensaje de sistema (QL-148, §3.43). En `systemKind: 'version_release'` trae la
  * versión anunciada (`{ version: 'X.Y.Z' }`); `null` en los mensajes de usuario.
  */
+/**
+ * Metadatos del mensaje de sistema. **Es un objeto compartido entre subtipos**: cada `systemKind`
+ * puebla sus propias claves y deja el resto ausentes, así que TODAS son opcionales y hay que
+ * discriminar por `systemKind` antes de leerlas — nunca dar por hecho que una está.
+ */
 export interface WallSystemMeta {
-  /** Versión anunciada en un aviso de release (SemVer `x.y.z`). */
+  /** (QL-148, `systemKind:'version_release'`) Versión anunciada (SemVer `x.y.z`). */
   version?: string;
+  /** (QL-193, `systemKind:'birthday'`) Id del usuario homenajeado, para resaltarlo en el feed. */
+  userId?: string;
+  /** (QL-193, `systemKind:'birthday'`) Año de la felicitación; el backend lo usa como clave única. */
+  birthdayYear?: number;
 }
+
+/** (QL-193) Subtipos de mensaje de sistema conocidos por el front. */
+export const WALL_SYSTEM_KIND = {
+  VERSION_RELEASE: 'version_release',
+  BIRTHDAY: 'birthday',
+} as const;
 
 /** Mensaje expandido del muro (§3.25). */
 export interface WallMessage {

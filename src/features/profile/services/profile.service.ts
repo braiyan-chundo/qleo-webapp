@@ -13,6 +13,13 @@ export interface UpdateMePayload {
   name?: string;
   jobTitle?: string;
   avatarUrl?: string;
+  /**
+   * QL-193 (§3.66): fecha de nacimiento como **día civil** `'YYYY-MM-DD'` literal; `null` (o
+   * `''`) la borra; **ausente** = no se toca. Mándala tal cual la eligió el usuario en el
+   * date-picker (`dateToCivilDay`), nunca `new Date(...).toISOString()`: el backend recorta a
+   * 10 caracteres y en `America/Bogota` (UTC-5) el ISO guardaría el **día anterior**.
+   */
+  birthDate?: string | null;
   /** QL-91: silenciar el push genérico del Muro Corporativo (las menciones siguen llegando). */
   wallPushMuted?: boolean;
   /**

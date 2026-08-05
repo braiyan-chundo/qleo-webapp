@@ -60,6 +60,36 @@ export interface HolidaysParams {
   to?: string; // ISO
 }
 
+/**
+ * (QL-193, §3.66) Cumpleaños **ya resuelto dentro del rango consultado**. Ojo con `date`: es el
+ * día de la **celebración** en el año del calendario, no la fecha de nacimiento — la respuesta
+ * no lleva año de nacimiento en ninguna parte, así que de aquí no se deduce la edad de nadie.
+ * Solo salen usuarios `ACTIVE` con fecha informada, ordenados por `date` asc y `name` dentro
+ * del día.
+ */
+export interface Birthday {
+  userId: string;
+  name: string;
+  /** Proxy privado del avatar (`/users/:id/avatar?v=…`), o `null` → iniciales. */
+  avatarDownloadUrl: string | null;
+  /** `'YYYY-MM-DD'` de la celebración dentro del rango pedido (misma clave que la grilla). */
+  date: string;
+  /** Día de nacimiento (1–31). En un 29-F sigue valiendo 29 aunque `date` caiga el 28. */
+  birthDay: number;
+  /** Mes de nacimiento (1–12). */
+  birthMonth: number;
+  /** `true` si nació un 29 de febrero y el año consultado no es bisiesto → se celebra el 28. */
+  shiftedFromLeapDay: boolean;
+}
+
+/**
+ * Filtros de `GET /work-calendar/birthdays`. Mismos que los de festivos: `year`, o el par
+ * `from`/`to`, o nada (año en curso). **El rango no puede superar 366 días** ni tener
+ * `from > to`: en ambos casos el backend responde 400. Por eso el hook del feature consulta
+ * **por año**, que siempre cabe dentro del límite.
+ */
+export type BirthdaysParams = HolidaysParams;
+
 /** Body de `POST /work-calendar/holidays` (solo ADMIN). */
 export interface CreateHolidayDto {
   date: string; // 'YYYY-MM-DD' o ISO8601
@@ -97,6 +127,13 @@ export const workCalendarService = {
   /** Lista los festivos (ordenados por fecha ascendente). */
   listHolidays: (params?: HolidaysParams) =>
     api.get<Holiday[]>(`/work-calendar/holidays${buildQuery({ ...params })}`),
+
+  /**
+   * (QL-193, §3.66) Cumpleaños del rango. El backend responde **400** si el rango supera 366 días
+   * o si `from > to`; consultar por `year` (lo que hace `useBirthdays`) siempre cabe.
+   */
+  listBirthdays: (params?: BirthdaysParams) =>
+    api.get<Birthday[]>(`/work-calendar/birthdays${buildQuery({ ...params })}`),
 
   /** Registra un festivo MANUAL (solo ADMIN). 409 `HOLIDAY_ALREADY_EXISTS` si ya existe ese día. */
   createHoliday: (dto: CreateHolidayDto) =>

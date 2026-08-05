@@ -26,6 +26,8 @@ import { Switch } from '@/components/ui/switch';
 import { ApiError } from '@/core/api/fetch-client';
 
 import { useCreateUser, useUpdateUser } from '../hooks/use-users';
+import { birthDateErrorMessage } from '../lib/birth-date';
+import { BirthDateField } from './BirthDateField';
 import {
   createUserSchema,
   updateUserSchema,
@@ -51,6 +53,8 @@ const createDefaults: CreateUserFormValues = {
   password: '',
   role: 'MEMBER',
   jobTitle: '',
+  // QL-193: sin fecha de nacimiento al alta (es opcional).
+  birthDate: '',
   // QL-127: por defecto los miembros NO pueden crear proyectos.
   canCreateProjects: false,
   // QL-184: por defecto los miembros SÍ pueden usar la IA (default invertido).
@@ -124,13 +128,16 @@ function CanUseAiField({ value, onChange, role }: CanCreateProjectsFieldProps) {
   );
 }
 
-/** Traduce un fallo de la API a un toast (409 = email duplicado). */
+/**
+ * Traduce un fallo de la API a un toast (409 = email duplicado). Los `error.code` de la fecha
+ * de nacimiento (QL-193: inválida / futura / fuera de rango) los resuelve `birthDateErrorMessage`.
+ */
 function reportError(err: unknown) {
   if (err instanceof ApiError && err.status === 409) {
     toast.error('Ya existe un usuario con ese email.');
     return;
   }
-  toast.error(err instanceof Error ? err.message : 'No se pudo guardar el usuario.');
+  toast.error(birthDateErrorMessage(err, 'No se pudo guardar el usuario.'));
 }
 
 export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps) {
@@ -151,6 +158,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       role: 'MEMBER',
       status: 'ACTIVE',
       jobTitle: '',
+      birthDate: '',
       password: '',
       canCreateProjects: false,
       canUseAi: true,
@@ -167,6 +175,9 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
         role: user.role,
         status: user.status,
         jobTitle: user.jobTitle ?? '',
+        // (QL-193) `GET /users` es ruta de ADMIN, así que `birthDate` llega sin enmascarar y
+        // un `null` aquí sí significa "sin fecha".
+        birthDate: user.birthDate ?? '',
         password: '',
         canCreateProjects: user.canCreateProjects ?? false,
         // QL-184: default activado; ausente en usuarios antiguos = con acceso.
@@ -191,6 +202,8 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       password: values.password,
       role: values.role,
       jobTitle: values.jobTitle?.trim() || undefined,
+      // (QL-193) Día civil literal, ya en `'YYYY-MM-DD'`. Sin fecha → se omite el campo.
+      birthDate: values.birthDate?.trim() || undefined,
       canCreateProjects: values.canCreateProjects,
       canUseAi: values.canUseAi,
     };
@@ -211,6 +224,8 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       role: values.role,
       status: values.status,
       jobTitle: values.jobTitle?.trim() || undefined,
+      // (QL-193) Día civil literal; `null` explícito para **borrar** la fecha guardada.
+      birthDate: values.birthDate?.trim() || null,
       canCreateProjects: values.canCreateProjects,
       canUseAi: values.canUseAi,
       ...(values.password ? { password: values.password } : {}),
@@ -324,6 +339,22 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                 {...editForm.register('jobTitle')}
               />
             </div>
+
+            {/* (QL-193, §3.66) Fecha de nacimiento: el ADMIN es, junto al propio usuario, el
+                único que puede editarla y ver el año. */}
+            <Controller
+              control={editForm.control}
+              name="birthDate"
+              render={({ field }) => (
+                <BirthDateField
+                  id="edit-birthDate"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  disabled={isPending}
+                  hint="Marca su cumpleaños en el calendario del equipo. Solo tú y esa persona veis el año."
+                />
+              )}
+            />
 
             <Controller
               control={editForm.control}
@@ -452,6 +483,21 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                 {...createForm.register('jobTitle')}
               />
             </div>
+
+            {/* (QL-193, §3.66) Opcional al alta; el usuario puede fijarla luego desde su perfil. */}
+            <Controller
+              control={createForm.control}
+              name="birthDate"
+              render={({ field }) => (
+                <BirthDateField
+                  id="create-birthDate"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  disabled={isPending}
+                  hint="Opcional. Marca su cumpleaños en el calendario del equipo."
+                />
+              )}
+            />
 
             <Controller
               control={createForm.control}

@@ -1,6 +1,7 @@
 import type { Attachment } from '@/features/attachments/services/attachments.service';
 import { isOutdated } from '@/features/app-version/lib/semver';
 
+import { WALL_SYSTEM_KIND } from '../types/wall.types';
 import type { WallAuthor, WallMessage, WallReplyPreview } from '../types/wall.types';
 
 /** Versión del bundle inyectada por Vite (`define`, QL-116); base de la comparación SemVer. */
@@ -50,15 +51,26 @@ export function isConfirmed(item: WallFeedItem): boolean {
 }
 
 /**
- * (QL-150) ¿Debe verse este mensaje de sistema? Solo cuando anuncia una versión (`meta.version`)
- * **posterior** a la de este bundle: entonces el cliente está desactualizado y hay algo accionable
- * ("Actualizar"). Si ya está al día, la tarjeta no aporta nada y se oculta por completo — `WallView`
- * usa este predicado para no pintar tampoco el separador de día huérfano, y `WallSystemMessage`
- * retorna `null`.
+ * ¿Debe verse este mensaje de sistema? **Se decide POR SUBTIPO**, no por `meta`.
+ *
+ * (QL-150) El aviso de versión solo aparece si anuncia una versión **posterior** a la de este
+ * bundle: entonces el cliente está desactualizado y hay algo accionable ("Actualizar"). Si ya
+ * está al día, la tarjeta no aporta nada y se oculta por completo — `WallView` usa este predicado
+ * para no pintar tampoco el separador de día huérfano, y `WallSystemMessage` retorna `null`.
+ *
+ * (QL-193) Ojo con la regla que había aquí: era `meta.version != null && isOutdated(…)`, aplicada
+ * a CUALQUIER mensaje de sistema. Como `meta` es un objeto compartido entre subtipos, una
+ * felicitación de cumpleaños —que no lleva `version`— caía en el `!= null` y **se ocultaba
+ * entera**. Por eso ahora se discrimina por `systemKind` y el default es MOSTRAR: un subtipo
+ * nuevo que este bundle aún no conozca debe verse (el backend no publica ruido), mientras que
+ * ocultarlo lo haría invisible sin dejar rastro.
  */
 export function isSystemMessageVisible(message: WallFeedItem): boolean {
-  const targetVersion = message.meta?.version ?? null;
-  return targetVersion != null && isOutdated(APP_VERSION, targetVersion);
+  if (message.systemKind === WALL_SYSTEM_KIND.VERSION_RELEASE) {
+    const targetVersion = message.meta?.version ?? null;
+    return targetVersion != null && isOutdated(APP_VERSION, targetVersion);
+  }
+  return true;
 }
 
 /** Datos con los que se pinta un mensaje optimista al instante (antes de confirmar el POST). */

@@ -1,12 +1,17 @@
 import { useMemo, useState } from 'react';
+import { Cake } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-import { useHolidaysForYears } from '../hooks/use-work-calendar';
-import type { Holiday } from '../services/work-calendar.service';
+import {
+  groupBirthdaysByDate,
+  useBirthdaysForYears,
+  useHolidaysForYears,
+} from '../hooks/use-work-calendar';
+import type { Birthday, Holiday } from '../services/work-calendar.service';
 import {
   buildMonthGrid,
   countWorkingDaysInMonth,
@@ -14,6 +19,7 @@ import {
   monthLabel,
   monthsInRange,
   yearsInRange,
+  BIRTHDAY_CHIP,
   WEEKDAY_HEADERS,
   type CalendarDay,
 } from '../lib/work-calendar';
@@ -22,6 +28,12 @@ interface WorkCalendarViewProps {
   /** Días de fin de semana (0=Dom … 6=Sáb) según la config. */
   weekendDays: number[];
 }
+
+/**
+ * (QL-193) Referencia estable para los días sin cumpleaños. Un `[]` literal en el JSX crearía un
+ * array nuevo por celda y por render, rompiendo la comparación de props de cada `DayCellView`.
+ */
+const EMPTY_BIRTHDAYS: Birthday[] = [];
 
 /** Primer día del mes de una fecha. */
 function startOfMonth(date: Date): Date {
@@ -65,6 +77,10 @@ export function WorkCalendarView({ weekendDays }: WorkCalendarViewProps) {
   }, [holidays]);
 
   const holidayKeys = useMemo(() => new Set(holidayByKey.keys()), [holidayByKey]);
+
+  // (QL-193) Los cumpleaños NO entran en `holidayKeys`: no alteran el conteo de días laborables.
+  const { birthdays } = useBirthdaysForYears(years);
+  const birthdaysByKey = useMemo(() => groupBirthdaysByDate(birthdays), [birthdays]);
 
   const yearSummaries = useMemo(
     () =>
@@ -132,6 +148,7 @@ export function WorkCalendarView({ weekendDays }: WorkCalendarViewProps) {
               month={ym.month}
               weekendDays={weekendDays}
               holidayByKey={holidayByKey}
+              birthdaysByKey={birthdaysByKey}
               workingDays={countWorkingDaysInMonth(
                 ym.year,
                 ym.month,
@@ -184,6 +201,12 @@ function Legend() {
         <span className="size-3 rounded-full bg-primary" aria-hidden />
         Hoy
       </span>
+      {/* (QL-193) Va con icono y no con muestra de color, para dejar claro que es un EVENTO del
+          día y no un tipo de día: el cumpleaños no cambia si la jornada es laborable. */}
+      <span className="inline-flex items-center gap-1.5">
+        <Cake className="size-3 text-primary" aria-hidden />
+        Cumpleaños
+      </span>
     </div>
   );
 }
@@ -202,6 +225,8 @@ interface MonthGridProps {
   month: number;
   weekendDays: number[];
   holidayByKey: Map<string, Holiday>;
+  /** (QL-193) Cumpleaños indexados por día (`'YYYY-MM-DD'`). */
+  birthdaysByKey: Map<string, Birthday[]>;
   workingDays: number;
 }
 
@@ -211,6 +236,7 @@ function MonthGrid({
   month,
   weekendDays,
   holidayByKey,
+  birthdaysByKey,
   workingDays,
 }: MonthGridProps) {
   const grid = useMemo(
@@ -252,6 +278,7 @@ function MonthGrid({
               key={cell.key}
               cell={cell}
               holiday={holidayByKey.get(cell.key)}
+              birthdays={birthdaysByKey.get(cell.key) ?? EMPTY_BIRTHDAYS}
             />
           ))}
         </div>
@@ -263,17 +290,31 @@ function MonthGrid({
 interface DayCellViewProps {
   cell: CalendarDay;
   holiday: Holiday | undefined;
+  /** (QL-193) Cumpleaños de ESE día. Lista, no uno: varias personas pueden coincidir. */
+  birthdays: Birthday[];
 }
 
-/** Celda de día: color por tipo (festivo AUTO/MANUAL, fin de semana), nombre del festivo, hoy. */
-function DayCellView({ cell, holiday }: DayCellViewProps) {
+/**
+ * Celda de día: color por tipo (festivo AUTO/MANUAL, fin de semana), nombre del festivo, hoy, y
+ * (QL-193) los cumpleaños del día como chip aparte.
+ */
+function DayCellView({ cell, holiday, birthdays }: DayCellViewProps) {
   const { day, inMonth, isToday, isWeekend } = cell;
   const isAuto = holiday?.source === 'AUTO';
   const isManual = holiday?.source === 'MANUAL';
 
+  // El `title` acumula ambas cosas: con varios cumpleaños el chip solo cabe un contador, así que
+  // los nombres completos tienen que estar en algún sitio.
+  const tooltip = [
+    holiday?.name,
+    ...birthdays.map((b) => `🎂 ${b.name}`),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <div
-      title={holiday ? holiday.name : undefined}
+      title={tooltip || undefined}
       className={cn(
         'flex min-h-16 flex-col border-r border-outline-variant/20 p-1 last:border-r-0',
         !inMonth && 'bg-surface-container-lowest/40',
@@ -308,6 +349,20 @@ function DayCellView({ cell, holiday }: DayCellViewProps) {
           )}
         >
           {holiday.name}
+        </span>
+      )}
+
+      {/* (QL-193) Cumpleaños del día: chip (evento), no fondo de celda — un cumpleaños no cambia
+          la naturaleza laboral del día. Ver `BIRTHDAY_CHIP` por qué se distingue por forma. */}
+      {inMonth && birthdays.length > 0 && (
+        // Con festivo el chip va debajo; sin él, el `mt-auto` del propio estilo lo empuja al fondo.
+        <span className={cn(BIRTHDAY_CHIP, holiday && 'mt-0.5')}>
+          <Cake className="size-3 shrink-0 text-primary" aria-hidden />
+          <span className="truncate">
+            {birthdays.length === 1
+              ? birthdays[0].name
+              : `${birthdays.length} cumpleaños`}
+          </span>
         </span>
       )}
     </div>

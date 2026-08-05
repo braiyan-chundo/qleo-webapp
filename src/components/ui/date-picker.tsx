@@ -30,6 +30,17 @@ export interface DatePickerProps {
   id?: string;
   /** Días deshabilitados (p. ej. `{ before: new Date() }` para no permitir el pasado). */
   disabledDays?: Matcher | Matcher[];
+  /**
+   * Cabecera del calendario: `'label'` (mes fijo, por defecto) o `'dropdown'` (selectores de
+   * mes y año). Úsalo cuando la fecha puede estar muy lejos del mes actual —una fecha de
+   * nacimiento, por ejemplo—, donde avanzar mes a mes no es viable. Acótalo con
+   * `startMonth`/`endMonth`: son los que definen el rango del desplegable de años.
+   */
+  captionLayout?: React.ComponentProps<typeof Calendar>['captionLayout'];
+  /** Primer mes navegable (y primer año del desplegable). */
+  startMonth?: Date;
+  /** Último mes navegable (y último año del desplegable). */
+  endMonth?: Date;
   /** Clases extra para el botón disparador (ancho, alto, estados de error…). */
   className?: string;
   /** Texto para lectores de pantalla si no hay `<Label>` asociado. */
@@ -52,6 +63,9 @@ export function DatePicker({
   disabled = false,
   id,
   disabledDays,
+  captionLayout,
+  startMonth,
+  endMonth,
   className,
   'aria-label': ariaLabel,
 }: DatePickerProps) {
@@ -88,6 +102,9 @@ export function DatePicker({
           selected={value}
           onSelect={handleSelect}
           disabled={disabledDays}
+          captionLayout={captionLayout}
+          startMonth={startMonth}
+          endMonth={endMonth}
           locale={es}
           weekStartsOn={1}
           autoFocus

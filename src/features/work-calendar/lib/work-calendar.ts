@@ -152,3 +152,19 @@ export function monthLabel(year: number, month: number): string {
     year: 'numeric',
   });
 }
+
+/**
+ * (QL-193) Estilo del chip de cumpleaños, **compartido por las dos vistas de calendario**.
+ *
+ * Se distingue por **forma (borde discontinuo) y no por color**, y la razón importa: cada vista
+ * ya tiene tomados roles distintos de M3 y no queda ninguno libre en ambas. En `WorkCalendarView`,
+ * `tertiary-container` = festivo automático y `secondary-container` = festivo manual; en
+ * `MemberCalendarView`, `primary-container` = día con turno y `secondary-container` = festivo.
+ * Cualquier relleno que se eligiera significaría otra cosa en la vista de al lado.
+ *
+ * El borde discontinuo además comunica lo correcto: un cumpleaños **anota** el día, no lo
+ * reclasifica — no altera si la jornada es laborable ni el conteo de días hábiles.
+ */
+export const BIRTHDAY_CHIP =
+  'mt-auto flex items-center gap-0.5 rounded border border-dashed border-outline ' +
+  'bg-surface px-1 py-0.5 text-[10px] leading-tight font-medium text-on-surface';

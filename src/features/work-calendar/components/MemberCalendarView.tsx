@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CalendarOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Cake, CalendarOff, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,14 +13,26 @@ import {
   shiftsForDay,
 } from '@/features/schedules/lib/schedule';
 
-import { useCalendarConfig, useHolidaysForYears } from '../hooks/use-work-calendar';
-import type { Holiday } from '../services/work-calendar.service';
+import {
+  groupBirthdaysByDate,
+  useBirthdaysForYears,
+  useCalendarConfig,
+  useHolidaysForYears,
+} from '../hooks/use-work-calendar';
+import type { Birthday, Holiday } from '../services/work-calendar.service';
 import {
   buildMonthGrid,
   monthLabel,
+  BIRTHDAY_CHIP,
   WEEKDAY_HEADERS,
   type CalendarDay,
 } from '../lib/work-calendar';
+
+/**
+ * (QL-193) Referencia estable para los días sin cumpleaños: un `[]` literal en el JSX crearía un
+ * array nuevo por celda y por render.
+ */
+const EMPTY_BIRTHDAYS: Birthday[] = [];
 
 interface MemberCalendarViewProps {
   /** Id del usuario cuya malla se pinta (el propio MEMBER en QL-162; cualquiera en QL-163). */
@@ -76,6 +88,11 @@ export function MemberCalendarView({ userId, ownCalendar = true }: MemberCalenda
     for (const h of holidays) map.set(h.date, h);
     return map;
   }, [holidays]);
+
+  // (QL-193) Cumpleaños del/los año(s) visibles. No se espera a `holidaysLoading` para pintarlos:
+  // van en su propia query y llegan cuando lleguen.
+  const { birthdays } = useBirthdaysForYears(years);
+  const birthdaysByKey = useMemo(() => groupBirthdaysByDate(birthdays), [birthdays]);
 
   const goToday = () =>
     setViewMonth({ year: today.getFullYear(), month: today.getMonth() });
@@ -160,6 +177,7 @@ export function MemberCalendarView({ userId, ownCalendar = true }: MemberCalenda
                   cell={cell}
                   holiday={holidayByKey.get(cell.key)}
                   schedule={schedule}
+                  birthdays={birthdaysByKey.get(cell.key) ?? EMPTY_BIRTHDAYS}
                 />
               ))}
             </div>
@@ -190,6 +208,11 @@ function Legend() {
         <span className="size-3 rounded-full bg-primary" aria-hidden />
         Hoy
       </span>
+      {/* (QL-193) Con icono y no con muestra de color: es un EVENTO del día, no un tipo de día. */}
+      <span className="inline-flex items-center gap-1.5">
+        <Cake className="size-3 text-primary" aria-hidden />
+        Cumpleaños
+      </span>
     </div>
   );
 }
@@ -207,6 +230,8 @@ interface DayCellProps {
   cell: CalendarDay;
   holiday: Holiday | undefined;
   schedule: UserSchedule | null | undefined;
+  /** (QL-193) Cumpleaños de ESE día. Lista: varias personas pueden coincidir. */
+  birthdays: Birthday[];
 }
 
 /**
@@ -215,7 +240,7 @@ interface DayCellProps {
  * backend). Con malla, el día es laborable sii tiene turnos (incluye el sábado intermedio); sin
  * malla, se cae al fin de semana de la config para el estilo de no-laborable.
  */
-function DayCell({ cell, holiday, schedule }: DayCellProps) {
+function DayCell({ cell, holiday, schedule, birthdays }: DayCellProps) {
   const { day, inMonth, isToday, isWeekend } = cell;
 
   const date = useMemo(() => parseYmdLocal(cell.key), [cell.key]);
@@ -225,11 +250,17 @@ function DayCell({ cell, holiday, schedule }: DayCellProps) {
   );
 
   const hasShifts = shifts.length > 0;
+  // (QL-193) Los cumpleaños NO entran aquí a propósito: son un evento del día, no cambian si se
+  // trabaja o no. Mezclarlos convertiría un cumpleaños en un día no laborable.
   const nonWorking = !!holiday || (schedule ? !hasShifts : isWeekend);
+
+  const tooltip = [holiday?.name, ...birthdays.map((b) => `🎂 ${b.name}`)]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div
-      title={holiday ? holiday.name : undefined}
+      title={tooltip || undefined}
       className={cn(
         'flex min-h-20 flex-col gap-1 border-r border-outline-variant/20 p-1.5 last:border-r-0 sm:min-h-24',
         !inMonth && 'bg-surface-container-lowest/40',
@@ -264,6 +295,18 @@ function DayCell({ cell, holiday, schedule }: DayCellProps) {
             <ShiftPill key={shift.id} shift={shift} />
           ))}
         </div>
+      )}
+
+      {/* (QL-193) Chip de cumpleaños. Se pinta SIEMPRE que haya, incluso en festivo o sin turnos:
+          la gente cumple años los festivos también. Estilo BIRTHDAY_CHIP compartido con la otra
+          vista — ver allí por qué se distingue por forma y no por color. */}
+      {inMonth && birthdays.length > 0 && (
+        <span className={BIRTHDAY_CHIP}>
+          <Cake className="size-3 shrink-0 text-primary" aria-hidden />
+          <span className="truncate">
+            {birthdays.length === 1 ? birthdays[0].name : `${birthdays.length} cumpleaños`}
+          </span>
+        </span>
       )}
     </div>
   );

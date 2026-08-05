@@ -29,6 +29,20 @@ export interface User {
   avatarCatalogId?: string | null;
   jobTitle?: string;
   /**
+   * QL-193 (§3.66): fecha de nacimiento como **día civil** `'YYYY-MM-DD'` (sin hora ni zona),
+   * o `null`. La edita el propio usuario (`PATCH /users/me`) o un ADMIN (`PATCH /users/:id`).
+   *
+   * Ojo: el backend la **enmascara** — solo la ve su dueño y un ADMIN. Un `null` significa
+   * "no tienes permiso para ver el año", **no** "no tiene cumpleaños"; para eso están
+   * `birthDay`/`birthMonth`. Nunca la conviertas con `new Date(...).toISOString()` (§3.66):
+   * usa `@/shared/lib/civil-date`.
+   */
+  birthDate?: string | null;
+  /** QL-193: día del mes de nacimiento (1–31), o `null` si no tiene fecha. Visible para todos. */
+  birthDay?: number | null;
+  /** QL-193: mes de nacimiento (1–12), o `null` si no tiene fecha. Visible para todos. */
+  birthMonth?: number | null;
+  /**
    * QL-88 (D2) / QL-91: push **genérico** del Muro Corporativo silenciado (default `false`).
    * Las @menciones del muro siguen llegando. Se togglea desde `/profile`.
    */

@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/table';
 
 import { useUsersList } from '../hooks/use-users';
+import { birthdayLabel } from '../lib/birth-date';
 import { UserFormDialog } from '../components/UserFormDialog';
 import { DeactivateUserDialog } from '../components/DeactivateUserDialog';
 import type { UserSummary } from '../services/users.service';
@@ -215,6 +216,11 @@ export function UsersAdminPage() {
                   />
                 </DataCardRow>
                 <DataCardRow label="Cargo">{user.jobTitle || '—'}</DataCardRow>
+                {/* (QL-193) `birthdayLabel` decide solo: fecha completa si el backend la
+                    sirve (ADMIN), y si no, día y mes sin año. Nunca se deduce la edad. */}
+                <DataCardRow label="Cumpleaños">
+                  {birthdayLabel(user) ?? '—'}
+                </DataCardRow>
                 <DataCardRow label="Creado">
                   {formatDate(user.createdAt)}
                 </DataCardRow>
@@ -245,6 +251,7 @@ export function UsersAdminPage() {
                 <TableHead>Rol</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Cargo</TableHead>
+                <TableHead>Cumpleaños</TableHead>
                 <TableHead>Creado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -271,6 +278,9 @@ export function UsersAdminPage() {
                   </TableCell>
                   <TableCell className="text-on-surface-variant">
                     {user.jobTitle || '—'}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-on-surface-variant">
+                    {birthdayLabel(user) ?? '—'}
                   </TableCell>
                   <TableCell className="text-on-surface-variant">
                     {formatDate(user.createdAt)}

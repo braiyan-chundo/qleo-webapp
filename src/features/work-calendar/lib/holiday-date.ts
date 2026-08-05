@@ -1,32 +1,30 @@
+import { civilDayToDate, dateToCivilDay } from '@/shared/lib/civil-date';
+
 /**
  * Conversión de fechas de festivo entre el `'YYYY-MM-DD'` que espera el backend y el
- * `Date` que usa el `DatePicker`. Puras, sin dependencias; compartidas por el alta y la edición
- * de festivos (QL-163). El día se maneja a **mediodía local** para que el desfase horario nunca
- * mueva la fecha de día al serializar.
+ * `Date` que usa el `DatePicker`, compartida por el alta y la edición de festivos (QL-163).
+ *
+ * La conversión en sí vive en `@/shared/lib/civil-date` (día civil sin hora ni zona), que es
+ * también la que usa la fecha de nacimiento (QL-193): **una sola implementación** del ida y
+ * vuelta, para que la trampa de la zona horaria (`toISOString()` restando un día en UTC-5) esté
+ * resuelta en un único sitio. Aquí solo quedan los alias del feature y su formato propio.
  */
 
 /** `'YYYY-MM-DD'` → `Date` local (mediodía) para el DatePicker, o `undefined` si vacío. */
 export function isoDayToDate(value: string): Date | undefined {
-  if (!value) return undefined;
-  const [year, month, day] = value.split('-').map(Number);
-  if (!year || !month || !day) return undefined;
-  return new Date(year, month - 1, day, 12, 0, 0);
+  return civilDayToDate(value);
 }
 
 /** `Date` local → `'YYYY-MM-DD'` (lo que espera el backend de festivos), o `''` si no hay. */
 export function dateToIsoDay(date: Date | undefined): string {
-  if (!date || Number.isNaN(date.getTime())) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return dateToCivilDay(date);
 }
 
 /** Formatea un `'YYYY-MM-DD'` a fecha legible en español (ej. "6 jul 2026"). */
 export function formatHolidayDate(isoDay: string): string {
-  const [year, month, day] = isoDay.split('-').map(Number);
-  if (!year || !month || !day) return isoDay;
-  return new Date(year, month - 1, day).toLocaleDateString('es', {
+  const date = civilDayToDate(isoDay);
+  if (!date) return isoDay;
+  return date.toLocaleDateString('es', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',

@@ -15,6 +15,10 @@ export const createUserSchema = z.object({
   password: z.string().min(6, 'Mínimo 6 caracteres'),
   role: roleEnum,
   jobTitle: z.string().trim().optional(),
+  // QL-193 (§3.66): día civil 'YYYY-MM-DD' o '' si no se informa. Se guarda la cadena que se
+  // va a enviar (no un `Date`) para que no medie ninguna conversión a UTC. Las reglas de fondo
+  // (no futura, ≥1900) las valida el backend vía `error.code`.
+  birthDate: z.string().optional(),
   // QL-127: por defecto un miembro nuevo NO puede crear proyectos (se otorga explícitamente).
   canCreateProjects: z.boolean(),
   // QL-184: permiso de usar el panel de IA. Al revés que arriba, el default es activado.
@@ -29,6 +33,8 @@ export const updateUserSchema = z.object({
   role: roleEnum,
   status: statusEnum,
   jobTitle: z.string().trim().optional(),
+  // QL-193 (§3.66): día civil 'YYYY-MM-DD'; vacío = borrar la fecha guardada.
+  birthDate: z.string().optional(),
   // QL-127: permiso de crear proyectos (solo aplica a MEMBER; el ADMIN siempre puede).
   canCreateProjects: z.boolean(),
   // QL-184: permiso de usar el panel de IA (solo aplica a MEMBER; el ADMIN siempre puede).

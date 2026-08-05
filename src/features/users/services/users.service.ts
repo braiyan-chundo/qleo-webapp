@@ -13,6 +13,19 @@ export interface UserSummary {
   avatarDownloadUrl?: string | null;
   jobTitle?: string;
   /**
+   * QL-193 (§3.66): fecha de nacimiento como **día civil** `'YYYY-MM-DD'`, o `null`.
+   *
+   * **Trampa del contrato:** el backend la enmascara y solo la sirve a su dueño o a un ADMIN.
+   * `null` significa "no tienes permiso para ver el año", **no** "no tiene cumpleaños". Para
+   * saber si lo tiene, mira `birthDay`/`birthMonth`, que viajan siempre. En la práctica todas
+   * las rutas que devuelven este DTO son de ADMIN, así que aquí sí llega completa.
+   */
+  birthDate?: string | null;
+  /** QL-193: día del mes de nacimiento (1–31), o `null` si no tiene fecha. Sin enmascarar. */
+  birthDay?: number | null;
+  /** QL-193: mes de nacimiento (1–12), o `null` si no tiene fecha. Sin enmascarar. */
+  birthMonth?: number | null;
+  /**
    * QL-127: permiso otorgado al MEMBER para crear proyectos (default `false`). Un ADMIN
    * siempre puede, sea cual sea el flag → resolver con `canCreateProjects()` de
    * `@/shared/lib/permissions`. No viene en `GET /users/directory` (superficie mínima).
@@ -45,6 +58,11 @@ export interface CreateUserDto {
   password: string;
   role?: 'ADMIN' | 'MEMBER';
   jobTitle?: string;
+  /**
+   * QL-193 (§3.66): fecha de nacimiento como **día civil** `'YYYY-MM-DD'` literal. Omítela
+   * para no fijarla. 400 `BIRTH_DATE_INVALID` / `BIRTH_DATE_IN_FUTURE` / `BIRTH_DATE_OUT_OF_RANGE`.
+   */
+  birthDate?: string;
   /** QL-127: otorga el permiso de crear proyectos al alta (default `false` en el backend). */
   canCreateProjects?: boolean;
   /** QL-184: permiso de usar el panel de IA al alta (default `true` en el backend si se omite). */
@@ -59,6 +77,12 @@ export interface UpdateUserDto {
   role?: 'ADMIN' | 'MEMBER';
   jobTitle?: string;
   status?: 'ACTIVE' | 'INACTIVE';
+  /**
+   * QL-193 (§3.66): fecha de nacimiento como **día civil** `'YYYY-MM-DD'` literal; `null`
+   * (o `''`) la borra; **ausente** = no se toca. Nunca mandes un ISO con hora: el backend se
+   * queda con los 10 primeros caracteres y en UTC-5 eso guarda el día anterior.
+   */
+  birthDate?: string | null;
   /** QL-127: otorga o revoca el permiso de crear proyectos. */
   canCreateProjects?: boolean;
   /** QL-184: otorga (`true`) o revoca (`false`) el permiso de usar el panel de IA. */
