@@ -24,9 +24,18 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ApiError } from '@/core/api/fetch-client';
+import {
+  USER_ROLES,
+  USER_ROLE_LABEL,
+  hasAtLeastRole,
+  roleIsAtLeast,
+} from '@/shared/lib/permissions';
+import { useAuthStore } from '@/store/auth.store';
+import type { UserRole } from '@/store/auth.store';
 
 import { useCreateUser, useUpdateUser } from '../hooks/use-users';
 import { birthDateErrorMessage } from '../lib/birth-date';
+import { userRoleErrorMessage } from '../lib/user-role-errors';
 import { BirthDateField } from './BirthDateField';
 import {
   createUserSchema,
@@ -66,32 +75,33 @@ interface CanCreateProjectsFieldProps {
   value: boolean;
   onChange: (next: boolean) => void;
   /** Rol **seleccionado ahora mismo** en el formulario, no el guardado. */
-  role: 'ADMIN' | 'MEMBER';
+  role: UserRole;
 }
 
 /**
  * Control del permiso de crear proyectos (QL-127). Compartido por el alta y la edición.
  *
- * Con rol ADMIN se fuerza a "marcado + deshabilitado": el flag no le aplica (un ADMIN
- * siempre puede) y mostrarlo apagado sería mentir. Solo se pinta el valor forzado; el valor
- * real del formulario no se toca, así que al volver a MEMBER reaparece tal cual estaba.
+ * Con rol ADMIN o **Dirección** se fuerza a "marcado + deshabilitado": el flag no les aplica
+ * (los dos pueden siempre, QL-195) y mostrarlo apagado sería mentir. Solo se pinta el valor
+ * forzado; el valor real del formulario no se toca, así que al volver a MEMBER reaparece tal
+ * cual estaba.
  */
 function CanCreateProjectsField({ value, onChange, role }: CanCreateProjectsFieldProps) {
-  const isAdmin = role === 'ADMIN';
+  const bypasses = roleIsAtLeast(role, 'MANAGER');
 
   return (
     <div className="grid gap-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low px-4 py-3">
       <label className="flex items-center gap-2.5 text-sm font-medium text-on-surface">
         <Switch
-          checked={isAdmin || value}
-          disabled={isAdmin}
+          checked={bypasses || value}
+          disabled={bypasses}
           onCheckedChange={onChange}
         />
         Puede crear proyectos
       </label>
       <p className="text-xs text-on-surface-variant">
-        {isAdmin
-          ? 'Los administradores siempre pueden crear proyectos.'
+        {bypasses
+          ? 'Administración y Dirección siempre pueden crear proyectos.'
           : 'Si está desactivado, solo trabajará en los proyectos a los que se le agregue.'}
       </p>
     </div>
@@ -101,38 +111,83 @@ function CanCreateProjectsField({ value, onChange, role }: CanCreateProjectsFiel
 /**
  * Control del permiso de usar el panel de IA (QL-184). Compartido por el alta y la edición.
  *
- * Espejo de `CanCreateProjectsField` con el default invertido: el permiso viene **activado** y el
- * ADMIN lo revoca. Con rol ADMIN se fuerza a "marcado + deshabilitado": el flag no le aplica (un
- * ADMIN siempre puede usar la IA). Solo se pinta el valor forzado; el valor real del formulario no
- * se toca, así que al volver a MEMBER reaparece tal cual estaba.
+ * Espejo de `CanCreateProjectsField` con el default invertido: el permiso viene **activado** y se
+ * revoca explícitamente. Con rol ADMIN o Dirección se fuerza a "marcado + deshabilitado": el flag
+ * no les aplica. Solo se pinta el valor forzado; el valor real del formulario no se toca, así que
+ * al volver a MEMBER reaparece tal cual estaba.
  */
 function CanUseAiField({ value, onChange, role }: CanCreateProjectsFieldProps) {
-  const isAdmin = role === 'ADMIN';
+  const bypasses = roleIsAtLeast(role, 'MANAGER');
 
   return (
     <div className="grid gap-1.5 rounded-lg border border-outline-variant/40 bg-surface-container-low px-4 py-3">
       <label className="flex items-center gap-2.5 text-sm font-medium text-on-surface">
         <Switch
-          checked={isAdmin || value}
-          disabled={isAdmin}
+          checked={bypasses || value}
+          disabled={bypasses}
           onCheckedChange={onChange}
         />
         Puede usar la IA
       </label>
       <p className="text-xs text-on-surface-variant">
-        {isAdmin
-          ? 'Los administradores siempre pueden usar el panel de IA.'
+        {bypasses
+          ? 'Administración y Dirección siempre pueden usar el panel de IA.'
           : 'Si está desactivado, no verá ni podrá usar el panel de IA.'}
       </p>
     </div>
   );
 }
 
+interface RoleSelectProps {
+  value: UserRole;
+  onChange: (next: UserRole) => void;
+  /** Roles ofrecidos (QL-195: Dirección no puede conceder ADMIN). */
+  options: UserRole[];
+  /** Bloqueado porque el backend rechazaría el cambio (`CANNOT_CHANGE_OWN_ROLE`). */
+  disabled?: boolean;
+  /** Aviso bajo el selector cuando está bloqueado. */
+  hint?: string;
+}
+
 /**
- * Traduce un fallo de la API a un toast (409 = email duplicado). Los `error.code` de la fecha
- * de nacimiento (QL-193: inválida / futura / fuera de rango) los resuelve `birthDateErrorMessage`.
+ * Selector del rol de plataforma. Las etiquetas salen de `USER_ROLE_LABEL` (QL-195), así que
+ * `MANAGER` aparece como **«Dirección»**. Qué opciones se ofrecen lo decide el llamador.
+ */
+function RoleSelect({ value, onChange, options, disabled, hint }: RoleSelectProps) {
+  return (
+    <div className="grid gap-1.5">
+      <Label className="text-on-surface">Rol</Label>
+      <Select
+        value={value}
+        onValueChange={(next) => onChange(next as UserRole)}
+        disabled={disabled}
+      >
+        <SelectTrigger className="h-10 w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((role) => (
+            <SelectItem key={role} value={role}>
+              {USER_ROLE_LABEL[role]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {hint && <span className="text-xs text-on-surface-variant">{hint}</span>}
+    </div>
+  );
+}
+
+/**
+ * Traduce un fallo de la API a un toast. Orden: los 403 de rol (QL-195), el 409 de email
+ * duplicado y los `error.code` de la fecha de nacimiento (QL-193).
  */
 function reportError(err: unknown) {
+  const roleMessage = userRoleErrorMessage(err);
+  if (roleMessage) {
+    toast.error(roleMessage);
+    return;
+  }
   if (err instanceof ApiError && err.status === 409) {
     toast.error('Ya existe un usuario con ese email.');
     return;
@@ -142,8 +197,25 @@ function reportError(err: unknown) {
 
 export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps) {
   const isEdit = !!user;
+  const currentUser = useAuthStore((s) => s.user);
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
+
+  /**
+   * (QL-195) Qué roles puede conceder quien está editando. Dirección no ve la opción
+   * «Administrador»: el backend responde 403 `ROLE_ESCALATION_FORBIDDEN` y es mejor no
+   * ofrecerla que traducir el error.
+   */
+  const roleOptions: UserRole[] = hasAtLeastRole(currentUser, 'ADMIN')
+    ? [...USER_ROLES]
+    : USER_ROLES.filter((role) => role !== 'ADMIN');
+
+  /**
+   * (QL-195) Nadie cambia su **propio** rol, ni un ADMIN (403 `CANNOT_CHANGE_OWN_ROLE`). El
+   * selector se bloquea, pero el valor se sigue enviando: reenviar el rol sin cambiarlo no
+   * dispara el error, así que el resto del formulario funciona con normalidad.
+   */
+  const editingSelf = isEdit && !!currentUser && user.id === currentUser.id;
 
   const createForm = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserSchema),
@@ -175,8 +247,8 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
         role: user.role,
         status: user.status,
         jobTitle: user.jobTitle ?? '',
-        // (QL-193) `GET /users` es ruta de ADMIN, así que `birthDate` llega sin enmascarar y
-        // un `null` aquí sí significa "sin fecha".
+        // (QL-193) `GET /users` es ruta del área de administración, así que `birthDate` llega
+        // sin enmascarar y un `null` aquí sí significa "sin fecha".
         birthDate: user.birthDate ?? '',
         password: '',
         canCreateProjects: user.canCreateProjects ?? false,
@@ -290,24 +362,29 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label className="text-on-surface">Rol</Label>
-                <Controller
-                  control={editForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="h-10 w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="MEMBER">Miembro</SelectItem>
-                        <SelectItem value="ADMIN">Administrador</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
+              <Controller
+                control={editForm.control}
+                name="role"
+                render={({ field }) => (
+                  <RoleSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    /* El rol actual siempre está en la lista aunque no se pueda conceder:
+                       si no, editar a un ADMIN dejaría el selector en blanco. */
+                    options={
+                      roleOptions.includes(field.value)
+                        ? roleOptions
+                        : [field.value, ...roleOptions]
+                    }
+                    disabled={editingSelf}
+                    hint={
+                      editingSelf
+                        ? 'Nadie puede cambiar su propio rol. Tiene que hacerlo otra persona.'
+                        : undefined
+                    }
+                  />
+                )}
+              />
               <div className="grid gap-1.5">
                 <Label className="text-on-surface">Estado</Label>
                 <Controller
@@ -340,8 +417,8 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
               />
             </div>
 
-            {/* (QL-193, §3.66) Fecha de nacimiento: el ADMIN es, junto al propio usuario, el
-                único que puede editarla y ver el año. */}
+            {/* (QL-193, §3.66) Fecha de nacimiento: solo el propio usuario y quien administra
+                (ADMIN o Dirección, QL-195) pueden editarla y ver el año. */}
             <Controller
               control={editForm.control}
               name="birthDate"
@@ -452,24 +529,17 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                   </span>
                 )}
               </div>
-              <div className="grid gap-1.5">
-                <Label className="text-on-surface">Rol</Label>
-                <Controller
-                  control={createForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="h-10 w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="MEMBER">Miembro</SelectItem>
-                        <SelectItem value="ADMIN">Administrador</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
+              <Controller
+                control={createForm.control}
+                name="role"
+                render={({ field }) => (
+                  <RoleSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={roleOptions}
+                  />
+                )}
+              />
             </div>
 
             <div className="grid gap-1.5">

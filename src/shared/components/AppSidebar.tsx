@@ -27,7 +27,7 @@ import { QleoMark } from '@/shared/components/QleoLogo';
 import { BetaBadge } from '@/shared/components/BetaBadge';
 import { NavBadge } from '@/shared/components/NavBadge';
 import { useAuthStore } from '@/store/auth.store';
-import { canUseAi } from '@/shared/lib/permissions';
+import { canUseAi, hasAtLeastRole } from '@/shared/lib/permissions';
 import { useWallUnreadCount } from '@/features/wall/hooks/use-wall';
 import { useProjects } from '@/features/projects/hooks/use-projects';
 import type { ProjectListParams } from '@/features/projects/services/projects.service';
@@ -105,8 +105,9 @@ function activeProjectId(pathname: string): string | null {
 export function AppSidebar() {
   const { pathname } = useLocation();
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'ADMIN';
-  // (QL-190) Gate del "Asistente IA": ADMIN o MEMBER no revocado (default activado).
+  // (QL-195) `adminOnly` en el nav = área de administración: ADMIN **o** Dirección.
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
+  // (QL-190) Gate del "Asistente IA": ADMIN/Dirección o MEMBER no revocado (default activado).
   const aiAllowed = canUseAi(user);
   const { count: wallUnread } = useWallUnreadCount();
 

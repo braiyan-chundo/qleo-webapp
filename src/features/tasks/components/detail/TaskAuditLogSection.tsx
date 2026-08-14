@@ -120,7 +120,7 @@ export function TaskAuditLogSection({ taskId }: TaskAuditLogSectionProps) {
           Historial de cambios
         </h2>
         <span className="rounded-full bg-secondary-container px-2 py-0.5 text-xs font-medium text-on-secondary-container">
-          Solo administradores
+          Administración y Dirección
         </span>
       </div>
 

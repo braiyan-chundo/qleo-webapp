@@ -17,6 +17,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ApiError } from '@/core/api/fetch-client';
+import { hasAtLeastRole } from '@/shared/lib/permissions';
+import { useAuthStore } from '@/store/auth.store';
 
 import {
   useAiConfig,
@@ -73,10 +75,12 @@ function formatEpochSeconds(epoch: number | null | undefined): string {
 interface ConnectedViewProps {
   config: AiConfigResponse;
   onDisconnect: () => void;
+  /** (QL-195) `false` para Dirección: ve la cuenta enlazada, pero no la desconecta. */
+  canManageAccount: boolean;
 }
 
 /** Estado conectado: cuenta, quién/cuándo la enlazó, uso y botón de desconexión. */
-function ConnectedView({ config, onDisconnect }: ConnectedViewProps) {
+function ConnectedView({ config, onDisconnect, canManageAccount }: ConnectedViewProps) {
   const usedPercent = config.rateLimits?.primary?.usedPercent;
   const resetsAt = config.rateLimits?.primary?.resetsAt ?? null;
 
@@ -124,15 +128,24 @@ function ConnectedView({ config, onDisconnect }: ConnectedViewProps) {
         </div>
       </dl>
 
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
-          className="text-error hover:bg-error-container hover:text-on-error-container"
-          onClick={onDisconnect}
-        >
-          Desconectar
-        </Button>
-      </div>
+      {/* (QL-195) Solo el usuario de sistemas desenlaza la cuenta: el device login usa su cuenta
+          personal de OpenAI, así que desconectarla no es una decisión de negocio. A Dirección se
+          le explica en vez de dejar un hueco sin motivo. */}
+      {canManageAccount ? (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            className="text-error hover:bg-error-container hover:text-on-error-container"
+            onClick={onDisconnect}
+          >
+            Desconectar
+          </Button>
+        </div>
+      ) : (
+        <p className="text-xs text-on-surface-variant">
+          Solo un Administrador del sistema puede cambiar o desconectar esta cuenta.
+        </p>
+      )}
     </div>
   );
 }
@@ -146,6 +159,8 @@ interface DisconnectedViewProps {
   onConnect: () => void;
   onRetry: () => void;
   retrying: boolean;
+  /** (QL-195) `false` para Dirección: ve que no hay conexión, pero no la establece. */
+  canManageAccount: boolean;
 }
 
 /** Estado no conectada (incl. el 503 tolerado): aviso opcional + botón de conectar. */
@@ -156,6 +171,7 @@ function DisconnectedView({
   onConnect,
   onRetry,
   retrying,
+  canManageAccount,
 }: DisconnectedViewProps) {
   return (
     <div className="space-y-4">
@@ -184,24 +200,42 @@ function DisconnectedView({
         </div>
         <h3 className="text-lg font-semibold text-on-surface">IA no conectada</h3>
         <p className="mt-1 max-w-sm text-sm text-on-surface-variant">
-          Enlaza una cuenta de ChatGPT para habilitar el panel de IA de toda la plataforma.
+          {canManageAccount
+            ? 'Enlaza una cuenta de ChatGPT para habilitar el panel de IA de toda la plataforma.'
+            : 'El panel de IA de la plataforma está sin cuenta enlazada. Solo un Administrador del sistema puede conectarla.'}
         </p>
-        <Button className="mt-6 h-11" onClick={onConnect} disabled={connecting}>
-          {connecting ? <Loader2 className="animate-spin" /> : <Sparkles />}
-          {connectLabel}
-        </Button>
+        {canManageAccount && (
+          <Button className="mt-6 h-11" onClick={onConnect} disabled={connecting}>
+            {connecting ? <Loader2 className="animate-spin" /> : <Sparkles />}
+            {connectLabel}
+          </Button>
+        )}
       </div>
     </div>
   );
 }
 
 /**
- * Contenido del tab **"Conexión IA"** de Configuración (QL-185, §3.62, solo ADMIN). Enlaza una sola
- * cuenta ChatGPT para toda la plataforma vía **device login** (código + enlace) y sondea el estado
- * hasta completar. El estado es de servidor (compartido entre admins): vive en la caché de
- * TanStack Query. Contrato: `docs/integracion/05-ia.md`.
+ * Contenido del tab **"Conexión IA"** de Configuración (QL-185, §3.62). Enlaza una sola cuenta
+ * ChatGPT para toda la plataforma vía **device login** (código + enlace) y sondea el estado hasta
+ * completar. El estado es de servidor (compartido): vive en la caché de TanStack Query.
+ * Contrato: `docs/integracion/05-ia.md`.
+ *
+ * **(QL-195, §3.67) La línea de corte aquí es «ver» vs. «tocar la cuenta», no el tab entero.**
+ * Es, junto al CTA de `AiPage`, lo ÚNICO del producto que sigue exigiendo ADMIN estricto:
+ * - **Dirección ve** el estado de la conexión (`GET /ai/config` es `@Roles(MANAGER)`) y usa
+ *   **toda** la sección de modelo de QL-194, cuyas cuatro rutas también son de Dirección. Sin el
+ *   estado de conexión el selector de modelo ni siquiera podría renderizarse, que es justo por
+ *   lo que ese GET se abrió.
+ * - **Conectar / cancelar / desconectar** siguen pidiendo ADMIN literal: el device login usa la
+ *   cuenta personal de OpenAI del usuario de sistemas, así que reapuntarla a otra cuenta o
+ *   desconectarla no es una decisión de negocio.
  */
 export function AiConnectionManager() {
+  const currentUser = useAuthStore((s) => s.user);
+  /** (QL-195) Enlazar/desenlazar la cuenta de ChatGPT: ADMIN literal, no `'MANAGER'`. */
+  const canManageAccount = hasAtLeastRole(currentUser, 'ADMIN');
+
   const [connectData, setConnectData] = useState<AiConnectResponse | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
@@ -258,8 +292,10 @@ export function AiConnectionManager() {
       <div>
         <h2 className="text-lg font-semibold text-on-surface">Conexión IA</h2>
         <p className="mt-0.5 text-sm text-on-surface-variant">
-          Enlaza una cuenta de ChatGPT para toda la plataforma. La usa el panel de IA de Qleo; la
-          credencial nunca se comparte con el navegador.
+          {/* (QL-195) Neutral a propósito: Dirección lee esta tarjeta pero no enlaza la cuenta,
+              así que el texto describe en vez de dar una instrucción que no puede seguir. */}
+          Una sola cuenta de ChatGPT da servicio a toda la plataforma. La usa el panel de IA de
+          Qleo; la credencial nunca se comparte con el navegador.
         </p>
       </div>
 
@@ -269,15 +305,21 @@ export function AiConnectionManager() {
           <Skeleton className="h-24 rounded-xl" />
         </div>
       ) : config?.connected ? (
-        <ConnectedView config={config} onDisconnect={() => setConfirmDisconnect(true)} />
+        <ConnectedView
+          config={config}
+          onDisconnect={() => setConfirmDisconnect(true)}
+          canManageAccount={canManageAccount}
+        />
       ) : (
         <DisconnectedView
           warning={warning}
           connectLabel={notAuthenticated ? 'Reconectar ChatGPT' : 'Conectar ChatGPT'}
           connecting={connectMutation.isPending}
           onConnect={handleConnect}
+          /* Reintentar solo re-consulta `GET /ai/config`, que Dirección sí puede: se deja. */
           onRetry={() => void refetch()}
           retrying={isFetching}
+          canManageAccount={canManageAccount}
         />
       )}
 

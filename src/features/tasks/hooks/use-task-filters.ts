@@ -6,6 +6,7 @@ import {
   useQueryParamSearch,
   useQueryParamState,
 } from '@/shared/hooks/use-query-param-state';
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 
 import type { Task } from '../services/tasks.service';
@@ -119,8 +120,12 @@ export function useTaskFilters(
 
   const currentUserId = useAuthStore((s) => s.user?.id);
   const currentUserName = useAuthStore((s) => s.user?.name);
-  /** (QL-180) Rol de **plataforma** (no el rol por tarea): un ADMIN no preselecciona nada. */
-  const isPlatformAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  /**
+   * (QL-180/QL-195) Rol de **plataforma** (no el rol por tarea): quien ve todas las tareas
+   * —ADMIN o Dirección— no preselecciona ningún Responsable.
+   */
+  const currentUser = useAuthStore((s) => s.user);
+  const isPlatformAdmin = hasAtLeastRole(currentUser, 'MANAGER');
   const [urlParams] = useSearchParams();
 
   /**
@@ -144,7 +149,7 @@ export function useTaskFilters(
     if (!currentUserId) return; // esperamos a tener sesión resuelta
     if (!canSeeAll) return; // miembro normal (o proyecto aún cargando): sin preselección
     didInitAssignee.current = true;
-    if (isPlatformAdmin) return; // (QL-180) el ADMIN arranca viendo TODOS los responsables
+    if (isPlatformAdmin) return; // (QL-180) administración arranca viendo TODOS los responsables
     if (!urlParams.has(ASSIGNEE_PARAM)) {
       setAssigneeId(currentUserId);
     }

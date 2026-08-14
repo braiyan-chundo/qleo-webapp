@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { BackButton } from '@/shared/components/BackButton';
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 
 import { useColumns } from '@/features/columns/hooks/use-columns';
@@ -91,7 +92,9 @@ export function TaskDetailPage() {
   // (QL-192) Ser además Responsable no le quita al Creador sus acciones de dueño: el rol se
   // comprueba contra `assignments`, no contra el escalar `currentUserRole`.
   const isCreator = userHasRole(task.assignments, user?.id, 'CREATOR');
-  const isAdmin = user?.role === 'ADMIN';
+  // (QL-195) Las secciones de análisis e historial de la tarea son del área de administración:
+  // ADMIN o Dirección. El backend aplica la misma regla (`@Roles(MANAGER)`).
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
   // (QL-141) Columna actual + su posición ordenada (para el color estable del chip).
   const columnIndex = columns?.findIndex((c) => c.id === task.columnId) ?? -1;
   const column = columnIndex >= 0 ? columns?.[columnIndex] : undefined;
@@ -161,7 +164,7 @@ export function TaskDetailPage() {
         </aside>
       </div>
 
-      {/* Sección "Solo administradores" (req. 3+4): historial de logs de la tarea (QL-144) y
+      {/* Sección "Administración y Dirección" (req. 3+4): historial de logs (QL-144) y
           análisis por-tarea (P5). Solo ADMIN de plataforma; el borrado/descarte vive en el
           menú kebab de la cabecera (`TaskAdminMenu`). */}
       {isAdmin && (

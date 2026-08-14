@@ -3,6 +3,7 @@ import { BarChart3, Users } from 'lucide-react';
 
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { BackButton } from '@/shared/components/BackButton';
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { useProjects } from '@/features/projects/hooks/use-projects';
 
@@ -25,19 +26,23 @@ import { UserPerformanceCard } from '../components/UserPerformanceCard';
 /**
  * Vista de Analíticas (QL-66, §3.24). Dos bloques:
  *  - **Resumen global** (solo ADMIN): totales, throughput y tareas por miembro del sistema.
- *  - **Por proyecto** (ADMIN o creador): selector de proyecto → tiempo por columna, tareas por
- *    miembro, adjuntos y throughput del proyecto.
- * La ruta es autenticada (no solo-ADMIN) para que un creador consulte sus proyectos; el
+ *  - **Por proyecto** (administración o creador): selector de proyecto → tiempo por columna,
+ *    tareas por miembro, adjuntos y throughput del proyecto.
+ * La ruta es autenticada (no gateada por rol) para que un creador consulte sus proyectos; el
  * backend autoriza cada endpoint. El acceso desde el menú es `adminOnly` (ver nav).
+ *
+ * (QL-195) `isAdmin` aquí significa **ADMIN o Dirección**: los bloques globales se abrieron a
+ * los dos roles.
  */
 export function AnalyticsPage() {
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
-  const userId = useAuthStore((s) => s.user?.id);
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
+  const userId = user?.id;
 
   const overview = useAnalyticsOverview();
   const usersPerformance = useUsersPerformance();
 
-  // Proyectos para el selector: ADMIN ve todos; un creador ve solo los suyos (evita 403).
+  // Proyectos para el selector: administración ve todos; un creador ve solo los suyos (evita 403).
   // `limit: 50` es el máximo que admite el DTO de paginación del backend (@Max(50)); pedir
   // más devolvía 400 y la sección "Por proyecto" no cargaba.
   const projectsQuery = useProjects({ limit: 50 });

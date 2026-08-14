@@ -1,5 +1,6 @@
 import { CalendarDays } from 'lucide-react';
 
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { BackButton } from '@/shared/components/BackButton';
 
@@ -17,7 +18,8 @@ import { MemberCalendarView } from '../components/MemberCalendarView';
 export function CalendarPage() {
   const user = useAuthStore((s) => s.user);
 
-  if (user?.role === 'ADMIN') {
+  // (QL-195) El calendario laboral (festivos, fines de semana) se abrió a Dirección.
+  if (hasAtLeastRole(user, 'MANAGER')) {
     return <AdminCalendarPage />;
   }
 
@@ -35,7 +37,7 @@ export function CalendarPage() {
         </div>
         <p className="mt-1 text-sm text-on-surface-variant">
           Consulta tus turnos por día según tu malla horaria, los festivos y los días no
-          laborables. Solo lectura: la configuración la gestiona un administrador.
+          laborables. Solo lectura: la configuración la gestionan Administración y Dirección.
         </p>
       </div>
 

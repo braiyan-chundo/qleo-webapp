@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { useDeactivateUser } from '../hooks/use-users';
+import { userRoleErrorMessage } from '../lib/user-role-errors';
 import type { UserSummary } from '../services/users.service';
 
 interface DeactivateUserDialogProps {
@@ -38,8 +39,11 @@ export function DeactivateUserDialog({
         onOpenChange(false);
       },
       onError: (err) => {
+        // (QL-195) 403 `CANNOT_MANAGE_ADMIN` si Dirección intenta desactivar a un ADMIN. La
+        // fila ya sale deshabilitada; esto cubre la sesión con el rol cacheado o desactualizado.
         toast.error(
-          err instanceof Error ? err.message : 'No se pudo desactivar el usuario.',
+          userRoleErrorMessage(err) ??
+            (err instanceof Error ? err.message : 'No se pudo desactivar el usuario.'),
         );
       },
     });

@@ -1,3 +1,5 @@
+import type { UserRole } from '@/store/auth.store';
+
 /** Acciones registradas por la auditoría (§3.3). */
 export type AuditAction =
   | 'CREATE'
@@ -11,7 +13,8 @@ export type AuditAction =
 export interface AuditActor {
   name: string;
   email: string;
-  role: 'ADMIN' | 'MEMBER';
+  /** (QL-195) Rol de plataforma del actor en el momento de leerlo: puede ser `MANAGER`. */
+  role: UserRole;
 }
 
 /**

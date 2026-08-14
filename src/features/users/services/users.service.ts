@@ -1,12 +1,13 @@
 import { api } from '@/core/api/fetch-client';
 import type { Paginated } from '@/shared/types/paginated';
+import type { UserRole } from '@/store/auth.store';
 
 /** DTO de respuesta del backend para un usuario (§3.2). Sin `passwordHash`. */
 export interface UserSummary {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'MEMBER';
+  role: UserRole;
   status: 'ACTIVE' | 'INACTIVE';
   avatarUrl?: string;
   /** QL-32: proxy privado del avatar subido, o `null` si no hay. */
@@ -15,10 +16,11 @@ export interface UserSummary {
   /**
    * QL-193 (§3.66): fecha de nacimiento como **día civil** `'YYYY-MM-DD'`, o `null`.
    *
-   * **Trampa del contrato:** el backend la enmascara y solo la sirve a su dueño o a un ADMIN.
-   * `null` significa "no tienes permiso para ver el año", **no** "no tiene cumpleaños". Para
-   * saber si lo tiene, mira `birthDay`/`birthMonth`, que viajan siempre. En la práctica todas
-   * las rutas que devuelven este DTO son de ADMIN, así que aquí sí llega completa.
+   * **Trampa del contrato:** el backend la enmascara y solo la sirve a su dueño o a quien
+   * administra (ADMIN o Dirección desde QL-195). `null` significa "no tienes permiso para ver
+   * el año", **no** "no tiene cumpleaños". Para saber si lo tiene, mira `birthDay`/`birthMonth`,
+   * que viajan siempre. En la práctica todas las rutas que devuelven este DTO son del área de
+   * administración, así que aquí sí llega completa.
    */
   birthDate?: string | null;
   /** QL-193: día del mes de nacimiento (1–31), o `null` si no tiene fecha. Sin enmascarar. */
@@ -51,12 +53,12 @@ export interface UserDirectoryEntry {
   jobTitle?: string;
 }
 
-/** DTO de creación de usuario (§3.2, `POST /users`). Solo `ADMIN`. */
+/** DTO de creación de usuario (§3.2, `POST /users`). **ADMIN o Dirección** (QL-195). */
 export interface CreateUserDto {
   name: string;
   email: string;
   password: string;
-  role?: 'ADMIN' | 'MEMBER';
+  role?: UserRole;
   jobTitle?: string;
   /**
    * QL-193 (§3.66): fecha de nacimiento como **día civil** `'YYYY-MM-DD'` literal. Omítela
@@ -74,7 +76,7 @@ export interface UpdateUserDto {
   name?: string;
   email?: string;
   password?: string;
-  role?: 'ADMIN' | 'MEMBER';
+  role?: UserRole;
   jobTitle?: string;
   status?: 'ACTIVE' | 'INACTIVE';
   /**
@@ -89,12 +91,12 @@ export interface UpdateUserDto {
   canUseAi?: boolean;
 }
 
-/** Filtros de listado de usuarios (§3.2). Solo `ADMIN` puede consultarlo. */
+/** Filtros de listado de usuarios (§3.2). **ADMIN o Dirección** (QL-195). */
 export interface UserListParams {
   page?: number;
   limit?: number;
   search?: string;
-  role?: 'ADMIN' | 'MEMBER';
+  role?: UserRole;
   status?: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -110,27 +112,43 @@ function buildQuery(params: UserListParams): string {
 }
 
 export const usersService = {
-  /** Listado completo con paginación. **Solo ADMIN** (pantalla de administración). */
+  /** Listado completo con paginación. **ADMIN o Dirección** (pantalla de administración). */
   list: (params: UserListParams = {}) => {
     return api.get<Paginated<UserSummary>>(`/users${buildQuery(params)}`);
   },
 
-  /** Crea un usuario fijando el rol de plataforma. **Solo ADMIN**. 409 si el email existe. */
+  /**
+   * Crea un usuario fijando el rol de plataforma. **ADMIN o Dirección**. 409 si el email existe.
+   *
+   * (QL-195) 403 `ROLE_ESCALATION_FORBIDDEN` si Dirección intenta crear un `ADMIN` — lo traduce
+   * `userRoleErrorMessage` en `../lib/user-role-errors`.
+   */
   create: (dto: CreateUserDto) => {
     return api.post<UserSummary>('/users', dto);
   },
 
-  /** Obtiene un usuario por id. **Solo ADMIN**. */
+  /** Obtiene un usuario por id. **ADMIN o Dirección**. */
   getById: (id: string) => {
     return api.get<UserSummary>(`/users/${id}`);
   },
 
-  /** Actualiza datos, rol, contraseña o estado. **Solo ADMIN**. */
+  /**
+   * Actualiza datos, rol, contraseña o estado. **ADMIN o Dirección**.
+   *
+   * (QL-195) Tres 403 posibles: `ROLE_ESCALATION_FORBIDDEN` (promover a ADMIN sin serlo),
+   * `CANNOT_MANAGE_ADMIN` (Dirección editando a un ADMIN) y `CANNOT_CHANGE_OWN_ROLE`
+   * (cambiarse el rol a uno mismo, ni el ADMIN puede). Reenviar el rol **sin cambiarlo** no
+   * dispara el último, así que se puede seguir mandando el objeto completo.
+   */
   update: (id: string, dto: UpdateUserDto) => {
     return api.patch<UserSummary>(`/users/${id}`, dto);
   },
 
-  /** Desactiva (soft delete → `status: INACTIVE`). **Solo ADMIN**. */
+  /**
+   * Desactiva (soft delete → `status: INACTIVE`). **ADMIN o Dirección**.
+   *
+   * (QL-195) 403 `CANNOT_MANAGE_ADMIN` si Dirección intenta desactivar a un ADMIN.
+   */
   remove: (id: string) => {
     return api.delete<UserSummary>(`/users/${id}`);
   },

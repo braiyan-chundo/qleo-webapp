@@ -16,6 +16,9 @@ import {
   TablePagination,
 } from '@/shared/components/data-table';
 import { BackButton } from '@/shared/components/BackButton';
+import { USER_ROLES, USER_ROLE_LABEL, roleIsAtLeast } from '@/shared/lib/permissions';
+import { useAuthStore } from '@/store/auth.store';
+import type { UserRole } from '@/store/auth.store';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +48,58 @@ const PAGE_SIZE = 12;
 
 const ALL = 'ALL';
 
+interface UserRowActionsProps {
+  user: UserSummary;
+  /** `false` ⇒ el backend rechazaría la acción (403 `CANNOT_MANAGE_ADMIN`). */
+  canManage: boolean;
+  onEdit: () => void;
+  onDeactivate: () => void;
+  className?: string;
+}
+
+/**
+ * Acciones de una fila de usuario (compartidas por la tabla de desktop y la tarjeta de móvil).
+ *
+ * (QL-195) Con `canManage` en `false` —Dirección mirando a un ADMIN— salen deshabilitadas con
+ * el porqué en el `title`, en vez de dejar pulsar y devolver un toast de error. El backend
+ * sigue siendo la autoridad: esto solo evita ofrecer lo que ya se sabe que va a fallar.
+ */
+function UserRowActions({
+  user,
+  canManage,
+  onEdit,
+  onDeactivate,
+  className,
+}: UserRowActionsProps) {
+  const blockedHint = canManage
+    ? undefined
+    : 'Solo un Administrador del sistema puede gestionar a otro Administrador.';
+
+  return (
+    <div className={className}>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={!canManage}
+        title={blockedHint}
+        onClick={onEdit}
+      >
+        Editar
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-error hover:bg-error-container hover:text-on-error-container"
+        disabled={!canManage || user.status === 'INACTIVE'}
+        title={blockedHint}
+        onClick={onDeactivate}
+      >
+        Desactivar
+      </Button>
+    </div>
+  );
+}
+
 function formatDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
@@ -56,9 +111,19 @@ function formatDate(iso: string): string {
 }
 
 export function UsersAdminPage() {
+  const currentUserRole = useAuthStore((s) => s.user?.role);
+
+  /**
+   * (QL-195) ¿Puede el usuario en sesión gestionar a `target`? Es **≥, no >**: Dirección sí
+   * gestiona a otra Dirección; lo único que no alcanza es un ADMIN (403 `CANNOT_MANAGE_ADMIN`).
+   * Espeja `canGrantOrManageRole` del backend, que es la autoridad — aquí solo decidimos si se
+   * pinta la acción, para no ofrecer un botón que va a fallar.
+   */
+  const canManageUser = (target: UserRole) => roleIsAtLeast(currentUserRole, target);
+
   // Filtros + paginación persistidos en la URL (params: `q`, `rol`, `estado`, `page`).
   const { value: search, setValue: setSearch, committed } = useQueryParamSearch('q', 350);
-  const [role, setRole] = useQueryParamState<'ALL' | 'ADMIN' | 'MEMBER'>('rol', 'ALL');
+  const [role, setRole] = useQueryParamState<'ALL' | UserRole>('rol', 'ALL');
   const [status, setStatus] = useQueryParamState<'ALL' | 'ACTIVE' | 'INACTIVE'>(
     'estado',
     'ALL',
@@ -147,8 +212,11 @@ export function UsersAdminPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Todos los roles</SelectItem>
-            <SelectItem value="ADMIN">Administrador</SelectItem>
-            <SelectItem value="MEMBER">Miembro</SelectItem>
+            {USER_ROLES.map((r) => (
+              <SelectItem key={r} value={r}>
+                {USER_ROLE_LABEL[r]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -224,24 +292,13 @@ export function UsersAdminPage() {
                 <DataCardRow label="Creado">
                   {formatDate(user.createdAt)}
                 </DataCardRow>
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openEdit(user)}
-                  >
-                    Editar
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-error hover:bg-error-container hover:text-on-error-container"
-                    disabled={user.status === 'INACTIVE'}
-                    onClick={() => setDeactivating(user)}
-                  >
-                    Desactivar
-                  </Button>
-                </div>
+                <UserRowActions
+                  user={user}
+                  canManage={canManageUser(user.role)}
+                  onEdit={() => openEdit(user)}
+                  onDeactivate={() => setDeactivating(user)}
+                  className="flex justify-end gap-2 pt-1"
+                />
               </DataCard>
             ))}
           >
@@ -286,24 +343,13 @@ export function UsersAdminPage() {
                     {formatDate(user.createdAt)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openEdit(user)}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-error hover:bg-error-container hover:text-on-error-container"
-                        disabled={user.status === 'INACTIVE'}
-                        onClick={() => setDeactivating(user)}
-                      >
-                        Desactivar
-                      </Button>
-                    </div>
+                    <UserRowActions
+                      user={user}
+                      canManage={canManageUser(user.role)}
+                      onEdit={() => openEdit(user)}
+                      onDeactivate={() => setDeactivating(user)}
+                      className="flex justify-end gap-2"
+                    />
                   </TableCell>
                 </TableRow>
               ))}

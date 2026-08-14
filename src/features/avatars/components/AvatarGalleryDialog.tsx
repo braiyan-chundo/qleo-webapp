@@ -88,7 +88,7 @@ export function AvatarGalleryDialog({
           </div>
         ) : avatars.length === 0 ? (
           <p className="py-10 text-center text-sm text-on-surface-variant">
-            El catálogo de avatares aún está vacío. Un administrador puede añadir fotos desde
+            El catálogo de avatares aún está vacío. Administración o Dirección pueden añadir fotos desde
             Configuración.
           </p>
         ) : (

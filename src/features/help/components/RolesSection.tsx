@@ -3,6 +3,9 @@ import { Check, Layers, Minus, ShieldCheck, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
+import { USER_ROLE_LABEL } from '@/shared/lib/permissions';
+import { useAuthStore } from '@/store/auth.store';
+
 import { useIsAdmin } from '../hooks/use-is-admin';
 import { Section } from './HelpPrimitives';
 
@@ -14,7 +17,7 @@ import { Section } from './HelpPrimitives';
 const PERMISSION_LEVELS: { title: string; body: string }[] = [
   {
     title: 'Rol de plataforma',
-    body: 'Global y único: Administrador o Miembro. El Administrador gestiona los usuarios, el calendario laboral, las analíticas y la auditoría; el Miembro trabaja en sus proyectos.',
+    body: 'Global y único: Administrador, Dirección o Miembro. Administración y Dirección gestionan los usuarios, el calendario laboral, las analíticas y la auditoría; el Miembro trabaja en sus proyectos.',
   },
   {
     title: 'Permisos del proyecto',
@@ -87,6 +90,9 @@ function MatrixCell({ value }: { value: Cell }) {
 
 export function RolesSection() {
   const isAdmin = useIsAdmin();
+  // (QL-195) La etiqueta sale del rol REAL, no de `isAdmin`: con tres roles, derivarla de un
+  // booleano le diría «Administrador» a alguien de Dirección.
+  const role = useAuthStore((s) => s.user?.role);
 
   return (
     <div className="space-y-6">
@@ -122,7 +128,7 @@ export function RolesSection() {
                 : 'bg-surface-container-high text-on-surface-variant',
             )}
           >
-            {isAdmin ? 'Administrador' : 'Miembro'}
+            {role ? USER_ROLE_LABEL[role] : '—'}
           </Badge>
           <span>
             {isAdmin
@@ -151,12 +157,12 @@ export function RolesSection() {
         <div className="mt-4 rounded-lg border border-outline-variant/40 bg-surface-container-low p-4">
           <p className="flex items-center gap-2 text-sm font-medium text-on-surface">
             <ShieldCheck className="size-4 text-primary" />
-            Ser Administrador no te da ningún rol aquí
+            Tu rol de plataforma no te da ningún rol aquí
           </p>
           <p className="mt-1 text-sm text-on-surface-variant">
             Estos cuatro roles se asignan{' '}
             <span className="font-medium text-on-surface">tarea por tarea</span> y no tienen
-            relación con el rol de plataforma: un Administrador que solo sea{' '}
+            relación con el rol de plataforma: alguien de Administración que solo sea{' '}
             <span className="font-medium text-on-surface">Observador</span> de una tarea no
             puede tocarla, y un Miembro que sea el{' '}
             <span className="font-medium text-on-surface">Creador</span> de la suya manda en

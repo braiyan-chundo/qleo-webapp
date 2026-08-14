@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { dashboardService } from '../services/dashboard.service';
 import { dashboardKeys } from './use-my-dashboard';
@@ -15,13 +16,15 @@ const STALE_TIME = 30_000;
 const REFETCH_INTERVAL = 45_000;
 
 /**
- * Panel de administración (`GET /dashboard/admin`). Solo corre si hay sesión **y** el
- * usuario es ADMIN — el backend igual lo protege con 403, pero evitamos la llamada para
- * un MEMBER. Expone `data`/`isLoading`/`isError`/`refetch` para pintar loading/error/UI.
+ * Panel de administración (`GET /dashboard/admin`). Solo corre si hay sesión **y** el usuario
+ * es ADMIN o **Dirección** (QL-195) — el backend igual lo protege con 403, pero evitamos la
+ * llamada para un MEMBER. Expone `data`/`isLoading`/`isError`/`refetch` para pintar
+ * loading/error/UI.
  */
 export function useAdminDashboard() {
   const token = useAuthStore((s) => s.accessToken);
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
 
   return useQuery({
     queryKey: dashboardKeys.admin(),

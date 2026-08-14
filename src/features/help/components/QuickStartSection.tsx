@@ -16,7 +16,7 @@ const QUICK_STEPS: { title: string; body: ReactNode }[] = [
         </Link>{' '}
         y pulsa «Nuevo proyecto». Ponle nombre (obligatorio) y, si quieres, código,
         cliente/grupo y un color para reconocerlo. Si no ves el botón, es que aún no tienes
-        el permiso para crear proyectos: pídeselo a un administrador.
+        el permiso para crear proyectos: pídeselo a Administración o a Dirección.
       </>
     ),
   },

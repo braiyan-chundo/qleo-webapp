@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { ApiError } from '@/core/api/fetch-client';
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -71,7 +72,10 @@ interface CompletionSectionProps {
 export function CompletionSection({ task, projectId }: CompletionSectionProps) {
   const currentUserId = useAuthStore((s) => s.user?.id);
   const role = effectiveTaskRole(task, currentUserId);
-  const isPlatformAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  // (QL-195) Rol de PLATAFORMA (no el rol por tarea): ADMIN o Dirección. `POST /tasks/:id/complete`
+  // usa exactamente el mismo mínimo en el backend.
+  const currentUser = useAuthStore((s) => s.user);
+  const isPlatformAdmin = hasAtLeastRole(currentUser, 'MANAGER');
 
   const isCreator = role === 'CREATOR';
   const isAssignee = role === 'ASSIGNEE';

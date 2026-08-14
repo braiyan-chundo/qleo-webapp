@@ -140,8 +140,8 @@ export function MemberCalendarView({ userId, ownCalendar = true }: MemberCalenda
                 : 'Este usuario no tiene mallas asignadas'}
             </span>
             <span className="text-on-surface-variant">
-              Se muestran los festivos y días no laborables. La malla horaria la asigna un
-              administrador.
+              Se muestran los festivos y días no laborables. La malla horaria la asigna
+              Administración o Dirección.
             </span>
           </div>
         </div>

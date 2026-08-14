@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import type { Attachment } from '@/features/attachments/services/attachments.service';
 import { AttachmentIcon } from '@/features/attachments/components/AttachmentIcon';
@@ -54,7 +55,9 @@ type CanDelete = (attachment: Attachment) => boolean;
  */
 export function WallSharedContent({ type, query, skeletonCount = 6 }: WallSharedContentProps) {
   const currentUserId = useAuthStore((s) => s.user?.id);
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  // (QL-195) `DELETE /attachments/:id` autoriza a ADMIN **o Dirección** (o al autor).
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = hasAtLeastRole(currentUser, 'MANAGER');
   const deleteAttachment = useDeleteSharedAttachment();
   const [target, setTarget] = useState<Attachment | null>(null);
 

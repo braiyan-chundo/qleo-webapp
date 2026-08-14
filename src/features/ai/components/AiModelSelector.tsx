@@ -91,7 +91,7 @@ function ModelStateSummary({ state }: { state: AiModelState }) {
 
   const effectiveNote =
     state.effectiveSource === 'configured'
-      ? 'Elegido por un administrador.'
+      ? 'Elegido por administración.'
       : state.effectiveSource === 'planDefault'
         ? 'Por defecto del plan de ChatGPT.'
         : 'El motor de IA no respondió; se usará el por defecto del plan.';

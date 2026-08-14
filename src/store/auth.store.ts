@@ -3,11 +3,34 @@ import { persist } from 'zustand/middleware';
 
 import { clearImageCache } from '@/shared/lib/image-cache';
 
+/**
+ * QL-195 (§3.67) — Rol de **plataforma**. Son **jerárquicos**: `ADMIN` > `MANAGER` > `MEMBER`.
+ *
+ * | Valor | Etiqueta en la UI | Quién |
+ * |---|---|---|
+ * | `ADMIN` | Administrador | El usuario de **sistemas** |
+ * | `MANAGER` | **Dirección** | La gerencia del Grupo Happy |
+ * | `MEMBER` | Miembro | El resto |
+ *
+ * `MANAGER` se pinta **siempre** como «Dirección» (`USER_ROLE_LABEL` en
+ * `@/shared/lib/permissions`): nunca «Manager» ni «Gerente». Hoy puede todo lo que puede un
+ * ADMIN salvo enlazar/desenlazar la cuenta de ChatGPT; la separación existe para poder
+ * divergir después.
+ *
+ * ⚠️ **Colisión de nombres:** `project.managerIds` (los gestores **de un proyecto**, QL-41) no
+ * tiene nada que ver con este rol. Un gestor de proyecto suele ser un MEMBER, y un MANAGER no
+ * aparece en `managerIds` de nada. Se leen igual y son cosas distintas.
+ *
+ * Nunca compares por igualdad (`role === 'ADMIN'`): usa `hasAtLeastRole` de
+ * `@/shared/lib/permissions`, que es donde vive la jerarquía.
+ */
+export type UserRole = 'ADMIN' | 'MANAGER' | 'MEMBER';
+
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'MEMBER';
+  role: UserRole;
   status: 'ACTIVE' | 'INACTIVE';
   /** Fallback EXTERNO: URL de imagen pública (texto). Ausente si nunca se estableció. */
   avatarUrl?: string;

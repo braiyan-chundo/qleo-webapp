@@ -58,7 +58,7 @@ const WALL_TOPICS: HelpFeature[] = [
   {
     icon: <Pin className="size-4 text-primary" />,
     term: 'Fijados',
-    desc: 'Solo un Administrador puede fijar (o desfijar) mensajes destacados para que queden accesibles arriba.',
+    desc: 'Fijar (o desfijar) mensajes destacados para que queden accesibles arriba está reservado a Administración y Dirección.',
   },
   {
     icon: <Search className="size-4 text-primary" />,

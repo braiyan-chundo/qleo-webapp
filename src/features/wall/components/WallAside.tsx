@@ -70,7 +70,7 @@ export function WallAside({ variant = 'desktop', onClose }: WallAsideProps) {
           </header>
           <p className="px-1 text-xs leading-relaxed text-on-surface-variant">
             Canal oficial de anuncios y discusión general del equipo. Todos los usuarios pueden
-            leer y participar; los administradores fijan los mensajes importantes.
+            leer y participar; Administración y Dirección fijan los mensajes importantes.
           </p>
         </section>
 

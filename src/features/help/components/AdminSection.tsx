@@ -14,14 +14,14 @@ import {
 import { Section, FeatureList, type HelpFeature } from './HelpPrimitives';
 
 /**
- * Pestaña «Administración» de la Ayuda (QL-128). **Solo la ve un ADMIN de plataforma**: el
- * filtro está en `HELP_TABS` (`adminOnly`), y cada `Section` lo repite por si acaso.
+ * Pestaña «Administración» de la Ayuda (QL-128). **Solo la ve el área de administración**
+ * —ADMIN o Dirección (QL-195)—: el filtro está en `HELP_TABS` (`adminOnly`), y cada `Section`
+ * lo repite por si acaso.
  *
- * Documenta lo que es **exclusivo** del rol ADMIN, verificado contra el código: rutas
- * `adminOnly` del nav (`shared/config/nav.ts`) con guard `AdminRoute`, el gating por
- * `role === 'ADMIN'` del muro y del análisis de tarea, y los ajustes globales (QL-129).
- * Lo que un creador/gestor de proyecto también puede hacer va aparte, al final, para no
- * confundir «solo ADMIN» con «ADMIN o creador».
+ * Documenta lo que **un MEMBER no puede hacer**, verificado contra el código: rutas `adminOnly`
+ * del nav (`shared/config/nav.ts`) con guard `AdminRoute`, el gate por rol de plataforma del
+ * muro y del análisis de tarea, y los ajustes globales (QL-129). Lo que un creador/gestor de
+ * proyecto también puede hacer va aparte, al final, para no confundirlo con esto.
  */
 const ADMIN_TOOLS: HelpFeature[] = [
   {
@@ -109,7 +109,7 @@ export function AdminSection() {
       <Section
         icon={<ShieldCheck className="size-5" />}
         title="Tu área de administración"
-        description="Lo que puedes hacer por ser Administrador de plataforma. Nada de esta pestaña la ve un miembro."
+        description="Lo que puedes hacer por administrar la plataforma. Nada de esta pestaña la ve un miembro."
         adminOnly
       >
         <FeatureList items={ADMIN_TOOLS} />
@@ -123,8 +123,9 @@ export function AdminSection() {
       >
         <div className="space-y-3 text-sm text-on-surface-variant">
           <p>
-            Un <span className="font-medium text-on-surface">Administrador</span> siempre
-            puede crear proyectos. Un{' '}
+            <span className="font-medium text-on-surface">Administración</span> y{' '}
+            <span className="font-medium text-on-surface">Dirección</span> siempre pueden crear
+            proyectos. Un{' '}
             <span className="font-medium text-on-surface">Miembro</span> solo puede si se lo
             concedes: por defecto <span className="font-medium text-on-surface">no</span>{' '}
             puede, y sin el permiso ni siquiera le aparece el botón «Nuevo proyecto».
@@ -144,7 +145,7 @@ export function AdminSection() {
       <Section
         icon={<Users className="size-5" />}
         title="Esto NO es exclusivo tuyo"
-        description="Acciones que también puede hacer alguien sin ser Administrador. Conviene no confundirlas."
+        description="Acciones que también puede hacer alguien que no administra la plataforma. Conviene no confundirlas."
         adminOnly
       >
         <ul className="space-y-2 text-sm text-on-surface-variant">
@@ -171,8 +172,8 @@ export function AdminSection() {
         <p className="mt-4 rounded-lg border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
           Y recuerda que los cuatro roles{' '}
           <span className="font-medium text-on-surface">por tarea</span>{' '}
-          (Creador/Responsable/Colaborador/Observador) van por su cuenta: ser Administrador
-          no te da ningún rol dentro de una tarea. Los tienes en la pestaña{' '}
+          (Creador/Responsable/Colaborador/Observador) van por su cuenta: administrar la
+          plataforma no te da ningún rol dentro de una tarea. Los tienes en la pestaña{' '}
           <span className="font-medium text-on-surface">Roles</span>.
         </p>
       </Section>

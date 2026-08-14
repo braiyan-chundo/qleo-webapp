@@ -93,7 +93,7 @@ export function ProfileInfoForm({ user }: ProfileInfoFormProps) {
           {user.email}
         </p>
         <p className="text-xs text-on-surface-variant">
-          El correo y el rol solo los cambia un administrador.
+          El correo y el rol solo los cambia Administración o Dirección.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ export function ProfileInfoForm({ user }: ProfileInfoFormProps) {
             value={field.value ?? ''}
             onChange={field.onChange}
             disabled={updateMutation.isPending}
-            hint="Solo tú y los administradores veis el año. En el calendario del equipo se marca el día, sin la edad."
+            hint="Solo tú y quien administra la plataforma veis el año. En el calendario del equipo se marca el día, sin la edad."
           />
         )}
       />

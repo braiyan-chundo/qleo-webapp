@@ -157,7 +157,7 @@ export function BoardConfigPanel({ project }: BoardConfigPanelProps) {
           </Label>
           <p className="mt-1 text-xs text-on-surface-variant">
             Si se desactiva, la columna Backlog y sus tareas se ocultan a los miembros que no
-            sean el creador ni administrador.
+            sean el creador ni administren la plataforma.
           </p>
         </div>
         <Switch

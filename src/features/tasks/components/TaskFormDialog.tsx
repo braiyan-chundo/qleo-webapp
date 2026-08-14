@@ -92,7 +92,7 @@ function taskFormErrorMessage(err: unknown, fallback: string): string {
       case 'READ_ONLY_ROLE':
         return 'Tu rol en esta tarea es de solo lectura.';
       case 'TASK_OWNERSHIP_REQUIRED':
-        return 'Solo el Creador de la tarea o un administrador pueden editarla.';
+        return 'Editar la tarea está reservado a su Creador y a quien administra la plataforma.';
       case 'COLUMN_SEQUENCE_VIOLATION':
         // (QL-135, §3.33) Misma regla que espeja `lib/column-sequence` en el board.
         return 'Solo puedes mover la tarea a una columna contigua.';
@@ -331,7 +331,7 @@ export function TaskFormDialog({
           <DialogTitle>{isEdit ? 'Editar tarea' : 'Nueva tarea'}</DialogTitle>
           <DialogDescription>
             {isFullEdit
-              ? 'Edición completa de administrador: se guardan de una vez los datos, la fecha límite y los participantes. El título es obligatorio.'
+              ? 'Edición completa de administración: se guardan de una vez los datos, la fecha límite y los participantes. El título es obligatorio.'
               : 'Cada tarea pertenece a una columna de estado. El título es obligatorio.'}
           </DialogDescription>
         </DialogHeader>

@@ -1,3 +1,4 @@
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 
 import { AdminDashboard } from '../components/AdminDashboard';
@@ -5,8 +6,9 @@ import { PersonalDashboard } from '../components/PersonalDashboard';
 import { RecentProjectsCard } from '../components/RecentProjectsCard';
 
 /**
- * Vista inicial tras login (`/`): el **panel role-aware** (QL-20). ADMIN ve el resumen de la
- * plataforma (`AdminDashboard`); el resto, su panel personal (`PersonalDashboard`).
+ * Vista inicial tras login (`/`): el **panel role-aware** (QL-20). ADMIN y **Dirección**
+ * (QL-195) ven el resumen de la plataforma (`AdminDashboard`); el resto, su panel personal
+ * (`PersonalDashboard`).
  *
  * QL-95 (D-K1) devolvió `/` al panel sin pestañas: el Muro Corporativo vive ahora en su propia
  * ruta (`/muro`, `WallPage`), no como pestaña del dashboard.
@@ -18,7 +20,8 @@ import { RecentProjectsCard } from '../components/RecentProjectsCard';
  * sola vez, y ningún rol se queda sin ella.
  */
 export function DashboardPage() {
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
 
   return (
     <div className="space-y-6 p-4 md:p-8">

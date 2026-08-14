@@ -9,8 +9,8 @@ const CODE_MESSAGES: Record<string, string> = {
   AI_ENGINE_UNAVAILABLE:
     'El motor de IA no está disponible ahora. Inténtalo de nuevo en un momento.',
   AI_NOT_AUTHENTICATED:
-    'La conexión con ChatGPT caducó. Un administrador debe reconectarla en Configuración.',
-  AI_ACCESS_DENIED: 'No tienes acceso al panel de IA. Pídeselo a un administrador.',
+    'La conexión con ChatGPT caducó. Un Administrador del sistema debe reconectarla en Configuración.',
+  AI_ACCESS_DENIED: 'No tienes acceso al panel de IA. Pídeselo a Administración o a Dirección.',
   AI_PROVIDER_ERROR: 'El asistente tuvo un problema al responder. Inténtalo de nuevo.',
   AI_ACTION_EXPIRED:
     'La propuesta caducó o ya no está disponible. Vuelve a pedirla en el chat.',
@@ -21,7 +21,7 @@ const CODE_MESSAGES: Record<string, string> = {
     'Ese modelo no está en el listado. Elige uno de la lista o añádelo primero.',
   AI_MODEL_ALREADY_LISTED: 'Ese modelo ya está en el listado; búscalo más abajo.',
   AI_MODEL_NOT_LISTED:
-    'Ese modelo no se puede quitar: lo publica el motor de IA, no lo añadió un administrador.',
+    'Ese modelo no se puede quitar: lo publica el motor de IA, no se añadió a mano.',
   AI_MODEL_IN_USE:
     'No puedes quitar el modelo que está activo. Elige primero otro modelo (o "Automático") y vuelve a intentarlo.',
 };

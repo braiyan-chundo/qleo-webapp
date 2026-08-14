@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/sheet';
 import { NavBadge } from '@/shared/components/NavBadge';
 import { useAuthStore } from '@/store/auth.store';
-import { canUseAi } from '@/shared/lib/permissions';
+import { canUseAi, hasAtLeastRole } from '@/shared/lib/permissions';
 import { useWallUnreadCount } from '@/features/wall/hooks/use-wall';
 import {
   bottomNavItems,
@@ -35,7 +35,8 @@ import {
 export function BottomNav() {
   const { pathname } = useLocation();
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'ADMIN';
+  // (QL-195) `adminOnly` en el nav = área de administración: ADMIN **o** Dirección.
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
   // (QL-190) Gate del "Asistente IA" en el menú "Más".
   const aiAllowed = canUseAi(user);
   const { count: wallUnread } = useWallUnreadCount();

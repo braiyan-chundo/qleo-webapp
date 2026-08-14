@@ -1,3 +1,4 @@
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import type { User } from '@/store/auth.store';
 import type { Project } from '../types/project';
 
@@ -22,9 +23,15 @@ type ProjectPermissionFields = Pick<Project, 'createdBy' | 'managerIds'>;
  * ¿El usuario puede **gestionar** el proyecto? → editar, archivar, configurar el tablero
  * (columnas/plantilla) y subir documentos de proyecto.
  *
- * Autoriza a `ADMIN`, al **creador** y a un miembro con **permiso de gestión otorgado**
- * (`managerIds`). Espeja `ProjectsService.assertCanManageProject` del backend (y su gemelo
- * en `ColumnsService`, que reserva las columnas y la plantilla a esos mismos tres).
+ * Autoriza a la **administración de plataforma** (ADMIN o Dirección, QL-195), al **creador** y
+ * a un miembro con **permiso de gestión otorgado** (`managerIds`). Espeja
+ * `ProjectsService.assertCanManageProject` del backend (y su gemelo en `ColumnsService`, que
+ * reserva las columnas y la plantilla a esos mismos tres).
+ *
+ * ⚠️ **Trampa de nombres:** `project.managerIds` son los **gestores de este proyecto** (QL-41),
+ * que suelen ser MEMBER. No tiene nada que ver con el rol de plataforma `MANAGER`
+ * («Dirección»), que entra por la primera rama. Se leen igual y son dos cosas distintas:
+ * un MANAGER gestiona **todos** los proyectos sin estar en `managerIds` de ninguno.
  *
  * Ojo: NO habilita gestionar la membresía ni otorgar/revocar gestores → `canManageMembership`.
  */
@@ -34,7 +41,7 @@ export function canManageProject(
 ): boolean {
   if (!project || !user) return false;
   return (
-    user.role === 'ADMIN' ||
+    hasAtLeastRole(user, 'MANAGER') ||
     project.createdBy === user.id ||
     project.managerIds.includes(user.id)
   );
@@ -44,13 +51,14 @@ export function canManageProject(
  * ¿El usuario puede gestionar la **membresía y los permisos** del proyecto? → añadir/quitar
  * miembros y otorgar/revocar el permiso de gestión.
  *
- * Más estricta que `canManageProject`: solo `ADMIN` o el **creador**. Un gestor otorgado puede
- * configurar el proyecto pero no repartir permisos. Espeja `assertCanManageMembership`.
+ * Más estricta que `canManageProject`: solo la **administración de plataforma** (ADMIN o
+ * Dirección, QL-195) o el **creador**. Un gestor otorgado (`managerIds`) puede configurar el
+ * proyecto pero no repartir permisos. Espeja `assertCanManageMembership`.
  */
 export function canManageMembership(
   project: Pick<Project, 'createdBy'> | null | undefined,
   user: User | null | undefined,
 ): boolean {
   if (!project || !user) return false;
-  return user.role === 'ADMIN' || project.createdBy === user.id;
+  return hasAtLeastRole(user, 'MANAGER') || project.createdBy === user.id;
 }

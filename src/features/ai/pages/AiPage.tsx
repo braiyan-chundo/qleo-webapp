@@ -4,6 +4,7 @@ import { Loader2, MessageSquareText, PlugZap, Sparkles } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { ApiError } from '@/core/api/fetch-client';
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/button';
 import {
@@ -47,7 +48,13 @@ function GateMessage({ icon, title, description, action }: GateMessageProps) {
  * un Sheet; en desktop es una columna fija.
  */
 export function AiPage() {
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  /**
+   * (QL-195) ADMIN **literal**, a propósito. El CTA lleva a conectar la cuenta de ChatGPT, y
+   * conectar sigue siendo exclusivo del usuario de sistemas: a Dirección le mandaría a una
+   * pantalla donde solo puede mirar. Para ellos vale el texto del mensaje, que ya dice a quién
+   * pedírselo. No confundir con `canUseAi`, que sí incluye a Dirección.
+   */
+  const canConnectAi = hasAtLeastRole(useAuthStore((s) => s.user), 'ADMIN');
   const { data: status, isLoading, isError, error } = useAiStatus();
 
   const chat = useAiChat();
@@ -95,7 +102,7 @@ export function AiPage() {
       <GateMessage
         icon={<Sparkles className="size-7" />}
         title="No tienes acceso al panel de IA"
-        description="Un administrador puede habilitártelo desde la administración de usuarios."
+        description="Pídeselo a Administración o a Dirección: se habilita desde la administración de usuarios."
       />
     );
   }
@@ -107,9 +114,9 @@ export function AiPage() {
       <GateMessage
         icon={<PlugZap className="size-7" />}
         title="El panel de IA aún no está conectado"
-        description="Pídele a un administrador que conecte la cuenta de ChatGPT en Configuración → Conexión IA para empezar a usar el asistente."
+        description="Pídele a un Administrador del sistema que conecte la cuenta de ChatGPT en Configuración → Conexión IA para empezar a usar el asistente."
         action={
-          isAdmin ? (
+          canConnectAi ? (
             <Button asChild>
               <Link to="/admin/configuracion?tab=conexion-ia">Ir a Conexión IA</Link>
             </Button>

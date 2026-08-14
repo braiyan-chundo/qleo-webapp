@@ -33,6 +33,7 @@ import { ProjectLabelManager } from '@/features/labels/components/ProjectLabelMa
 import type { Label as CatalogLabel } from '@/features/labels/services/labels.service';
 
 import { ProjectColorPicker } from './ProjectColorPicker';
+import { canManageMembership } from '../utils/permissions';
 import { MemberMultiSelect } from './MemberMultiSelect';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
 import type {
@@ -96,8 +97,10 @@ export function ProjectFormDialog({
   // envían como `labelIds` al guardar, tanto en creación como en edición.
   const [labels, setLabels] = useState<CatalogLabel[]>([]);
 
-  const canManage =
-    isEdit && !!user && (user.role === 'ADMIN' || project.createdBy === user.id);
+  // (QL-195) Gestionar la membresía es la regla estricta: administración de plataforma (ADMIN o
+  // Dirección) o el creador. Se delega en `canManageMembership` en vez de recalcular la
+  // expresión aquí, que es justo lo que la desincronizaba (ver el JSDoc de ese módulo).
+  const canManage = isEdit && canManageMembership(project, user);
 
   const {
     register,

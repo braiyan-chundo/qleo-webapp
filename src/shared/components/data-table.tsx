@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 import { Table } from '@/components/ui/table';
+import { USER_ROLE_LABEL } from '@/shared/lib/permissions';
+import type { UserRole } from '@/store/auth.store';
 
 /**
  * Subcomponentes reutilizables para las tablas del producto (usuarios, auditoría, lista de
@@ -170,19 +172,24 @@ export function StatusDot({ tone, label }: { tone: StatusTone; label: string }) 
   );
 }
 
-/** Badge del rol de plataforma: Administrador (verde tonal) · Miembro (azul tonal). */
-export function RoleBadge({ role }: { role: 'ADMIN' | 'MEMBER' }) {
-  return (
-    <Badge
-      className={
-        role === 'ADMIN'
-          ? 'bg-palette-green-surface text-palette-green-on-surface'
-          : 'bg-palette-blue-surface text-palette-blue-on-surface'
-      }
-    >
-      {role === 'ADMIN' ? 'Administrador' : 'Miembro'}
-    </Badge>
-  );
+/**
+ * Color tonal por rol de plataforma (QL-195). Tres tonos de la paleta de etiquetas, elegidos
+ * para distinguirse entre sí en claro y en oscuro: Administrador verde, **Dirección** púrpura
+ * (el rol nuevo estrena un tono propio; púrpura no se confunde ni con el verde ni con el azul),
+ * Miembro azul.
+ */
+const ROLE_BADGE_CLASS: Record<UserRole, string> = {
+  ADMIN: 'bg-palette-green-surface text-palette-green-on-surface',
+  MANAGER: 'bg-palette-purple-surface text-palette-purple-on-surface',
+  MEMBER: 'bg-palette-blue-surface text-palette-blue-on-surface',
+};
+
+/**
+ * Badge del rol de plataforma. La etiqueta sale de `USER_ROLE_LABEL`, que es donde vive el
+ * copy: `MANAGER` se pinta **«Dirección»**, nunca «Manager».
+ */
+export function RoleBadge({ role }: { role: UserRole }) {
+  return <Badge className={ROLE_BADGE_CLASS[role]}>{USER_ROLE_LABEL[role]}</Badge>;
 }
 
 /** Pie de paginación: "Mostrando X–Y de Z {itemLabel}" + controles anterior/siguiente. */

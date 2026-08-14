@@ -251,7 +251,7 @@ export function ProjectsPage() {
                 ? 'Los proyectos que archives aparecerán aquí.'
                 : canCreate
                   ? 'Crea tu primer proyecto para empezar a trabajar.'
-                  : 'Un administrador puede agregarte a un proyecto; cuando lo haga, aparecerá aquí.'}
+                  : 'Administración o Dirección pueden agregarte a un proyecto; cuando lo hagan, aparecerá aquí.'}
           </p>
           {canCreate && !archived && !debouncedSearch && (
             <Button onClick={openCreate} className="mt-5 h-10">

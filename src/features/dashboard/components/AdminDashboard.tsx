@@ -10,9 +10,11 @@ import {
   UserCheck,
 } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
+import type { UserRole } from '@/store/auth.store';
 import { timeAgo } from '@/features/notifications/lib/notification-text';
 import type { AuditAction } from '@/features/audit/types/audit';
 
@@ -82,7 +84,10 @@ export function AdminDashboard() {
     );
   }
 
-  const totalUsers = data.usersByRole.ADMIN + data.usersByRole.MEMBER;
+  // (QL-195) La suma de los TRES cubos. Con `ADMIN + MEMBER` los de Dirección desaparecían
+  // del censo y el KPI "Total de usuarios" quedaba por debajo de "Usuarios activos".
+  const totalUsers =
+    data.usersByRole.ADMIN + data.usersByRole.MANAGER + data.usersByRole.MEMBER;
 
   return (
     <div className="space-y-6">
@@ -240,11 +245,23 @@ interface RolesCardProps {
   total: number;
 }
 
+/**
+ * (QL-195) Los **tres** cubos del censo, en orden de poder. `dot`/`bar` usan tokens M3 con
+ * suficiente contraste entre sí; la etiqueta es la del rol, con Dirección para `MANAGER`.
+ *
+ * Se recorre la lista en vez de escribir tres bloques a mano justamente porque este componente
+ * ya se quedó corto una vez: pintaba `ADMIN` y `MEMBER` fijos, y añadir un rol dejaba a tres
+ * personas fuera del desglose sin que nada fallara.
+ */
+const ROLE_SLICES: { role: UserRole; label: string; tone: string }[] = [
+  { role: 'ADMIN', label: 'Administradores', tone: 'bg-primary' },
+  // «Dirección» ya es colectivo: no lleva plural como los otros dos.
+  { role: 'MANAGER', label: 'Dirección', tone: 'bg-secondary' },
+  { role: 'MEMBER', label: 'Miembros', tone: 'bg-tertiary' },
+];
+
 /** Desglose de usuarios por rol de plataforma con barra proporcional. */
 function RolesCard({ usersByRole, total }: RolesCardProps) {
-  const adminPct = total > 0 ? Math.round((usersByRole.ADMIN / total) * 100) : 0;
-  const memberPct = total > 0 ? 100 - adminPct : 0;
-
   return (
     <section className="flex flex-col rounded-xl border border-outline-variant/40 bg-surface-container-low p-5">
       <div className="mb-4 flex items-center gap-2">
@@ -252,36 +269,32 @@ function RolesCard({ usersByRole, total }: RolesCardProps) {
         <h2 className="text-base font-semibold text-on-surface">Roles y permisos</h2>
       </div>
 
-      {/* Barra proporcional */}
+      {/* Barra proporcional. Los porcentajes se derivan del mismo `total` (suma de los tres
+          cubos), así que no hay que "cuadrar" el último tramo a mano. */}
       <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-container-high">
-        {total > 0 && (
-          <>
-            <div className="h-full bg-primary" style={{ width: `${adminPct}%` }} />
-            <div className="h-full bg-tertiary" style={{ width: `${memberPct}%` }} />
-          </>
-        )}
+        {total > 0 &&
+          ROLE_SLICES.map(({ role, tone }) => (
+            <div
+              key={role}
+              className={cn('h-full', tone)}
+              style={{ width: `${(usersByRole[role] / total) * 100}%` }}
+            />
+          ))}
       </div>
 
       {/* Leyenda / desglose */}
       <dl className="mt-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <dt className="inline-flex items-center gap-2 text-sm text-on-surface-variant">
-            <span className="size-2.5 rounded-full bg-primary" />
-            Administradores
-          </dt>
-          <dd className="text-sm font-semibold tabular-nums text-on-surface">
-            {usersByRole.ADMIN}
-          </dd>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="inline-flex items-center gap-2 text-sm text-on-surface-variant">
-            <span className="size-2.5 rounded-full bg-tertiary" />
-            Miembros
-          </dt>
-          <dd className="text-sm font-semibold tabular-nums text-on-surface">
-            {usersByRole.MEMBER}
-          </dd>
-        </div>
+        {ROLE_SLICES.map(({ role, label, tone }) => (
+          <div key={role} className="flex items-center justify-between gap-3">
+            <dt className="inline-flex items-center gap-2 text-sm text-on-surface-variant">
+              <span className={cn('size-2.5 rounded-full', tone)} />
+              {label}
+            </dt>
+            <dd className="text-sm font-semibold tabular-nums text-on-surface">
+              {usersByRole[role]}
+            </dd>
+          </div>
+        ))}
       </dl>
 
       <Button asChild variant="outline" size="sm" className="mt-5 w-full">

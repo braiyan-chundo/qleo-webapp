@@ -63,7 +63,7 @@ const CONCEPTS: HelpConcept[] = [
   {
     term: 'Permiso para crear proyectos',
     icon: <FolderPlus className="size-4 text-primary" />,
-    desc: 'Crear proyectos no lo puede todo el mundo: un administrador siempre puede, y un miembro solo si un administrador se lo concede. Sin el permiso, el botón «Nuevo proyecto» no aparece.',
+    desc: 'Crear proyectos no lo puede todo el mundo: Administración y Dirección siempre pueden, y un miembro solo si se lo conceden. Sin el permiso, el botón «Nuevo proyecto» no aparece.',
   },
   {
     term: 'Creador y Gestor del proyecto',

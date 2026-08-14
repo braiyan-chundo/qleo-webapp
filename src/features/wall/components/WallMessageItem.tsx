@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
 import { CollapsibleText } from '@/shared/components/CollapsibleText';
@@ -102,7 +103,9 @@ export function WallMessageItem({
     message;
 
   const currentUserId = useAuthStore((s) => s.user?.id);
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  // (QL-195) Fijar/destacar en el muro se abrió a Dirección.
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = hasAtLeastRole(currentUser, 'MANAGER');
   const isOwn = !!currentUserId && author.id === currentUserId;
   const canEdit = isOwn && !pending;
   // (QL-102) Borrar es SOLO del autor: ni ADMIN puede borrar mensajes ajenos. El backend valida

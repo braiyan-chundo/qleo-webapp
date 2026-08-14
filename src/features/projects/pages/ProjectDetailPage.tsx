@@ -50,6 +50,7 @@ import { BoardFilterPanel } from '@/features/tasks/components/BoardFilterPanel';
 import { useTaskFilters } from '@/features/tasks/hooks/use-task-filters';
 import { projectDot } from '@/features/tasks/lib/palette';
 
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 
 import { useProject } from '../hooks/use-projects';
@@ -108,11 +109,12 @@ function isBoardView(value: string | null): value is BoardView {
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'ADMIN';
+  // (QL-195) Administración de plataforma: ADMIN o Dirección. Gobierna la pestaña "Descartadas".
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
   const { data: project, isLoading, isError, error } = useProject(id);
 
-  // (QL-169) ¿El usuario ve TODAS las tareas del proyecto? `canManageProject` ya cubre ADMIN de
-  // plataforma + creador + gestor (equivale a `canSeeAll`). El backend aplica la misma regla al
+  // (QL-169) ¿El usuario ve TODAS las tareas del proyecto? `canManageProject` ya cubre la
+  // administración de plataforma + creador + gestor del proyecto (equivale a `canSeeAll`). El backend aplica la misma regla al
   // servir `GET /tasks?projectId=`; la UI solo espeja qué filtro mostrar.
   const canSeeAll = canManageProject(project, user);
   // (QL-169/QL-52) Opciones del filtro de Responsable = TODOS los miembros del proyecto (no solo
@@ -140,8 +142,9 @@ export function ProjectDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const viewParam = searchParams.get('view');
   const rawView: BoardView = isBoardView(viewParam) ? viewParam : DEFAULT_VIEW;
-  // (QL-142) "Descartadas" es solo-ADMIN: si un no-ADMIN fuerza `?view=discarded` por URL,
-  // se cae a la vista por defecto en vez de mostrar una pestaña que no le corresponde.
+  // (QL-142/QL-195) "Descartadas" es del área de administración (ADMIN o Dirección): si otro
+  // rol fuerza `?view=discarded` por URL, se cae a la vista por defecto en vez de mostrar una
+  // pestaña que no le corresponde.
   const view: BoardView =
     rawView === 'discarded' && !isAdmin ? DEFAULT_VIEW : rawView;
   const visibleTabs = isAdmin ? [...VIEW_TABS, DISCARDED_TAB] : VIEW_TABS;

@@ -19,7 +19,8 @@ import { useIsAdmin } from '../hooks/use-is-admin';
  *
  * - a un **MEMBER** se le **oculta** lo marcado `adminOnly` (no debe leer cómo hacer algo
  *   que no puede hacer);
- * - a un **ADMIN** se le muestra con el badge «Solo administradores», para que sepa qué ve
+ * - a **administración** (ADMIN o Dirección) se le muestra con el badge «Administración y
+ *   Dirección», para que sepa qué ve
  *   —y qué no ve— un miembro.
  *
  * Invariante: `adminOnly` ⇔ oculto para un MEMBER. Si algo lo ve todo el mundo, **no** se
@@ -27,7 +28,11 @@ import { useIsAdmin } from '../hooks/use-is-admin';
  * los ve cualquiera, aunque solo un ADMIN pueda fijarlos → ese ítem NO es `adminOnly`.
  */
 
-/** Marca discreta de lo que solo ve (y solo puede) un ADMIN de plataforma. */
+/**
+ * Marca discreta de lo que solo ve (y solo puede) el **área de administración** de la
+ * plataforma. (QL-195) Desde que existe Dirección son dos roles, no uno: el copy dejó de decir
+ * «Solo administradores» porque a un MANAGER le estaría mintiendo sobre lo que sí puede hacer.
+ */
 export function AdminOnlyBadge() {
   return (
     <Badge
@@ -35,7 +40,7 @@ export function AdminOnlyBadge() {
       className="border-outline-variant/60 text-on-surface-variant"
     >
       <ShieldCheck />
-      Solo administradores
+      Administración y Dirección
     </Badge>
   );
 }

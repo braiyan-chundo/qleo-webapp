@@ -29,9 +29,9 @@ const FAQS: { q: string; a: ReactNode; adminOnly?: boolean }[] = [
     q: '¿Por qué no veo el botón «Nuevo proyecto»?',
     a: (
       <>
-        Porque crear proyectos requiere permiso y aún no lo tienes. Pídeselo a un
-        administrador: él lo activa en un momento desde la administración de usuarios. Los
-        administradores siempre pueden crear proyectos.
+        Porque crear proyectos requiere permiso y aún no lo tienes. Pídeselo a Administración
+        o a Dirección: se activa en un momento desde la administración de usuarios. Ellos
+        siempre pueden crear proyectos.
       </>
     ),
   },
@@ -45,7 +45,7 @@ const FAQS: { q: string; a: ReactNode; adminOnly?: boolean }[] = [
           Administración
         </Link>
         , pulsa «Editar» en el usuario y activa «Puede crear proyectos». Por defecto los
-        miembros no pueden; a un administrador no le hace falta (siempre puede).
+        miembros no pueden; a Administración y a Dirección no les hace falta (siempre pueden).
       </>
     ),
   },
@@ -56,7 +56,7 @@ const FAQS: { q: string; a: ReactNode; adminOnly?: boolean }[] = [
   },
   {
     q: '¿Por qué no puedo configurar el tablero de un proyecto?',
-    a: 'Configurar el tablero (las columnas) está reservado al creador del proyecto, a sus Gestores y a los administradores. Además, el botón solo aparece en la vista Kanban.',
+    a: 'Configurar el tablero (las columnas) está reservado al creador del proyecto, a sus Gestores y a quien administra la plataforma (Administración o Dirección). Además, el botón solo aparece en la vista Kanban.',
   },
   {
     q: '¿Por qué no me llegan los push con la app cerrada (Android)?',

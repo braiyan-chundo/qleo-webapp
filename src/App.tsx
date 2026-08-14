@@ -59,25 +59,26 @@ function App() {
                 />
                 <Route path="/tasks" element={<MyTasksPage />} />
                 {/* Panel de IA (QL-190): autenticado; el acceso lo gatea `GET /ai/status`
-                    (canal `canUseAi`; ADMIN siempre pasa). El nav se oculta con `canUseAi()`,
-                    pero la seguridad real la impone el `AiAccessGuard` del backend. */}
+                    (canal `canUseAi`; ADMIN y Dirección siempre pasan, QL-195). El nav se oculta
+                    con `canUseAi()`, pero la seguridad real la impone el `AiAccessGuard`. */}
                 <Route path="/ia" element={<AiPage />} />
                 {/* Resolutor de push `/tasks/:taskId` → ruta anidada real (§3.10/§3.17).
                     Va antes del comodín `*`; distinto segmento que `/tasks`, no colisiona. */}
                 <Route path="/tasks/:taskId" element={<TaskRedirectPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/help" element={<HelpPage />} />
-                {/* Analíticas (QL-66): autenticada; overview solo ADMIN, por-proyecto
-                    ADMIN o creador (el backend autoriza). El acceso del menú es adminOnly. */}
+                {/* Analíticas (QL-66): autenticada; el resumen global es del área de
+                    administración —ADMIN o Dirección (QL-195)— y el por-proyecto además del
+                    creador (el backend autoriza). El acceso del menú es adminOnly. */}
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 {/* Calendario (QL-162): **ruta única** autenticada. La página se ramifica por rol —el
-                    MEMBER ve su calendario de solo lectura; el ADMIN, la administración con sus
+                    MEMBER ve su calendario de solo lectura; administración/Dirección, la gestión con sus
                     secciones en **tabs** (`?tab=`, dentro de la misma ruta). Se revirtieron las
                     sub-rutas `/calendar/festivos|turnos|mallas` de QL-165. */}
                 <Route path="/calendar" element={<CalendarPage />} />
 
-                {/* Área de administración (solo ADMIN) */}
+                {/* Área de administración: ADMIN o Dirección (QL-195, ver `AdminRoute`) */}
                 <Route element={<AdminRoute />}>
                   <Route path="/admin" element={<UsersAdminPage />} />
                   {/* QL-149: Configuración (tabs; hoy solo el catálogo de Etiquetas). */}

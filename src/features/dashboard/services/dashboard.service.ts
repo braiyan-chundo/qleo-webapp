@@ -49,9 +49,16 @@ export interface MyDashboard {
   recentMentions: MentionSummary[];
 }
 
-/** Conteo de usuarios por rol de plataforma (`usersByRole`). */
+/**
+ * Conteo de usuarios por rol de plataforma (`usersByRole`).
+ *
+ * (QL-195, §3.67) Son **tres cubos** desde que existe Dirección, y los MANAGER **no** se suman
+ * a ninguno de los otros dos: el total de usuarios es la suma de los tres. Sumar solo
+ * `ADMIN + MEMBER` haría desaparecer a Dirección del censo.
+ */
 export interface UsersByRole {
   ADMIN: number;
+  MANAGER: number;
   MEMBER: number;
 }
 

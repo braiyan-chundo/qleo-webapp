@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 
 import {
@@ -55,11 +56,13 @@ interface TaskAdminMenuProps {
  * - **Eliminar** (§3.40): hard-delete **irreversible** con cascada (adjuntos, comentarios,
  *   notificaciones…), tras un `AlertDialog` que advierte del alcance.
  *
- * Se renderiza `null` para no-ADMIN: estas acciones son exclusivas del rol de plataforma
- * `ADMIN` y el backend responde 403 a cualquier otro (no dependemos solo del gate de UI).
+ * Se renderiza `null` fuera del área de administración: descartar/restaurar (QL-142) y el
+ * hard-delete (QL-143) son de ADMIN o **Dirección** (QL-195), y el backend responde 403 a
+ * cualquier otro (no dependemos solo del gate de UI).
  */
 export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps) {
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
 
   const discardTask = useDiscardTask(projectId);
   const restoreTask = useRestoreTask(projectId);
@@ -119,7 +122,7 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
       <DropdownMenu>
         <DropdownMenuTrigger
           className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50"
-          aria-label="Acciones de administrador"
+          aria-label="Acciones de administración"
           disabled={busy}
         >
           {busy ? (
@@ -129,7 +132,7 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuLabel>Solo administradores</DropdownMenuLabel>
+          <DropdownMenuLabel>Administración y Dirección</DropdownMenuLabel>
           <DropdownMenuSeparator />
 
           {/* (QL-178) Formulario completo: datos + fecha límite + participantes en un PATCH. */}

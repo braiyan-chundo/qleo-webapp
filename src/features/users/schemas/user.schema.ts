@@ -6,7 +6,8 @@ import * as z from 'zod';
  * - Edición: todos opcionales; `password` opcional (si se deja vacío no se cambia).
  */
 
-const roleEnum = z.enum(['ADMIN', 'MEMBER']);
+// QL-195 (§3.67): tres roles de plataforma. `MANAGER` se pinta «Dirección» en la UI.
+const roleEnum = z.enum(['ADMIN', 'MANAGER', 'MEMBER']);
 const statusEnum = z.enum(['ACTIVE', 'INACTIVE']);
 
 export const createUserSchema = z.object({

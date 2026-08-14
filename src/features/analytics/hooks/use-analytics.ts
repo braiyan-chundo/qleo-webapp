@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { analyticsService } from '../services/analytics.service';
 
@@ -20,12 +21,14 @@ export const analyticsKeys = {
 };
 
 /**
- * Métricas globales (`GET /analytics/overview`). Solo corre si hay sesión **y** el usuario
- * es ADMIN (el backend igual lo protege con 403; evitamos la llamada para un MEMBER).
+ * Métricas globales (`GET /analytics/overview`). Solo corre si hay sesión **y** el usuario es
+ * ADMIN o **Dirección** (QL-195; el backend igual lo protege con 403, evitamos la llamada para
+ * un MEMBER).
  */
 export function useAnalyticsOverview() {
   const token = useAuthStore((s) => s.accessToken);
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
 
   return useQuery({
     queryKey: analyticsKeys.overview(),
@@ -51,13 +54,14 @@ export function useProjectAnalytics(projectId: string | undefined) {
 }
 
 /**
- * Análisis de una tarea (`GET /analytics/tasks/:id`, §3.24 P5). **Solo ADMIN** (el backend es
- * estricto: ni el creador). Solo corre con sesión ADMIN **y** `taskId`, para no llamar (403)
- * a un MEMBER.
+ * Análisis de una tarea (`GET /analytics/tasks/:id`, §3.24 P5). **ADMIN o Dirección** (QL-195);
+ * el backend sigue siendo estricto con el resto: ni el creador de la tarea lo ve. Solo corre
+ * con ese rol **y** `taskId`, para no llamar (403) desde un MEMBER.
  */
 export function useTaskAnalytics(taskId: string | undefined) {
   const token = useAuthStore((s) => s.accessToken);
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
 
   return useQuery({
     queryKey: analyticsKeys.task(taskId ?? ''),
@@ -68,12 +72,13 @@ export function useTaskAnalytics(taskId: string | undefined) {
 }
 
 /**
- * Rendimiento por usuario (`GET /analytics/users`, §3.24 P6). **Solo ADMIN**; ya viene ordenado
- * por eficiencia desc. Solo corre con sesión ADMIN (evita la llamada 403 para un MEMBER).
+ * Rendimiento por usuario (`GET /analytics/users`, §3.24 P6). **ADMIN o Dirección** (QL-195); ya
+ * viene ordenado por eficiencia desc. Solo corre con ese rol (evita la llamada 403 de un MEMBER).
  */
 export function useUsersPerformance() {
   const token = useAuthStore((s) => s.accessToken);
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = hasAtLeastRole(user, 'MANAGER');
 
   return useQuery({
     queryKey: analyticsKeys.users(),
