@@ -24,6 +24,8 @@ export const createUserSchema = z.object({
   canCreateProjects: z.boolean(),
   // QL-184: permiso de usar el panel de IA. Al revés que arriba, el default es activado.
   canUseAi: z.boolean(),
+  // QL-198 (§3.70): perfil de permisos, UNO solo. `''` = sin perfil (se envía `null`).
+  profileId: z.string(),
 });
 
 export type CreateUserFormValues = z.infer<typeof createUserSchema>;
@@ -40,6 +42,8 @@ export const updateUserSchema = z.object({
   canCreateProjects: z.boolean(),
   // QL-184: permiso de usar el panel de IA (solo aplica a MEMBER; el ADMIN siempre puede).
   canUseAi: z.boolean(),
+  // QL-198 (§3.70): perfil de permisos, UNO solo. `''` = sin perfil (se envía `null` para quitarlo).
+  profileId: z.string(),
   // Vacío = no cambiar la contraseña; si viene, debe cumplir el mínimo.
   password: z
     .string()

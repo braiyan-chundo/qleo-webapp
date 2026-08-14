@@ -25,6 +25,7 @@ import {
 import { useColumns } from '@/features/columns/hooks/use-columns';
 import { useProject, useProjectMembers } from '@/features/projects/hooks/use-projects';
 import { TaskLabelSelect } from '@/features/labels/components/TaskLabelSelect';
+import { useAbsentByUser, useWhoIsOut } from '@/features/absences/hooks/use-absences';
 import { ApiError } from '@/core/api/fetch-client';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -208,6 +209,26 @@ export function TaskFormDialog({
   const openEnded = (watch('openEnded') ?? false) && formRules.allowOpenEnded;
   const openEndedManagerId = watch('openEndedManagerId') ?? '';
   const openEndedReason = watch('openEndedReason') ?? '';
+  const startDateValue = watch('startDate') ?? '';
+
+  /**
+   * (QL-199, §3.71 §2) Quién no está durante el periodo de la tarea. **Una sola petición** con el
+   * rango del formulario: la respuesta viene agrupada por persona, así que marcar a los candidatos
+   * es una búsqueda en un `Map` y no una llamada por candidato.
+   *
+   * Los campos ya son días civiles `'YYYY-MM-DD'`, que es justo lo que pide el endpoint. Se vuelve
+   * a consultar cuando cambian las fechas, porque el rango consultado **es** el de la tarea; sin
+   * fechas aún, el backend responde por hoy, que sigue siendo un aviso útil. El hook acota el
+   * rango a 366 días, así que un dedazo en el año no tumba el aviso con un 400.
+   *
+   * Solo corre con el diálogo abierto y con el picker en pantalla — en la edición reducida del
+   * CREATOR los roles ni se muestran.
+   */
+  const { data: absentUsers } = useWhoIsOut(
+    { from: startDateValue || undefined, to: dueDateValue || undefined },
+    { enabled: open && showFullFields },
+  );
+  const absentByUser = useAbsentByUser(absentUsers);
 
   useEffect(() => {
     if (!open) return;
@@ -637,6 +658,8 @@ export function TaskFormDialog({
               onCollaboratorsChange={(ids) => setValue('collaboratorIds', ids)}
               onObserversChange={(ids) => setValue('observerIds', ids)}
               disabled={isPending}
+              // (QL-199) Marca a quien no está, y avisa si es el Responsable elegido. Nunca bloquea.
+              absentByUser={absentByUser}
             />
           )}
 

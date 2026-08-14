@@ -20,6 +20,7 @@ import { USER_ROLES, USER_ROLE_LABEL, roleIsAtLeast } from '@/shared/lib/permiss
 import { useAuthStore } from '@/store/auth.store';
 import type { UserRole } from '@/store/auth.store';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -97,6 +98,25 @@ function UserRowActions({
         Desactivar
       </Button>
     </div>
+  );
+}
+
+/**
+ * (QL-198, §3.70) Perfil de permisos de la fila. Un perfil **retirado** se marca: el usuario lo
+ * conserva asignado pero no recibe sus permisos, y esconder esa diferencia haría creer que sigue
+ * concediendo.
+ */
+function ProfileCell({ user }: { user: UserSummary }) {
+  if (!user.profile) return <span className="text-on-surface-variant">—</span>;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span className="text-on-surface">{user.profile.name}</span>
+      {!user.profile.active && (
+        <Badge variant="outline" className="text-on-surface-variant">
+          Retirado
+        </Badge>
+      )}
+    </span>
   );
 }
 
@@ -284,6 +304,10 @@ export function UsersAdminPage() {
                   />
                 </DataCardRow>
                 <DataCardRow label="Cargo">{user.jobTitle || '—'}</DataCardRow>
+                {/* (QL-198) Perfil de permisos asignado. */}
+                <DataCardRow label="Perfil">
+                  <ProfileCell user={user} />
+                </DataCardRow>
                 {/* (QL-193) `birthdayLabel` decide solo: fecha completa si el backend la
                     sirve (ADMIN), y si no, día y mes sin año. Nunca se deduce la edad. */}
                 <DataCardRow label="Cumpleaños">
@@ -308,6 +332,7 @@ export function UsersAdminPage() {
                 <TableHead>Rol</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Cargo</TableHead>
+                <TableHead>Perfil</TableHead>
                 <TableHead>Cumpleaños</TableHead>
                 <TableHead>Creado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -335,6 +360,9 @@ export function UsersAdminPage() {
                   </TableCell>
                   <TableCell className="text-on-surface-variant">
                     {user.jobTitle || '—'}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-on-surface-variant">
+                    <ProfileCell user={user} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-on-surface-variant">
                     {birthdayLabel(user) ?? '—'}

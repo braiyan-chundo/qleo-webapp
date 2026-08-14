@@ -1,14 +1,15 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Archive, ArchiveRestore, ExternalLink, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ApiError } from '@/core/api/fetch-client';
 import { LabelChip } from '@/features/labels/components/LabelChip';
-import { hasAtLeastRole } from '@/shared/lib/permissions';
-import { useAuthStore } from '@/store/auth.store';
 
 import { useDiscardedTasks, useRestoreTask } from '../hooks/use-tasks';
+import { useCanDiscardTask } from '../hooks/use-task-permissions';
 import type { Task } from '../services/tasks.service';
 
 interface DiscardedTasksSectionProps {
@@ -34,22 +35,32 @@ function formatDateTime(iso: string | null): string {
  * la descartó y, para ADMIN, un botón **"Restaurar"** que la devuelve a su columna. Es la
  * contraparte no destructiva de Eliminar (QL-143).
  *
- * Decisión de UX: la pestaña que la contiene solo se muestra al área de administración —ADMIN o
- * Dirección (QL-195)— en `ProjectDetailPage`, porque restaurar es una acción suya y "Descartadas"
- * es un concepto de administración; aun así, el componente re-verifica el rol para el botón
- * (defensa en profundidad, el backend da 403).
+ * (QL-198b, §3.70 §9.1) La pestaña que la contiene se muestra a quien puede restaurar: ADMIN y
+ * Dirección por rol, o quien tenga `TASK_DISCARD` **en este proyecto**. El componente re-verifica
+ * el permiso para el botón (defensa en profundidad; el backend responde 403). Si el usuario ve
+ * esta sección es porque es miembro del proyecto, así que con el permiso puede restaurar — es el
+ * mismo criterio que el botón de descartar.
  */
 export function DiscardedTasksSection({ projectId }: DiscardedTasksSectionProps) {
-  const user = useAuthStore((s) => s.user);
-  const isAdmin = hasAtLeastRole(user, 'MANAGER');
+  const canRestore = useCanDiscardTask(projectId);
   const { data: tasks, isLoading, isError, error } = useDiscardedTasks(projectId);
   const restoreTask = useRestoreTask(projectId);
+  /** Un 403 `TASK_DISCARD_FORBIDDEN` retira la acción en vez de invitar a reintentarla. */
+  const [restoreDenied, setRestoreDenied] = useState(false);
+
+  const showRestore = canRestore && !restoreDenied;
 
   const handleRestore = (task: Task) => {
     restoreTask.mutate(task.id, {
       onSuccess: () => toast.success(`Tarea "${task.title}" restaurada`),
-      onError: (err) =>
-        toast.error(err instanceof Error ? err.message : 'No se pudo restaurar la tarea'),
+      onError: (err) => {
+        if (err instanceof ApiError && err.code === 'TASK_DISCARD_FORBIDDEN') {
+          setRestoreDenied(true);
+          toast.error(err.message);
+          return;
+        }
+        toast.error(err instanceof Error ? err.message : 'No se pudo restaurar la tarea');
+      },
     });
   };
 
@@ -135,7 +146,7 @@ export function DiscardedTasksSection({ projectId }: DiscardedTasksSectionProps)
                   <span className="hidden sm:inline">Abrir</span>
                 </Link>
               </Button>
-              {isAdmin && (
+              {showRestore && (
                 <Button
                   type="button"
                   variant="outline"

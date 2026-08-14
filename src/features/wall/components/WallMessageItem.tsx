@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 
-import { hasAtLeastRole } from '@/shared/lib/permissions';
+import { canPinWallMessages } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { AuthedAvatar, identityAvatarFallback } from '@/shared/components/AuthedAvatar';
 import { CollapsibleText } from '@/shared/components/CollapsibleText';
@@ -103,9 +103,8 @@ export function WallMessageItem({
     message;
 
   const currentUserId = useAuthStore((s) => s.user?.id);
-  // (QL-195) Fijar/destacar en el muro se abrió a Dirección.
+  // (QL-195) Fijar/destacar en el muro se abrió a Dirección; (QL-198b) ahora va por permiso.
   const currentUser = useAuthStore((s) => s.user);
-  const isAdmin = hasAtLeastRole(currentUser, 'MANAGER');
   const isOwn = !!currentUserId && author.id === currentUserId;
   const canEdit = isOwn && !pending;
   // (QL-102) Borrar es SOLO del autor: ni ADMIN puede borrar mensajes ajenos. El backend valida
@@ -119,9 +118,11 @@ export function WallMessageItem({
   // (QL-103) Responder está disponible sobre cualquier mensaje vivo ya confirmado (no optimista):
   // se cita por id, así que no aplica a un mensaje en vuelo ni a una lápida.
   const canReply = !!onReply && !pending && !message.deleted;
-  // Fijar/desfijar es SOLO para ADMIN (rol de plataforma) y sobre mensajes ya confirmados
-  // (no optimistas). Un MEMBER no ve la acción; si la invocara igual recibiría 403 (§3.27).
-  const canPin = isAdmin && !pending;
+  // (QL-198b, §3.70 §9.3) Fijar/desfijar pasó de exigir rol a exigir el permiso `WALL_PIN`, que
+  // Dirección puede delegar en un perfil sin subir a nadie de rol (ADMIN y Dirección lo tienen por
+  // rol, así que nadie perdió acceso). Alcance global. No permite editar ni borrar mensajes
+  // ajenos, y no dispara ninguna notificación. Solo sobre mensajes ya confirmados (no optimistas).
+  const canPin = canPinWallMessages(currentUser) && !pending;
   const isPinned = pinnedAt != null;
 
   const editMessage = useEditWallMessage();

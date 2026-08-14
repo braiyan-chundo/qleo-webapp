@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Trash2, UserPlus } from 'lucide-react';
+import { CalendarOff, Loader2, Trash2, UserPlus } from 'lucide-react';
 
 import { ApiError } from '@/core/api/fetch-client';
 import { Badge } from '@/components/ui/badge';
@@ -16,8 +16,11 @@ import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 import { useAuthStore } from '@/store/auth.store';
 
 import { useProjectMembers } from '@/features/projects/hooks/use-projects';
+import { useAbsentByUser, useWhoIsOut } from '@/features/absences/hooks/use-absences';
+import { absenceNotice, absenceOptionSuffix } from '@/features/absences/lib/absence';
 
 import { useAssignRole, useRemoveRole, useUpdateTask } from '../hooks/use-tasks';
+import { isoToDateInput } from '../lib/deadline';
 import type { Task, TaskRole } from '../services/tasks.service';
 import {
   TASK_ROLE_BADGE_CLASS,
@@ -99,6 +102,21 @@ export function RoleManager({ task }: RoleManagerProps) {
 
   const assignee = assigneeOf(task);
   const assigneeId = assignee?.userId ?? '';
+
+  /**
+   * (QL-199, §3.71 §2) Quién no está durante el periodo de la tarea. Se consulta con **el rango de
+   * la tarea**, igual que en el alta: el aviso solo tiene sentido contra las fechas en las que el
+   * trabajo va a ocurrir. Solo corre para el Creador, que es el único que ve este selector.
+   */
+  const { data: absentUsers } = useWhoIsOut(
+    {
+      from: isoToDateInput(task.startDate) || undefined,
+      to: isoToDateInput(task.dueDate) || undefined,
+    },
+    { enabled: isCreator },
+  );
+  const absentByUser = useAbsentByUser(absentUsers);
+  const assigneeAbsence = assigneeId ? absentByUser.get(assigneeId) : undefined;
 
   // Miembros del proyecto que aún no participan en la tarea (candidatos a añadir),
   // filtrados en cliente por el término de búsqueda (la lista de miembros es acotada).
@@ -193,15 +211,31 @@ export function RoleManager({ task }: RoleManagerProps) {
                 {membersLoading ? 'Cargando miembros…' : 'Selecciona un Responsable'}
               </NativeSelectOption>
             )}
-            {assigneeOptions.map((option) => (
-              <NativeSelectOption key={option.userId} value={option.userId}>
-                {option.name}
-              </NativeSelectOption>
-            ))}
+            {assigneeOptions.map((option) => {
+              // (QL-199) Se MARCA a quien no está; jamás se deshabilita la opción.
+              const absence = absentByUser.get(option.userId);
+              return (
+                <NativeSelectOption key={option.userId} value={option.userId}>
+                  {absence
+                    ? `${option.name} — ${absenceOptionSuffix(absence)}`
+                    : option.name}
+                </NativeSelectOption>
+              );
+            })}
           </NativeSelect>
           <span className="text-xs text-on-surface-variant">
             Toda tarea tiene un Responsable. Para dejar de serlo, asigna a otra persona.
           </span>
+
+          {/* (QL-199, §3.71 §2) Si el Responsable actual no está durante el periodo de la tarea,
+              se dice — no se impide nada. El copy sale entero de la API (`typeLabel` ya
+              enmascarado, `returnsOn` ya encadenado). */}
+          {assigneeAbsence && (
+            <p className="inline-flex items-start gap-1.5 rounded-md border border-warning/30 bg-warning-container/40 px-2.5 py-2 text-xs text-on-warning-container">
+              <CalendarOff className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>{absenceNotice(assigneeAbsence)}</span>
+            </p>
+          )}
         </div>
       )}
 

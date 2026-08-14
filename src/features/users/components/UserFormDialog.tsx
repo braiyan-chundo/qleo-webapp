@@ -24,6 +24,11 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ApiError } from '@/core/api/fetch-client';
+import { EffectivePermissionsPanel } from '@/features/permission-profiles/components/EffectivePermissionsPanel';
+import {
+  NO_PROFILE,
+  PermissionProfileSelect,
+} from '@/features/permission-profiles/components/PermissionProfileSelect';
 import {
   USER_ROLES,
   USER_ROLE_LABEL,
@@ -68,6 +73,8 @@ const createDefaults: CreateUserFormValues = {
   canCreateProjects: false,
   // QL-184: por defecto los miembros SÍ pueden usar la IA (default invertido).
   canUseAi: true,
+  // QL-198: sin perfil de permisos al alta.
+  profileId: NO_PROFILE,
 };
 
 interface CanCreateProjectsFieldProps {
@@ -188,6 +195,12 @@ function reportError(err: unknown) {
     toast.error(roleMessage);
     return;
   }
+  // (QL-198, §3.70 §6) Asignar un perfil retirado. Comparte el 409 con el email duplicado, así
+  // que se desempata por `error.code` antes de caer al mensaje genérico.
+  if (err instanceof ApiError && err.code === 'PERMISSION_PROFILE_INACTIVE') {
+    toast.error('Ese perfil está retirado. Reactívalo antes de asignárselo a alguien.');
+    return;
+  }
   if (err instanceof ApiError && err.status === 409) {
     toast.error('Ya existe un usuario con ese email.');
     return;
@@ -234,6 +247,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       password: '',
       canCreateProjects: false,
       canUseAi: true,
+      profileId: NO_PROFILE,
     },
   });
 
@@ -254,6 +268,8 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
         canCreateProjects: user.canCreateProjects ?? false,
         // QL-184: default activado; ausente en usuarios antiguos = con acceso.
         canUseAi: user.canUseAi ?? true,
+        // QL-198: perfil asignado, o '' si no tiene.
+        profileId: user.profileId ?? NO_PROFILE,
       });
     } else {
       createForm.reset(createDefaults);
@@ -278,6 +294,8 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       birthDate: values.birthDate?.trim() || undefined,
       canCreateProjects: values.canCreateProjects,
       canUseAi: values.canUseAi,
+      // (QL-198) Sin perfil se omite el campo; `''` no es un id válido.
+      profileId: values.profileId || undefined,
     };
     createMutation.mutate(dto, {
       onSuccess: () => {
@@ -300,6 +318,8 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
       birthDate: values.birthDate?.trim() || null,
       canCreateProjects: values.canCreateProjects,
       canUseAi: values.canUseAi,
+      // (QL-198) `null` explícito para QUITAR el perfil (omitirlo no lo tocaría).
+      profileId: values.profileId || null,
       ...(values.password ? { password: values.password } : {}),
     };
     updateMutation.mutate(
@@ -457,6 +477,37 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
               )}
             />
 
+            {/* (QL-198, §3.70 §3) Perfil de permisos: selector SIMPLE, junto a los interruptores
+                individuales y con la nota de que SUMAN. Debajo, el permiso efectivo ya resuelto
+                por el backend, con su procedencia — es lo que evita apagar el perfil creyendo
+                que se cortó un acceso que en realidad venía del interruptor. */}
+            <Controller
+              control={editForm.control}
+              name="profileId"
+              render={({ field }) => (
+                <PermissionProfileSelect
+                  id="edit-profileId"
+                  value={field.value ?? NO_PROFILE}
+                  onChange={field.onChange}
+                  currentProfile={user?.profile ?? null}
+                  disabled={isPending}
+                />
+              )}
+            />
+
+            {user && (
+              <EffectivePermissionsPanel
+                subject={{
+                  role: user.role,
+                  canCreateProjects: user.canCreateProjects,
+                  canUseAi: user.canUseAi,
+                  profile: user.profile,
+                  effectivePermissions: user.effectivePermissions,
+                }}
+                pendingChanges={editForm.formState.isDirty}
+              />
+            )}
+
             <div className="grid gap-1.5">
               <Label htmlFor="password" className="text-on-surface">
                 Nueva contraseña
@@ -589,6 +640,22 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                   value={!!field.value}
                   onChange={field.onChange}
                   role={createRole}
+                />
+              )}
+            />
+
+            {/* (QL-198) El alta también acepta `profileId`. El permiso efectivo no se pinta aquí:
+                el usuario aún no existe, así que el backend no lo ha calculado — aparece al
+                reabrir la ficha en modo edición. */}
+            <Controller
+              control={createForm.control}
+              name="profileId"
+              render={({ field }) => (
+                <PermissionProfileSelect
+                  id="create-profileId"
+                  value={field.value ?? NO_PROFILE}
+                  onChange={field.onChange}
+                  disabled={isPending}
                 />
               )}
             />

@@ -48,9 +48,9 @@ import { DiscardedTasksSection } from '@/features/tasks/components/DiscardedTask
 import { ProjectDocumentsPanel } from '@/features/attachments/components/ProjectDocumentsPanel';
 import { BoardFilterPanel } from '@/features/tasks/components/BoardFilterPanel';
 import { useTaskFilters } from '@/features/tasks/hooks/use-task-filters';
+import { useCanDiscardTask } from '@/features/tasks/hooks/use-task-permissions';
 import { projectDot } from '@/features/tasks/lib/palette';
 
-import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 
 import { useProject } from '../hooks/use-projects';
@@ -109,8 +109,13 @@ function isBoardView(value: string | null): value is BoardView {
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const user = useAuthStore((s) => s.user);
-  // (QL-195) Administración de plataforma: ADMIN o Dirección. Gobierna la pestaña "Descartadas".
-  const isAdmin = hasAtLeastRole(user, 'MANAGER');
+  /**
+   * (QL-198b, §3.70 §9.1) La pestaña "Descartadas" ya no es solo del rol: la ve quien pueda
+   * restaurar, y eso incluye a un miembro con el permiso `TASK_DISCARD` delegado. Si el usuario
+   * está viendo este proyecto es porque es miembro (a un no-miembro el backend le responde 404),
+   * así que con el permiso puede restaurar aquí.
+   */
+  const canSeeDiscarded = useCanDiscardTask(id);
   const { data: project, isLoading, isError, error } = useProject(id);
 
   // (QL-169) ¿El usuario ve TODAS las tareas del proyecto? `canManageProject` ya cubre la
@@ -146,8 +151,8 @@ export function ProjectDetailPage() {
   // rol fuerza `?view=discarded` por URL, se cae a la vista por defecto en vez de mostrar una
   // pestaña que no le corresponde.
   const view: BoardView =
-    rawView === 'discarded' && !isAdmin ? DEFAULT_VIEW : rawView;
-  const visibleTabs = isAdmin ? [...VIEW_TABS, DISCARDED_TAB] : VIEW_TABS;
+    rawView === 'discarded' && !canSeeDiscarded ? DEFAULT_VIEW : rawView;
+  const visibleTabs = canSeeDiscarded ? [...VIEW_TABS, DISCARDED_TAB] : VIEW_TABS;
   const setView = (next: BoardView) => {
     setSearchParams(
       (prev) => {

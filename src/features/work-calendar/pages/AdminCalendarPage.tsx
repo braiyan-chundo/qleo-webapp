@@ -1,12 +1,19 @@
 import type { ComponentType } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CalendarDays, CalendarRange, Clock, PartyPopper } from 'lucide-react';
+import {
+  CalendarDays,
+  CalendarOff,
+  CalendarRange,
+  Clock,
+  PartyPopper,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BackButton } from '@/shared/components/BackButton';
 import { ShiftCatalogManager } from '@/features/shifts/components/ShiftCatalogManager';
 import { UserScheduleManager } from '@/features/schedules/components/UserScheduleManager';
+import { AbsencesManager } from '@/features/absences/components/AbsencesManager';
 
 import { AdminCalendarTab } from '../components/AdminCalendarTab';
 import { HolidaysManager } from '../components/HolidaysManager';
@@ -47,6 +54,14 @@ const CALENDAR_TABS: readonly CalendarTab[] = [
     label: 'Mallas',
     icon: CalendarRange,
     Component: UserScheduleManager,
+  },
+  // (QL-199, §3.71) Ausencias: CRUD de Dirección. Es la ÚNICA pantalla que ve el tipo real y la
+  // nota; el resto de la app solo recibe lo enmascarado.
+  {
+    value: 'ausencias',
+    label: 'Ausencias',
+    icon: CalendarOff,
+    Component: AbsencesManager,
   },
 ] as const;
 

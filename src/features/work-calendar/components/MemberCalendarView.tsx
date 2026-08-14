@@ -12,6 +12,12 @@ import {
   parseYmdLocal,
   shiftsForDay,
 } from '@/features/schedules/lib/schedule';
+import {
+  AbsenceDayChip,
+  AbsenceLegendItem,
+} from '@/features/absences/components/AbsenceDayChip';
+import { useAbsenceCalendarForYears } from '@/features/absences/hooks/use-absences';
+import { groupAbsencesByDay, type AbsenceOnDay } from '@/features/absences/lib/absence';
 
 import {
   groupBirthdaysByDate,
@@ -33,6 +39,9 @@ import {
  * array nuevo por celda y por render.
  */
 const EMPTY_BIRTHDAYS: Birthday[] = [];
+
+/** (QL-199) Mismo motivo para los días sin ausencias. */
+const EMPTY_ABSENCES: AbsenceOnDay[] = [];
 
 interface MemberCalendarViewProps {
   /** Id del usuario cuya malla se pinta (el propio MEMBER en QL-162; cualquiera en QL-163). */
@@ -93,6 +102,18 @@ export function MemberCalendarView({ userId, ownCalendar = true }: MemberCalenda
   // van en su propia query y llegan cuando lleguen.
   const { birthdays } = useBirthdaysForYears(years);
   const birthdaysByKey = useMemo(() => groupBirthdaysByDate(birthdays), [birthdays]);
+
+  // (QL-199, §3.71 §3) Ausencias del/los año(s) visibles. Como los cumpleaños: capa aparte, no
+  // altera el conteo ni la naturaleza laboral del día. Las respuestas vienen SIN recortar, así que
+  // la expansión se acota a los días que la grilla pinta de verdad.
+  const { absences } = useAbsenceCalendarForYears(years);
+  const gridFrom = grid[0][0].key;
+  const gridTo = grid[grid.length - 1][6].key;
+  const absencesByKey = useMemo(
+    () => groupAbsencesByDay(absences, gridFrom, gridTo),
+    // `absences` se recompone cada render (`useQueries`); la clave real es el rango + los datos.
+    [absences, gridFrom, gridTo],
+  );
 
   const goToday = () =>
     setViewMonth({ year: today.getFullYear(), month: today.getMonth() });
@@ -178,6 +199,7 @@ export function MemberCalendarView({ userId, ownCalendar = true }: MemberCalenda
                   holiday={holidayByKey.get(cell.key)}
                   schedule={schedule}
                   birthdays={birthdaysByKey.get(cell.key) ?? EMPTY_BIRTHDAYS}
+                  absences={absencesByKey.get(cell.key) ?? EMPTY_ABSENCES}
                 />
               ))}
             </div>
@@ -213,6 +235,8 @@ function Legend() {
         <Cake className="size-3 text-primary" aria-hidden />
         Cumpleaños
       </span>
+      {/* (QL-199) Barra continua: es un RANGO, no un día. Ver `ABSENCE_CHIP`. */}
+      <AbsenceLegendItem />
     </div>
   );
 }
@@ -232,6 +256,8 @@ interface DayCellProps {
   schedule: UserSchedule | null | undefined;
   /** (QL-193) Cumpleaños de ESE día. Lista: varias personas pueden coincidir. */
   birthdays: Birthday[];
+  /** (QL-199) Ausencias que tocan ESE día, con su posición dentro del rango. */
+  absences: AbsenceOnDay[];
 }
 
 /**
@@ -240,7 +266,7 @@ interface DayCellProps {
  * backend). Con malla, el día es laborable sii tiene turnos (incluye el sábado intermedio); sin
  * malla, se cae al fin de semana de la config para el estilo de no-laborable.
  */
-function DayCell({ cell, holiday, schedule, birthdays }: DayCellProps) {
+function DayCell({ cell, holiday, schedule, birthdays, absences }: DayCellProps) {
   const { day, inMonth, isToday, isWeekend } = cell;
 
   const date = useMemo(() => parseYmdLocal(cell.key), [cell.key]);
@@ -254,7 +280,14 @@ function DayCell({ cell, holiday, schedule, birthdays }: DayCellProps) {
   // trabaja o no. Mezclarlos convertiría un cumpleaños en un día no laborable.
   const nonWorking = !!holiday || (schedule ? !hasShifts : isWeekend);
 
-  const tooltip = [holiday?.name, ...birthdays.map((b) => `🎂 ${b.name}`)]
+  // (QL-199) Las ausencias tampoco entran en `nonWorking`: alguien de vacaciones no convierte el
+  // día en no laborable para el resto, y el backend no las cuenta en los días hábiles.
+  const tooltip = [
+    holiday?.name,
+    ...birthdays.map((b) => `🎂 ${b.name}`),
+    // Solo `name` y `typeLabel`, que es lo que la API da (el tipo llega ya enmascarado si tocaba).
+    ...absences.map((a) => `${a.absence.name}: ${a.absence.typeLabel}`),
+  ]
     .filter(Boolean)
     .join(' · ');
 
@@ -307,6 +340,13 @@ function DayCell({ cell, holiday, schedule, birthdays }: DayCellProps) {
             {birthdays.length === 1 ? birthdays[0].name : `${birthdays.length} cumpleaños`}
           </span>
         </span>
+      )}
+
+      {/* (QL-199) Ausencias del día: barra continua, pegada al borde de la celda para que los
+          días consecutivos de un mismo periodo se lean como un tramo. Se pinta aunque sea festivo
+          o día sin turno: la ausencia existe igual. */}
+      {inMonth && absences.length > 0 && (
+        <AbsenceDayChip entries={absences} className="-mx-1.5 mt-auto" />
       )}
     </div>
   );

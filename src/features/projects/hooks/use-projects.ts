@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SAFETY_NET_POLL_MS } from '@/core/query/query-client';
 import type { UserDirectoryEntry } from '@/features/users/services/users.service';
@@ -48,6 +48,41 @@ export function useProjects(
     enabled,
     refetchInterval: SAFETY_NET_POLL_MS,
   });
+}
+
+/**
+ * (QL-198b, §3.70 §9.1) Ids de los proyectos **donde el usuario es miembro**, para resolver el
+ * alcance por proyecto de `TASK_DISCARD` con `canDiscardTaskIn()`.
+ *
+ * Sale de `GET /projects`, que para un no-ADMIN ya devuelve solo los suyos (§3.20): no hace falta
+ * endpoint nuevo ni un campo extra en la tarea.
+ *
+ * Devuelve `undefined` —"no lo sé"— en dos casos, y en ambos `canDiscardTaskIn` cae al permiso a
+ * secas, que es la respuesta correcta en las vistas normales:
+ * - la lista aún no ha cargado (o falló);
+ * - **hay más proyectos de los que cabe en una página** (`limit` tope 50 en el backend). Sin este
+ *   caso, alguien con 60 proyectos perdería el botón en los 10 últimos, que es peor que confiar en
+ *   el 403 del backend.
+ *
+ * `enabled` evita la petición para quien no la necesita: ADMIN y Dirección superan el permiso por
+ * rol, y quien no tiene `TASK_DISCARD` no va a ver el botón de ninguna forma.
+ */
+export function useMyProjectIds({ enabled = true }: { enabled?: boolean } = {}) {
+  const params: ProjectListParams = { page: 1, limit: 50 };
+  const query = useQuery({
+    queryKey: projectKeys.list(params),
+    queryFn: () => projectsService.list(params),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data } = query;
+
+  return useMemo(() => {
+    if (!data) return undefined;
+    if (data.total > data.data.length) return undefined;
+    return new Set(data.data.map((project) => project.id));
+  }, [data]);
 }
 
 /** Detalle de un proyecto por id. Solo corre si hay id. Registra la visita en "recientes". */

@@ -15,6 +15,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+import type { PlatformPermission } from '@/shared/lib/permissions';
+
 /**
  * Configuración de navegación compartida por el shell (QL-21/22/23).
  * Fuente única de rutas/labels/iconos para el sidebar (desktop) y la barra inferior (móvil),
@@ -41,6 +43,16 @@ export interface NavItem {
    * `AiAccessGuard` del backend.
    */
   requiresAi?: boolean;
+  /**
+   * (QL-198b, §3.70 §9) Permiso de plataforma que **ABRE** el ítem a quien no llega por rol. Se
+   * suma a `adminOnly`, no lo sustituye: con `adminOnly: true` + `requiresPermission`, el ítem lo
+   * ven ADMIN/Dirección **o** quien tenga ese permiso delegado en su perfil.
+   *
+   * Existe porque un permiso delegable cuya pantalla vive tras un gate de rol sería un permiso
+   * que miente: se puede conceder y no sirve de nada. Hoy solo lo usa Configuración, por
+   * `LABEL_MANAGE`.
+   */
+  requiresPermission?: PlatformPermission;
   /** Si está, el consumidor pinta un badge numérico junto al ítem (QL-91). */
   badge?: NavBadgeKind;
   /**
@@ -87,10 +99,14 @@ export const primaryNavItems: NavItem[] = [
     children: [
       { title: 'Usuarios', url: '/admin', icon: Users, adminOnly: true },
       {
+        // (QL-198b) También la ve quien tenga `LABEL_MANAGE` delegado: la pantalla contiene el
+        // catálogo de Etiquetas, que ese permiso habilita a curar. La propia página filtra sus
+        // tabs, así que un delegado solo ve "Etiquetas".
         title: 'Configuración',
         url: '/admin/configuracion',
         icon: SlidersHorizontal,
         adminOnly: true,
+        requiresPermission: 'LABEL_MANAGE',
       },
     ],
   },
@@ -166,24 +182,73 @@ export function activeNavUrl(
 }
 
 /**
- * Aplana una lista de navegación expandiendo los grupos (`children`) en sus hojas (QL-149),
- * **consciente del rol** (QL-165). Lo usa el menú "Más" del bottom nav, que es una lista plana.
+ * Lo que hace falta saber del usuario para decidir qué ítems se ven. Se resuelve **una vez** en
+ * el consumidor (sidebar / bottom nav) y viaja como dato: la config no puede llamar hooks, y
+ * duplicar el predicado en los dos consumidores es cómo se desincronizaron antes.
+ */
+export interface NavVisibilityContext {
+  /** ADMIN o Dirección (`hasAtLeastRole(user,'MANAGER')`). */
+  isAdmin: boolean;
+  /** `canUseAi(user)`. */
+  aiAllowed: boolean;
+  /** `(permission) => hasPermission(user, permission)`. */
+  hasPermission: (permission: PlatformPermission) => boolean;
+}
+
+/**
+ * ¿Se le muestra este ítem al usuario? Fuente **única** del gate de navegación.
  *
- * Por cada grupo se filtran los hijos por rol (`!adminOnly || isAdmin`):
+ * `requiresPermission` **abre** el ítem: un `adminOnly` con permiso delegado lo ve tanto quien
+ * llega por rol como quien lo tiene concedido en su perfil (QL-198b).
+ */
+export function isNavItemAllowed(item: NavItem, ctx: NavVisibilityContext): boolean {
+  if (item.requiresAi && !ctx.aiAllowed) return false;
+  if (item.requiresPermission && ctx.hasPermission(item.requiresPermission)) return true;
+  return !item.adminOnly || ctx.isAdmin;
+}
+
+/** Hijos visibles de un grupo, ya filtrados por rol y permisos. */
+export function visibleChildrenOf(
+  item: NavItem,
+  ctx: NavVisibilityContext,
+): NavItem[] {
+  return (item.children ?? []).filter((child) => isNavItemAllowed(child, ctx));
+}
+
+/**
+ * ¿Se pinta este ítem de primer nivel? Igual que {@link isNavItemAllowed}, salvo que un **grupo**
+ * también se muestra si le queda algún hijo visible: así un MEMBER con `LABEL_MANAGE` ve
+ * "Administración" con solo "Configuración" dentro, sin abrirle el resto del área.
+ */
+export function isTopLevelNavItemVisible(
+  item: NavItem,
+  ctx: NavVisibilityContext,
+): boolean {
+  if (isNavItemAllowed(item, ctx)) return true;
+  return visibleChildrenOf(item, ctx).length > 0;
+}
+
+/**
+ * Aplana una lista de navegación expandiendo los grupos (`children`) en sus hojas (QL-149),
+ * **consciente del rol y de los permisos** (QL-165, QL-198b). Lo usa el menú "Más" del bottom
+ * nav, que es una lista plana.
+ *
+ * Por cada grupo se filtran los hijos:
  * - si quedan hijos visibles → se devuelven esos (el parent-contenedor se descarta, su `url` ya
  *   la cubre un hijo);
  * - si NO queda ninguno (un grupo cuyos hijos son todos `adminOnly`, visto por un MEMBER) → se
  *   devuelve el **parent** como link plano, para no perder la sección del menú.
  *
- * Los ítems sin hijos se mantienen tal cual. El filtro por `adminOnly` de los ítems de primer
- * nivel (p. ej. el parent `adminOnly` de "Administración") lo sigue aplicando el consumidor.
+ * Los ítems sin hijos se mantienen tal cual. El filtro de los ítems de primer nivel lo sigue
+ * aplicando el consumidor con {@link isTopLevelNavItemVisible}.
  */
-export function flattenNavItems(items: NavItem[], isAdmin: boolean): NavItem[] {
+export function flattenNavItems(
+  items: NavItem[],
+  ctx: NavVisibilityContext,
+): NavItem[] {
   return items.flatMap((item) => {
     if (!item.children) return [item];
-    const visibleChildren = item.children.filter(
-      (child) => !child.adminOnly || isAdmin,
-    );
+    const visibleChildren = visibleChildrenOf(item, ctx);
     return visibleChildren.length > 0 ? visibleChildren : [item];
   });
 }

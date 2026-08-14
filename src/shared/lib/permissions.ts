@@ -91,41 +91,140 @@ export function hasAtLeastRole(
 }
 
 /**
+ * QL-198 (§3.70) — Claves del catálogo de permisos de plataforma **a las que el front
+ * reacciona**. NO es el catálogo: el catálogo lo sirve `GET /permission-profiles/catalog` y
+ * **seguirá creciendo**, así que el editor de perfiles se renderiza desde ese array y nunca
+ * desde esta unión (una casilla hardcodeada se quedaría coja en el siguiente permiso).
+ *
+ * Esta unión existe solo para que `hasPermission(user, 'WALL_PIN')` no acepte un literal mal
+ * escrito en un punto de decisión de la UI. Al añadir un gate nuevo en el front, se añade aquí
+ * la clave; hasta entonces el permiso viaja igual en `effectivePermissions` y se puede conceder
+ * desde el editor sin tocar este archivo.
+ */
+export type PlatformPermission =
+  | 'PROJECT_CREATE'
+  | 'AI_USE'
+  | 'TASK_DISCARD'
+  | 'LABEL_MANAGE'
+  | 'WALL_PIN';
+
+/**
+ * QL-198 (§3.70) — Permiso efectivo de plataforma, **leído** de `user.effectivePermissions`.
+ *
+ * El backend lo calcula con la misma función que usan sus guards (`rol ⊇ catálogo` para
+ * ADMIN/Dirección; `flag individual ∪ permisos del perfil activo` para un MEMBER). **No
+ * reimplementes esa fórmula**: es exactamente el fallo de QL-192 —dos copias de una regla que
+ * divergen— y aquí acabaría ofreciendo botones que la API responde con 403.
+ *
+ * El *fallback* cubre un caso real y acotado: el `user` del store se **persiste en
+ * localStorage**, así que una sesión abierta antes de QL-198 no trae el array hasta el primer
+ * `GET /auth/me`. Mientras tanto se resuelve con la expresión anterior a QL-198, que es correcta
+ * para un usuario **sin perfil** (§0 del contrato) — y sin perfil están todos hasta que Dirección
+ * cree el primero. Los tres permisos de QL-198b caen a `false`: nunca existieron como flag suelto,
+ * así que no hay nada heredado que respetar.
+ */
+export function hasPermission(
+  user: User | null | undefined,
+  permission: PlatformPermission,
+): boolean {
+  const effective = user?.effectivePermissions;
+  if (Array.isArray(effective)) return effective.includes(permission);
+
+  if (hasAtLeastRole(user, 'MANAGER')) return true;
+  if (permission === 'PROJECT_CREATE') return !!user?.canCreateProjects;
+  if (permission === 'AI_USE') return user?.canUseAi ?? true;
+  return false;
+}
+
+/**
  * ¿El usuario puede crear proyectos? (QL-127)
  *
- * El permiso efectivo es `hasAtLeastRole(user,'MANAGER') || canCreateProjects === true`:
- * - **ADMIN y Dirección siempre pueden**, independientemente del flag. El flag es el permiso
- *   que se concede a un MEMBER, así que a ellos no les aplica y el backend ni lo consulta.
- *   Sin esta rama, un ADMIN con el flag en `false` (el default) se quedaría sin el botón de
- *   crear aunque `POST /projects` sí le respondería 201.
- * - Un MEMBER solo puede si se lo otorgaron (default `false`).
- *
- * (QL-195) El *bypass* se abrió a Dirección junto con el resto de permisos de administración.
+ * (QL-198, §3.70) Ahora es `effectivePermissions.includes('PROJECT_CREATE')`: el permiso puede
+ * venir del **rol** (ADMIN/Dirección lo tienen siempre), del **flag individual**
+ * (`canCreateProjects`, que no se migró ni se retiró) o del **perfil** asignado — y los tres
+ * suman. La expresión antigua (`rol || flag`) seguía acertando mientras nadie tuviera perfil,
+ * pero empieza a mentir en cuanto Dirección crea el primero.
  *
  * Es la **única fuente** de esta regla en el front; refleja el gate del backend, que
  * responde 403 `PROJECT_CREATE_FORBIDDEN` si no se cumple.
  */
 export function canCreateProjects(user: User | null | undefined): boolean {
-  return hasAtLeastRole(user, 'MANAGER') || !!user?.canCreateProjects;
+  return hasPermission(user, 'PROJECT_CREATE');
 }
 
 /**
  * ¿El usuario puede usar el **panel de IA**? (QL-184)
  *
- * El permiso efectivo es `hasAtLeastRole(user,'MANAGER') || (canUseAi ?? true)`:
- * - **ADMIN y Dirección siempre pueden**, el flag no les aplica (el backend ni lo consulta).
- * - Un MEMBER puede **por defecto**: el default es activado (al revés que `canCreateProjects`).
- *   Solo se **revoca** explícitamente (`PATCH /users/:id { canUseAi: false }`).
+ * (QL-198, §3.70) Ahora es `effectivePermissions.includes('AI_USE')`. Ojo con el default
+ * invertido de `canUseAi` (`?? true`): resolverlo a mano con `user.canUseAi ?? false` dejaría
+ * sin IA a media plantilla, porque los usuarios anteriores al campo no lo tienen guardado. Con
+ * `effectivePermissions` el backend ya lo ha resuelto.
  *
- * El **`?? true`** es deliberado: los usuarios creados antes del campo no lo tienen en Mongo y el
- * backend los resuelve con acceso, así que el front debe tratar la ausencia como `true`.
- *
- * (QL-195) El *bypass* se abrió a Dirección. Ojo: esto es el acceso al **panel de IA**, que no
- * tiene nada que ver con enlazar la cuenta de ChatGPT — eso sigue siendo solo de ADMIN.
+ * Esto es el acceso al **panel de IA**, que no tiene nada que ver con enlazar la cuenta de
+ * ChatGPT — eso sigue siendo solo de ADMIN (rol, no permiso).
  *
  * Es la **única fuente** de esta regla en el front; refleja el `AiAccessGuard` del backend, que
- * responde 403 `AI_ACCESS_DENIED` si no se cumple. (El cableado al nav del panel llega en QL-190.)
+ * responde 403 `AI_ACCESS_DENIED` si no se cumple.
  */
 export function canUseAi(user: User | null | undefined): boolean {
-  return hasAtLeastRole(user, 'MANAGER') || (user?.canUseAi ?? true);
+  return hasPermission(user, 'AI_USE');
+}
+
+/**
+ * QL-198b (§3.70 §9.2) — ¿Puede curar el **catálogo global de etiquetas**? (renombrar, cambiar
+ * icono/color y **archivar**). Alcance global: el catálogo es único y compartido.
+ *
+ * **Eliminar** una etiqueta NO entra aquí: sigue pidiendo rol `MANAGER`+ porque la arrastra en
+ * cascada fuera de todos los proyectos y tareas que la usaban y no hay deshacer. Archivar es la
+ * vía reversible y sí está delegada, así que el delegado no se queda a medias.
+ */
+export function canManageLabels(user: User | null | undefined): boolean {
+  return hasPermission(user, 'LABEL_MANAGE');
+}
+
+/**
+ * QL-198b (§3.70 §9.3) — ¿Puede **fijar/desfijar** mensajes del Muro? Alcance global. No
+ * habilita editar ni borrar mensajes ajenos (eso sigue siendo del autor / del rol) y no dispara
+ * ninguna notificación.
+ */
+export function canPinWallMessages(user: User | null | undefined): boolean {
+  return hasPermission(user, 'WALL_PIN');
+}
+
+/**
+ * QL-198b (§3.70 §9.1) — ¿Puede **descartar/restaurar** la tarea de `projectId`?
+ *
+ * Es el primer permiso del catálogo que **no se responde solo con `effectivePermissions`**:
+ * tiene **alcance por proyecto**.
+ *
+ * ```
+ * ADMIN / Dirección  →  cualquier tarea (alcance global, como siempre)
+ * resto              →  TASK_DISCARD  ∧  ser MIEMBRO del proyecto de la tarea
+ * ```
+ *
+ * `memberProjectIds` sale de `GET /projects`, que para un no-ADMIN ya devuelve **solo** los
+ * proyectos donde es miembro (§3.20) — no hace falta endpoint nuevo. Lo sirve
+ * `useMyProjectIds()` (`@/features/projects/hooks/use-projects`).
+ *
+ * **`undefined` = "todavía no sé cuáles son sus proyectos"** y entonces manda el permiso a secas.
+ * No es dejadez: en las vistas normales esa respuesta ya es correcta —`GET /tasks`, `/tasks/mine`,
+ * `/tasks/:id` y el buscador filtran por membresía, y a un no-miembro le responden 404, así que
+ * toda tarea que la API le sirve a un MEMBER está ya en un proyecto suyo—. Tratar el `undefined`
+ * como "no" escondería el botón mientras carga la lista, y lo escondería **para siempre** a quien
+ * tenga más proyectos de los que cabe en una página. La comprobación de membresía suma cuando se
+ * conoce entera: cubre los casos raros (deep link, caché vieja, una vista futura que no filtre).
+ *
+ * El backend responde 403 `TASK_DISCARD_FORBIDDEN` tanto si falta el permiso como si la tarea es
+ * de un proyecto ajeno (no los distingue a propósito, para que el error no sea un oráculo de
+ * permisos): trátalo como parte del flujo, enseña el `message` y deja de ofrecer el botón.
+ */
+export function canDiscardTaskIn(
+  user: User | null | undefined,
+  projectId: string | undefined,
+  memberProjectIds: ReadonlySet<string> | undefined,
+): boolean {
+  if (hasAtLeastRole(user, 'MANAGER')) return true;
+  if (!hasPermission(user, 'TASK_DISCARD')) return false;
+  if (!memberProjectIds) return true;
+  return !!projectId && memberProjectIds.has(projectId);
 }

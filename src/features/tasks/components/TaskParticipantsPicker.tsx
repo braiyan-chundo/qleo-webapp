@@ -1,5 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarOff } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
@@ -8,6 +10,8 @@ import {
 } from '@/components/ui/native-select';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 import type { ProjectMember } from '@/features/projects/types/project';
+import type { AbsentUser } from '@/features/absences/services/absences.service';
+import { absenceNotice, absenceOptionSuffix } from '@/features/absences/lib/absence';
 
 interface TaskParticipantsPickerProps {
   /** Membresía real del proyecto (`GET /projects/:id/members`, §3.20). */
@@ -44,6 +48,15 @@ interface TaskParticipantsPickerProps {
   /** (QL-138) Cambia la selección de Observadores. */
   onObserversChange: (userIds: string[]) => void;
   disabled?: boolean;
+  /**
+   * (QL-199, §3.71 §2) Personas ausentes en el periodo de la tarea, indexadas por `userId`
+   * (`GET /absences/who-is-out`). Se **marca**, nunca se bloquea: una asignación a alguien que
+   * está fuera puede ser perfectamente legítima (una tarea que arranca cuando ya volvió), y una
+   * ausencia mal cargada no puede dejar a nadie sin poder recibir trabajo.
+   *
+   * Vacío o ausente = nadie está fuera, o el dato aún no ha llegado.
+   */
+  absentByUser?: Map<string, AbsentUser>;
 }
 
 interface MemberCheckListProps {
@@ -134,6 +147,7 @@ export function TaskParticipantsPicker({
   onCollaboratorsChange,
   onObserversChange,
   disabled,
+  absentByUser,
 }: TaskParticipantsPickerProps) {
   /**
    * (QL-192) Candidatos a **Responsable**: todos los miembros, incluido el Creador. Si el
@@ -219,6 +233,26 @@ export function TaskParticipantsPicker({
     );
   };
 
+  /**
+   * (QL-199) Aviso de ausencia del Responsable elegido. **No modal y no bloqueante**: el
+   * formulario se puede guardar con él en pantalla — es la decisión de producto que manda sobre
+   * todo lo demás (§3.71 §0), y el backend no valida nada de esto, así que si no se pinta aquí no
+   * avisa nadie.
+   */
+  const assigneeAbsence = assigneeId ? absentByUser?.get(assigneeId) : undefined;
+  const assigneeRef = useRef<HTMLSelectElement>(null);
+  /** "Asignar de todas formas" descarta el aviso para ESA persona, no para siempre. */
+  const [acknowledgedAbsence, setAcknowledgedAbsence] = useState<string | null>(null);
+
+  // Cambiar de Responsable (o de fechas, que cambia el aviso) vuelve a mostrarlo: lo aceptado fue
+  // una asignación concreta, no la idea de ignorar ausencias.
+  useEffect(() => {
+    setAcknowledgedAbsence(null);
+  }, [assigneeId, assigneeAbsence?.returnsOn]);
+
+  const showAbsenceWarning =
+    !!assigneeAbsence && acknowledgedAbsence !== assigneeAbsence.userId;
+
   return (
     <div className="grid gap-4 border-t border-outline-variant/40 pt-4">
       <div className="grid gap-1.5">
@@ -227,6 +261,7 @@ export function TaskParticipantsPicker({
         </Label>
         <NativeSelect
           id="assigneeId"
+          ref={assigneeRef}
           className="w-full [&>select]:h-10"
           disabled={disabled || isLoading || noAssigneeCandidates}
           value={assigneeId}
@@ -244,13 +279,47 @@ export function TaskParticipantsPicker({
                   : 'Selecciona un Responsable'}
             </NativeSelectOption>
           )}
-          {assigneeCandidates.map((member) => (
-            <NativeSelectOption key={member.id} value={member.id}>
-              {member.name}
-            </NativeSelectOption>
-          ))}
+          {assigneeCandidates.map((member) => {
+            // (QL-199) La marca va EN la opción, no deshabilitándola: se ve al elegir, y quien
+            // quiera asignar a esa persona puede hacerlo igual.
+            const absence = absentByUser?.get(member.id);
+            return (
+              <NativeSelectOption key={member.id} value={member.id}>
+                {absence ? `${member.name} — ${absenceOptionSuffix(absence)}` : member.name}
+              </NativeSelectOption>
+            );
+          })}
         </NativeSelect>
         <span className="text-xs text-on-surface-variant">{assigneeHint}</span>
+
+        {/* (QL-199, §3.71 §2) Aviso NO bloqueante. El copy sale entero de la API: `typeLabel` (ya
+            enmascarado si el tipo era reservado) y `returnsOn` (ya encadenado con las ausencias
+            consecutivas). El botón primario es continuar. */}
+        {showAbsenceWarning && assigneeAbsence && (
+          <div className="mt-1 grid gap-2 rounded-lg border border-warning/30 bg-warning-container/40 px-3 py-2.5">
+            <p className="inline-flex items-start gap-1.5 text-xs text-on-warning-container">
+              <CalendarOff className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>{absenceNotice(assigneeAbsence)}</span>
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setAcknowledgedAbsence(assigneeAbsence.userId)}
+              >
+                Asignar de todas formas
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => assigneeRef.current?.focus()}
+              >
+                Elegir a otra persona
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-1.5">

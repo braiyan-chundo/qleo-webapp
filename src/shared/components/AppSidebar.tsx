@@ -27,7 +27,12 @@ import { QleoMark } from '@/shared/components/QleoLogo';
 import { BetaBadge } from '@/shared/components/BetaBadge';
 import { NavBadge } from '@/shared/components/NavBadge';
 import { useAuthStore } from '@/store/auth.store';
-import { canUseAi, hasAtLeastRole } from '@/shared/lib/permissions';
+import {
+  canUseAi,
+  hasAtLeastRole,
+  hasPermission,
+  type PlatformPermission,
+} from '@/shared/lib/permissions';
 import { useWallUnreadCount } from '@/features/wall/hooks/use-wall';
 import { useProjects } from '@/features/projects/hooks/use-projects';
 import type { ProjectListParams } from '@/features/projects/services/projects.service';
@@ -37,7 +42,10 @@ import {
   footerNavItems,
   isNavItemActive,
   activeNavUrl,
+  isTopLevelNavItemVisible,
+  visibleChildrenOf,
   type NavItem,
+  type NavVisibilityContext,
 } from '@/shared/config/nav';
 import { getDailySlogan } from '@/shared/config/slogans';
 
@@ -111,8 +119,16 @@ export function AppSidebar() {
   const aiAllowed = canUseAi(user);
   const { count: wallUnread } = useWallUnreadCount();
 
+  // (QL-198b) El predicado vive en `nav.ts` y lo comparten sidebar y bottom nav: un `adminOnly`
+  // con `requiresPermission` también lo ve quien tenga ese permiso delegado en su perfil.
+  const navContext: NavVisibilityContext = {
+    isAdmin,
+    aiAllowed,
+    hasPermission: (permission: PlatformPermission) => hasPermission(user, permission),
+  };
+
   const isNavItemVisible = (item: NavItem) =>
-    (!item.adminOnly || isAdmin) && (!item.requiresAi || aiAllowed);
+    isTopLevelNavItemVisible(item, navContext);
 
   const visibleNavItems = primaryNavItems.filter(isNavItemVisible);
   const visibleFooterItems = footerNavItems.filter(isNavItemVisible);
@@ -147,14 +163,12 @@ export function AppSidebar() {
                 const badgeCount = item.badge === 'wall' ? wallUnread : 0;
 
                 // Grupo con sub-ítems estáticos (QL-149, p. ej. "Administración"): se despliega en
-                // sus hijos con el mismo patrón visual que Proyectos. Los hijos se filtran por rol;
-                // si tras filtrar queda alguno → grupo desplegable con esos hijos; si NO queda
-                // ninguno (grupo con hijos todos `adminOnly`, visto por un MEMBER) → se cae al link
-                // plano del parent de más abajo.
+                // sus hijos con el mismo patrón visual que Proyectos. Los hijos se filtran por rol
+                // y permisos (QL-198b); si tras filtrar queda alguno → grupo desplegable con esos
+                // hijos; si NO queda ninguno (grupo con hijos todos `adminOnly`, visto por un
+                // MEMBER) → se cae al link plano del parent de más abajo.
                 if (item.children) {
-                  const visibleChildren = item.children.filter(
-                    (child) => !child.adminOnly || isAdmin,
-                  );
+                  const visibleChildren = visibleChildrenOf(item, navContext);
                   if (visibleChildren.length > 0) {
                     return (
                       <NavGroupItem

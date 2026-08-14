@@ -81,12 +81,18 @@ function App() {
                 {/* Área de administración: ADMIN o Dirección (QL-195, ver `AdminRoute`) */}
                 <Route element={<AdminRoute />}>
                   <Route path="/admin" element={<UsersAdminPage />} />
-                  {/* QL-149: Configuración (tabs; hoy solo el catálogo de Etiquetas). */}
+                  <Route path="/audit" element={<AuditLogPage />} />
+                </Route>
+
+                {/* QL-149: Configuración (tabs: Etiquetas, Perfiles de permisos, Avatares,
+                    Conexión IA). (QL-198b) Además de Dirección, la abre quien tenga
+                    `LABEL_MANAGE` delegado —el permiso habilita curar el catálogo de Etiquetas,
+                    que vive aquí—; la página filtra sus tabs, así que un delegado solo ve esa. */}
+                <Route element={<AdminRoute allowWithPermission="LABEL_MANAGE" />}>
                   <Route
                     path="/admin/configuracion"
                     element={<AdminSettingsPage />}
                   />
-                  <Route path="/audit" element={<AuditLogPage />} />
                 </Route>
               </Route>
             </Route>

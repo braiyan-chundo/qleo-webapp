@@ -39,6 +39,31 @@ export interface UserSummary {
    * permiso efectivo con `canUseAi()` de `@/shared/lib/permissions`. No viene en `GET /users/directory`.
    */
   canUseAi?: boolean;
+  /**
+   * QL-198 (§3.70): id del perfil de permisos asignado, o `null`. Se edita con `PATCH /users/:id`.
+   */
+  profileId?: string | null;
+  /**
+   * QL-198 (§3.70): resumen del perfil, **para pintar**. Puede llegar con `active: false` (perfil
+   * retirado): el usuario lo conserva asignado pero ya no recibe sus permisos.
+   *
+   * ⚠️ No decidas permisos con `profile.permissions`: deja fuera el rol y los flags individuales.
+   */
+  profile?: {
+    id: string;
+    name: string;
+    permissions: string[];
+    active: boolean;
+  } | null;
+  /**
+   * QL-198 (§3.70): **unión ya calculada** de lo que conceden el rol, los flags individuales y el
+   * perfil activo. Es lo que hay que enseñar como "lo que esta persona puede hacer": recalcularlo
+   * en el front es el fallo de QL-192 (dos copias de la regla que divergen).
+   *
+   * `string[]` a propósito: el catálogo del backend crece y una clave desconocida debe viajar sin
+   * romper el parseo.
+   */
+  effectivePermissions?: string[];
   createdAt: string;
 }
 
@@ -69,6 +94,12 @@ export interface CreateUserDto {
   canCreateProjects?: boolean;
   /** QL-184: permiso de usar el panel de IA al alta (default `true` en el backend si se omite). */
   canUseAi?: boolean;
+  /**
+   * QL-198 (§3.70): perfil de permisos asignado al alta. **Un solo perfil por usuario** (decisión
+   * de producto): selector simple, nunca multi-select. Un perfil retirado da 409
+   * `PERMISSION_PROFILE_INACTIVE`.
+   */
+  profileId?: string | null;
 }
 
 /** DTO de actualización de usuario (§3.2, `PATCH /users/:id`). Todos opcionales. */
@@ -89,6 +120,14 @@ export interface UpdateUserDto {
   canCreateProjects?: boolean;
   /** QL-184: otorga (`true`) o revoca (`false`) el permiso de usar el panel de IA. */
   canUseAi?: boolean;
+  /**
+   * QL-198 (§3.70): asigna el perfil de permisos, o `null` para quitarlo.
+   *
+   * ⚠️ Quitar el perfil **no revoca** lo que el usuario tenga concedido por su rol o por sus
+   * interruptores individuales: los permisos **suman**. 409 `PERMISSION_PROFILE_INACTIVE` si el
+   * perfil está retirado.
+   */
+  profileId?: string | null;
 }
 
 /** Filtros de listado de usuarios (§3.2). **ADMIN o Dirección** (QL-195). */

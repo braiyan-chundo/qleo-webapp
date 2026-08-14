@@ -5,6 +5,16 @@ import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import {
+  AbsenceDayChip,
+  AbsenceLegendItem,
+} from '@/features/absences/components/AbsenceDayChip';
+import { useAbsenceCalendarForYears } from '@/features/absences/hooks/use-absences';
+import {
+  addCivilDays,
+  groupAbsencesByDay,
+  type AbsenceOnDay,
+} from '@/features/absences/lib/absence';
 
 import {
   groupBirthdaysByDate,
@@ -19,6 +29,7 @@ import {
   monthLabel,
   monthsInRange,
   yearsInRange,
+  ymd,
   BIRTHDAY_CHIP,
   WEEKDAY_HEADERS,
   type CalendarDay,
@@ -34,6 +45,9 @@ interface WorkCalendarViewProps {
  * array nuevo por celda y por render, rompiendo la comparación de props de cada `DayCellView`.
  */
 const EMPTY_BIRTHDAYS: Birthday[] = [];
+
+/** (QL-199) Mismo motivo para los días sin ausencias. */
+const EMPTY_ABSENCES: AbsenceOnDay[] = [];
 
 /** Primer día del mes de una fecha. */
 function startOfMonth(date: Date): Date {
@@ -81,6 +95,24 @@ export function WorkCalendarView({ weekendDays }: WorkCalendarViewProps) {
   // (QL-193) Los cumpleaños NO entran en `holidayKeys`: no alteran el conteo de días laborables.
   const { birthdays } = useBirthdaysForYears(years);
   const birthdaysByKey = useMemo(() => groupBirthdaysByDate(birthdays), [birthdays]);
+
+  // (QL-199) Ausencias del rango visible. Tampoco entran en `holidayKeys`: una ausencia no
+  // convierte el día en no laborable (§3.71 §8), solo anota quién no está.
+  const { absences } = useAbsenceCalendarForYears(years);
+  // La expansión se acota a los días que las grillas pueden pintar (los meses del rango más el
+  // relleno de semana de los extremos): los rangos llegan sin recortar, y expandir unas vacaciones
+  // de tres meses entera para dibujar una semana sería trabajo tirado.
+  const first = months[0];
+  const last = months[months.length - 1];
+  const gridFrom = addCivilDays(ymd(first.year, first.month, 1), -7);
+  const gridTo = addCivilDays(
+    ymd(last.year, last.month, new Date(last.year, last.month + 1, 0).getDate()),
+    7,
+  );
+  const absencesByKey = useMemo(
+    () => groupAbsencesByDay(absences, gridFrom, gridTo),
+    [absences, gridFrom, gridTo],
+  );
 
   const yearSummaries = useMemo(
     () =>
@@ -149,6 +181,7 @@ export function WorkCalendarView({ weekendDays }: WorkCalendarViewProps) {
               weekendDays={weekendDays}
               holidayByKey={holidayByKey}
               birthdaysByKey={birthdaysByKey}
+              absencesByKey={absencesByKey}
               workingDays={countWorkingDaysInMonth(
                 ym.year,
                 ym.month,
@@ -207,6 +240,8 @@ function Legend() {
         <Cake className="size-3 text-primary" aria-hidden />
         Cumpleaños
       </span>
+      {/* (QL-199) Barra continua, no muestra de color: es un RANGO. Ver `ABSENCE_CHIP`. */}
+      <AbsenceLegendItem />
     </div>
   );
 }
@@ -227,6 +262,8 @@ interface MonthGridProps {
   holidayByKey: Map<string, Holiday>;
   /** (QL-193) Cumpleaños indexados por día (`'YYYY-MM-DD'`). */
   birthdaysByKey: Map<string, Birthday[]>;
+  /** (QL-199) Ausencias indexadas por día, ya expandidas desde sus rangos. */
+  absencesByKey: Map<string, AbsenceOnDay[]>;
   workingDays: number;
 }
 
@@ -237,6 +274,7 @@ function MonthGrid({
   weekendDays,
   holidayByKey,
   birthdaysByKey,
+  absencesByKey,
   workingDays,
 }: MonthGridProps) {
   const grid = useMemo(
@@ -279,6 +317,7 @@ function MonthGrid({
               cell={cell}
               holiday={holidayByKey.get(cell.key)}
               birthdays={birthdaysByKey.get(cell.key) ?? EMPTY_BIRTHDAYS}
+              absences={absencesByKey.get(cell.key) ?? EMPTY_ABSENCES}
             />
           ))}
         </div>
@@ -292,22 +331,26 @@ interface DayCellViewProps {
   holiday: Holiday | undefined;
   /** (QL-193) Cumpleaños de ESE día. Lista, no uno: varias personas pueden coincidir. */
   birthdays: Birthday[];
+  /** (QL-199) Ausencias que tocan ESE día, con su posición dentro del rango. */
+  absences: AbsenceOnDay[];
 }
 
 /**
- * Celda de día: color por tipo (festivo AUTO/MANUAL, fin de semana), nombre del festivo, hoy, y
- * (QL-193) los cumpleaños del día como chip aparte.
+ * Celda de día: color por tipo (festivo AUTO/MANUAL, fin de semana), nombre del festivo, hoy,
+ * (QL-193) los cumpleaños del día como chip aparte y (QL-199) las ausencias como barra.
  */
-function DayCellView({ cell, holiday, birthdays }: DayCellViewProps) {
+function DayCellView({ cell, holiday, birthdays, absences }: DayCellViewProps) {
   const { day, inMonth, isToday, isWeekend } = cell;
   const isAuto = holiday?.source === 'AUTO';
   const isManual = holiday?.source === 'MANUAL';
 
-  // El `title` acumula ambas cosas: con varios cumpleaños el chip solo cabe un contador, así que
-  // los nombres completos tienen que estar en algún sitio.
+  // El `title` acumula todo: con varios cumpleaños o ausentes el chip solo cabe un contador, así
+  // que los nombres completos tienen que estar en algún sitio. De la ausencia solo salen `name` y
+  // `typeLabel` — lo que da la API, ya enmascarado si el tipo era reservado.
   const tooltip = [
     holiday?.name,
     ...birthdays.map((b) => `🎂 ${b.name}`),
+    ...absences.map((a) => `${a.absence.name}: ${a.absence.typeLabel}`),
   ]
     .filter(Boolean)
     .join(' · ');
@@ -364,6 +407,15 @@ function DayCellView({ cell, holiday, birthdays }: DayCellViewProps) {
               : `${birthdays.length} cumpleaños`}
           </span>
         </span>
+      )}
+
+      {/* (QL-199) Ausencias del día: barra continua a sangre para que los días consecutivos de un
+          mismo periodo se lean como un tramo. `mt-auto` solo si no lo empujó ya otro chip. */}
+      {inMonth && absences.length > 0 && (
+        <AbsenceDayChip
+          entries={absences}
+          className={cn('-mx-1', !holiday && birthdays.length === 0 && 'mt-auto')}
+        />
       )}
     </div>
   );

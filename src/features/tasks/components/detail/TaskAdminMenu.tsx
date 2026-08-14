@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { ApiError } from '@/core/api/fetch-client';
 import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -35,6 +36,7 @@ import {
   useDiscardTask,
   useRestoreTask,
 } from '../../hooks/use-tasks';
+import { useCanDiscardTask } from '../../hooks/use-task-permissions';
 import type { Task } from '../../services/tasks.service';
 import { TaskFormDialog } from '../TaskFormDialog';
 
@@ -56,13 +58,18 @@ interface TaskAdminMenuProps {
  * - **Eliminar** (§3.40): hard-delete **irreversible** con cascada (adjuntos, comentarios,
  *   notificaciones…), tras un `AlertDialog` que advierte del alcance.
  *
- * Se renderiza `null` fuera del área de administración: descartar/restaurar (QL-142) y el
- * hard-delete (QL-143) son de ADMIN o **Dirección** (QL-195), y el backend responde 403 a
- * cualquier otro (no dependemos solo del gate de UI).
+ * (QL-198b, §3.70 §9.1) **Descartar/restaurar ya no es solo del rol**: se puede delegar con el
+ * permiso `TASK_DISCARD`, acotado a los proyectos donde el usuario es miembro. Por eso el menú ya
+ * no se decide en bloque — cada acción lleva su propio gate y el menú se muestra si queda alguna:
+ * editar y el hard-delete siguen exigiendo rol `MANAGER`+ (borrar es irreversible y con cascada, y
+ * el contrato dice que no se abrirá), descartar/restaurar exige el permiso. Se renderiza `null` si
+ * el usuario no puede hacer ninguna de las dos cosas. El backend responde 403 en cualquier caso:
+ * el gate de UI solo evita ofrecer lo que va a fallar.
  */
 export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps) {
   const user = useAuthStore((s) => s.user);
   const isAdmin = hasAtLeastRole(user, 'MANAGER');
+  const canDiscard = useCanDiscardTask(projectId);
 
   const discardTask = useDiscardTask(projectId);
   const restoreTask = useRestoreTask(projectId);
@@ -71,14 +78,33 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /**
+   * (§3.70 §9.1) El 403 `TASK_DISCARD_FORBIDDEN` es **parte del flujo**, no un bug: llega tanto si
+   * falta el permiso como si la tarea es de un proyecto ajeno (el backend no los distingue a
+   * propósito, para que el error no funcione como oráculo de permisos). Se enseña su `message` y
+   * se deja de ofrecer la acción **para esta tarea**; nunca se reintenta.
+   */
+  const [discardDenied, setDiscardDenied] = useState(false);
 
-  if (!isAdmin) return null;
+  const showDiscard = canDiscard && !discardDenied;
+
+  if (!isAdmin && !showDiscard) return null;
 
   /**
    * (QL-178, §3.58) El rol de **solo lectura manda sobre el ADMIN**: un ADMIN que es OBSERVER
    * de la tarea recibe 403 `READ_ONLY_ROLE` en el PATCH, así que no le pintamos la acción.
    */
   const canFullEdit = task.currentUserRole !== 'OBSERVER';
+
+  /** Traduce el fallo de descartar/restaurar y retira la acción si fue un 403 de permiso. */
+  const reportDiscardError = (err: unknown, fallback: string) => {
+    if (err instanceof ApiError && err.code === 'TASK_DISCARD_FORBIDDEN') {
+      setDiscardDenied(true);
+      toast.error(err.message);
+      return;
+    }
+    toast.error(err instanceof Error ? err.message : fallback);
+  };
 
   const handleDiscard = () => {
     discardTask.mutate(task.id, {
@@ -88,7 +114,7 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
       },
       onError: (err) => {
         setConfirmDiscard(false);
-        toast.error(err instanceof Error ? err.message : 'No se pudo descartar la tarea');
+        reportDiscardError(err, 'No se pudo descartar la tarea');
       },
     });
   };
@@ -96,8 +122,7 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
   const handleRestore = () => {
     restoreTask.mutate(task.id, {
       onSuccess: () => toast.success('Tarea restaurada'),
-      onError: (err) =>
-        toast.error(err instanceof Error ? err.message : 'No se pudo restaurar la tarea'),
+      onError: (err) => reportDiscardError(err, 'No se pudo restaurar la tarea'),
     });
   };
 
@@ -132,11 +157,14 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuLabel>Administración y Dirección</DropdownMenuLabel>
+          <DropdownMenuLabel>
+            {isAdmin ? 'Administración y Dirección' : 'Acciones del tablero'}
+          </DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          {/* (QL-178) Formulario completo: datos + fecha límite + participantes en un PATCH. */}
-          {canFullEdit && (
+          {/* (QL-178) Formulario completo: datos + fecha límite + participantes en un PATCH.
+              Sigue exigiendo rol: no está en el catálogo de permisos delegables. */}
+          {isAdmin && canFullEdit && (
             <>
               <DropdownMenuItem onSelect={() => setEditOpen(true)}>
                 <Pencil className="size-4" />
@@ -146,36 +174,43 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
             </>
           )}
 
-          {task.isDiscarded ? (
-            <DropdownMenuItem
-              onSelect={handleRestore}
-              disabled={restoreTask.isPending}
-            >
-              <ArchiveRestore className="size-4" />
-              Restaurar tarea
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onSelect={() => setConfirmDiscard(true)}>
-              <Archive className="size-4" />
-              Descartar tarea
-            </DropdownMenuItem>
+          {/* (QL-198b) Delegable con `TASK_DISCARD`, acotado a los proyectos propios. */}
+          {showDiscard &&
+            (task.isDiscarded ? (
+              <DropdownMenuItem
+                onSelect={handleRestore}
+                disabled={restoreTask.isPending}
+              >
+                <ArchiveRestore className="size-4" />
+                Restaurar tarea
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onSelect={() => setConfirmDiscard(true)}>
+                <Archive className="size-4" />
+                Descartar tarea
+              </DropdownMenuItem>
+            ))}
+
+          {/* (§3.70 §9) El hard-delete NO se abrió y no se abrirá: es irreversible y arrastra
+              adjuntos y comentarios. Sigue pidiendo rol `MANAGER`+. */}
+          {isAdmin && (
+            <>
+              {showDiscard && <DropdownMenuSeparator />}
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="size-4" />
+                Eliminar tarea
+              </DropdownMenuItem>
+            </>
           )}
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={() => setConfirmDelete(true)}
-          >
-            <Trash2 className="size-4" />
-            Eliminar tarea
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       {/* (QL-178) Edición COMPLETA solo-ADMIN. El diálogo gatea sus propias queries por `open`
           (columnas, proyecto y miembros), así que montarlo cerrado no cuesta peticiones. */}
-      {canFullEdit && (
+      {isAdmin && canFullEdit && (
         <TaskFormDialog
           open={editOpen}
           onOpenChange={setEditOpen}

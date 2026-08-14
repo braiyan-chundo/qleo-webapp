@@ -12,7 +12,12 @@ import {
 } from '@/components/ui/sheet';
 import { NavBadge } from '@/shared/components/NavBadge';
 import { useAuthStore } from '@/store/auth.store';
-import { canUseAi, hasAtLeastRole } from '@/shared/lib/permissions';
+import {
+  canUseAi,
+  hasAtLeastRole,
+  hasPermission,
+  type PlatformPermission,
+} from '@/shared/lib/permissions';
 import { useWallUnreadCount } from '@/features/wall/hooks/use-wall';
 import {
   bottomNavItems,
@@ -20,6 +25,8 @@ import {
   isNavItemActive,
   activeNavUrl,
   flattenNavItems,
+  isTopLevelNavItemVisible,
+  type NavVisibilityContext,
 } from '@/shared/config/nav';
 
 /**
@@ -42,12 +49,20 @@ export function BottomNav() {
   const { count: wallUnread } = useWallUnreadCount();
   const [moreOpen, setMoreOpen] = useState(false);
 
+  // (QL-198b) Rol + permisos delegados, resueltos una vez y compartidos con `nav.ts`, que es
+  // donde vive el predicado (el sidebar usa exactamente el mismo).
+  const navContext: NavVisibilityContext = {
+    isAdmin,
+    aiAllowed,
+    hasPermission: (permission: PlatformPermission) => hasPermission(user, permission),
+  };
+
   // "Más" es una lista plana: los grupos (p. ej. Administración QL-149) se expanden en sus hijos
-  // con `flattenNavItems`, que es consciente del rol: si un grupo no deja hijos visibles devuelve
-  // el parent como link plano, así que el MEMBER conserva la sección. El filtro externo por
-  // `adminOnly` sigue quitando los parents solo-ADMIN (p. ej. Administración) del menú de un MEMBER.
-  const menuItems = flattenNavItems(allNavItems, isAdmin).filter(
-    (item) => (!item.adminOnly || isAdmin) && (!item.requiresAi || aiAllowed),
+  // con `flattenNavItems`, que es consciente del rol y de los permisos: si un grupo no deja hijos
+  // visibles devuelve el parent como link plano, así que el MEMBER conserva la sección. El filtro
+  // externo quita los parents que no le corresponden.
+  const menuItems = flattenNavItems(allNavItems, navContext).filter((item) =>
+    isTopLevelNavItemVisible(item, navContext),
   );
 
   // Un único ítem activo a la vez: el de `url` más específica que casa con la ruta (resuelve el

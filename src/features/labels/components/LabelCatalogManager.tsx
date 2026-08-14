@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { canManageLabels, hasAtLeastRole } from '@/shared/lib/permissions';
+import { useAuthStore } from '@/store/auth.store';
 
 import { useLabels, useUpdateLabel } from '../hooks/use-labels';
 import type { Label } from '../services/labels.service';
@@ -16,14 +18,25 @@ import { EditLabelDialog } from './EditLabelDialog';
 import { DeleteLabelDialog } from './DeleteLabelDialog';
 
 /**
- * Gestión del **catálogo global de etiquetas** (QL-149, §3.38, solo ADMIN). Lista TODAS las
- * etiquetas —incluidas las archivadas— y permite crear, editar (nombre/icono/color/archivado) y
- * borrar en cascada. Es el contenido del tab "Etiquetas" de la vista de Configuración.
+ * Gestión del **catálogo global de etiquetas** (QL-149, §3.38). Lista TODAS las etiquetas
+ * —incluidas las archivadas— y permite crear, editar (nombre/icono/color/archivado) y borrar en
+ * cascada. Es el contenido del tab "Etiquetas" de la vista de Configuración.
+ *
+ * (QL-198b, §3.70 §9.2) Las acciones ya no van todas por rol, y la frontera es la reversibilidad:
+ * - **`LABEL_MANAGE`** (delegable en un perfil) habilita **editar** y **archivar**. Archivar
+ *   retira la etiqueta del picker sin destruir nada, así que el delegado tiene la vía completa
+ *   para sacar una etiqueta de circulación.
+ * - **`DELETE`** sigue exigiendo rol `MANAGER`+: arrastra la etiqueta fuera de `project.labelIds`
+ *   y `task.labelIds` de todo lo que la usaba, y no hay deshacer.
+ * - **Crear** ya podía hacerlo cualquier autenticado y no ha cambiado.
  *
  * El catálogo es un set pequeño y global, así que se trae completo una vez
  * (`includeArchived: true`) y se filtra/ordena en cliente; no se pagina.
  */
 export function LabelCatalogManager() {
+  const user = useAuthStore((s) => s.user);
+  const canCurate = canManageLabels(user);
+  const canDelete = hasAtLeastRole(user, 'MANAGER');
   const { data, isLoading, isError, error } = useLabels('', {
     includeArchived: true,
   });
@@ -159,30 +172,37 @@ export function LabelCatalogManager() {
                 )}
 
                 <div className="ml-auto flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleArchived(label)}
-                    disabled={isToggling}
-                  >
-                    {isToggling && <Loader2 className="animate-spin" />}
-                    {label.archived ? 'Reactivar' : 'Archivar'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditing(label)}
-                  >
-                    Editar
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-error hover:bg-error-container hover:text-on-error-container"
-                    onClick={() => setDeleting(label)}
-                  >
-                    Eliminar
-                  </Button>
+                  {canCurate && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleArchived(label)}
+                        disabled={isToggling}
+                      >
+                        {isToggling && <Loader2 className="animate-spin" />}
+                        {label.archived ? 'Reactivar' : 'Archivar'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditing(label)}
+                      >
+                        Editar
+                      </Button>
+                    </>
+                  )}
+                  {/* Destructivo y en cascada: sigue siendo del rol, no del permiso. */}
+                  {canDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-error hover:bg-error-container hover:text-on-error-container"
+                      onClick={() => setDeleting(label)}
+                    >
+                      Eliminar
+                    </Button>
+                  )}
                 </div>
               </li>
             );

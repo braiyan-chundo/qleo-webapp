@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { authKeys } from '@/features/auth/hooks/use-auth';
+
 import {
   usersService,
   type CreateUserDto,
@@ -103,7 +105,14 @@ export function useCreateUser() {
   });
 }
 
-/** Actualiza un usuario e invalida los listados. */
+/**
+ * Actualiza un usuario e invalida los listados.
+ *
+ * (QL-198, §3.70 §7) Invalida también `['auth','me']`: la edición puede cambiar permisos (perfil
+ * o interruptores individuales) y no hay evento de tiempo real para eso. Si quien edita se está
+ * editando a sí mismo, sin esto seguiría viendo su nav y sus botones con los permisos anteriores
+ * —que la API ya está rechazando, porque cada gate relee la BD— hasta el siguiente arranque.
+ */
 export function useUpdateUser() {
   const queryClient = useQueryClient();
 
@@ -112,6 +121,7 @@ export function useUpdateUser() {
       usersService.update(id, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: authKeys.profile });
     },
   });
 }

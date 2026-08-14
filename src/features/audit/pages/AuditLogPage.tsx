@@ -46,7 +46,24 @@ const PAGE_SIZE = 15;
 
 const ALL = 'ALL';
 
-const ENTITY_TYPES = ['PROJECT', 'TASK', 'USER', 'COLUMN'] as const;
+/**
+ * Entidades ofrecidas en el filtro. Es una lista **fija**, así que cada módulo nuevo que audita
+ * hay que añadirlo aquí o sus registros solo se ven en "Todas las entidades".
+ *
+ * `PERMISSION-PROFILE` va **con guion** (QL-198, §3.70 §7): el `entityType` sale de despluralizar
+ * el segmento de la ruta (`/permission-profiles`), no de un identificador escrito a mano.
+ */
+const ENTITY_TYPES = [
+  'PROJECT',
+  'TASK',
+  'USER',
+  'COLUMN',
+  // (QL-198) Crear/editar/borrar un perfil de permisos. Asignárselo a alguien se registra como
+  // `USER`/`UPDATE`, igual que cualquier otra edición de usuario.
+  'PERMISSION-PROFILE',
+  // (QL-199) Altas, ediciones y borrados de ausencias.
+  'ABSENCE',
+] as const;
 
 type BadgeVariant =
   | 'default'

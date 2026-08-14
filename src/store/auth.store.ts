@@ -89,6 +89,37 @@ export interface User {
    */
   canUseAi?: boolean;
   /**
+   * QL-198 (§3.70): id del **perfil de permisos** asignado, o `null`. Un solo perfil por usuario
+   * (decisión de producto, no limitación temporal): con uno, "¿qué puede hacer Juan?" se responde
+   * mirando una cosa. Se asigna con `PATCH /users/:id`; no es self-service.
+   */
+  profileId?: string | null;
+  /**
+   * QL-198 (§3.70): resumen del perfil asignado, **para pintar** (nombre, chips), o `null`.
+   *
+   * ⚠️ **No decidas permisos con `profile.permissions`**: dejaría fuera el rol y los flags
+   * individuales. Para eso está `effectivePermissions`. Puede llegar con `active: false` (perfil
+   * retirado): el usuario conserva la asignación pero ya **no** recibe sus permisos.
+   */
+  profile?: {
+    id: string;
+    name: string;
+    permissions: string[];
+    active: boolean;
+  } | null;
+  /**
+   * QL-198 (§3.70): permisos efectivos **ya calculados por el backend** — la unión de lo que
+   * conceden el rol, los flags individuales y el perfil activo. Es lo que decide en la UI; se lee
+   * con `hasPermission()` de `@/shared/lib/permissions`, nunca a mano.
+   *
+   * Tipado como `string[]` a propósito: el catálogo crece en el backend y una clave que el front
+   * aún no conoce debe viajar sin romper el parseo.
+   *
+   * Puede faltar en una sesión **persistida antes de QL-198** (el store va a localStorage); el
+   * helper resuelve ese hueco con la regla anterior hasta el primer `GET /auth/me`.
+   */
+  effectivePermissions?: string[];
+  /**
    * QL-153: token de la paleta curada para el color primary en modo **claro**. `null`/ausente
    * = genérico (sin preferencia). El backend solo persiste la clave (string corto, p. ej.
    * `'violet'`); el mapeo token→tokens Material 3 lo posee el front (`features/profile/lib/theme-palette`).
