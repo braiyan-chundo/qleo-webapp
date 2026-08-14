@@ -164,4 +164,12 @@ export const usersService = {
     qs.set('limit', String(limit));
     return api.get<UserDirectoryEntry[]>(`/users/directory?${qs.toString()}`);
   },
+
+  /**
+   * QL-197 — Usuarios de **Dirección** (`MANAGER`/`ADMIN` activos), para elegir a quién pedir la
+   * autorización de fecha de fin abierta. Accesible a **cualquier autenticado**, que es justo el
+   * motivo de que exista: quien pide la autorización suele ser un MEMBER, y `GET /users` le
+   * responde 403. Devuelve la misma forma reducida que el directorio general.
+   */
+  directives: () => api.get<UserDirectoryEntry[]>('/users/directory/directives'),
 };

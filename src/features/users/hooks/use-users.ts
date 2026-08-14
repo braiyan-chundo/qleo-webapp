@@ -5,6 +5,7 @@ import {
   type CreateUserDto,
   type UpdateUserDto,
   type UserListParams,
+  type UserSummary,
 } from '../services/users.service';
 
 /**
@@ -21,6 +22,8 @@ export const userKeys = {
   list: (params: UserListParams) => [...userKeys.lists(), params] as const,
   directories: () => [...userKeys.all, 'directory'] as const,
   directory: (search: string) => [...userKeys.directories(), search] as const,
+  /** (QL-197) Usuarios ACTIVOS con rol de Dirección, para el selector de autorización. */
+  directives: () => [...userKeys.all, 'directives'] as const,
 };
 
 interface UseUserDirectoryOptions {
@@ -43,6 +46,41 @@ export function useUserDirectory(
     queryFn: () => usersService.directory(term || undefined, 50),
     enabled,
   });
+}
+
+/**
+ * (QL-197, §3.69) Candidatos del selector de **directivo** al pedir autorización para dejar la
+ * fecha de fin abierta. El backend solo acepta un `managerId` que sea usuario **ACTIVO** con rol
+ * `MANAGER` **o** `ADMIN` (`hasAtLeastRole(...,'MANAGER')`), y si no responde 400
+ * `OPEN_ENDED_MANAGER_INVALID` **sin crear la tarea**.
+ *
+ * Sale de `GET /users/directory/directives`, que el backend expuso **para esto**: quien pide la
+ * autorización es normalmente un **MEMBER**, y con `GET /users` (que es `@Roles(MANAGER)`) se
+ * habría comido un 403. El endpoint está abierto a cualquier autenticado y devuelve la forma
+ * reducida del directorio —sin `role` ni `status`—, porque pertenecer a Dirección ya va implícito
+ * en salir de esa lista.
+ *
+ * Una sola petición: el backend ya une `MANAGER` + `ADMIN`. Filtrar en cliente nunca fue una
+ * opción — el directorio general omite `role` a propósito, así que el dato no llega.
+ */
+export function useDirectiveUsers({ enabled = true }: { enabled?: boolean } = {}) {
+  const query = useQuery({
+    queryKey: userKeys.directives(),
+    queryFn: async (): Promise<UserSummary[]> => {
+      const directives = await usersService.directives();
+      return directives.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        email: entry.email,
+        avatarUrl: entry.avatarUrl,
+        avatarDownloadUrl: entry.avatarDownloadUrl,
+        jobTitle: entry.jobTitle,
+      })) as UserSummary[];
+    },
+    enabled,
+  });
+
+  return query;
 }
 
 /** Listado paginado de usuarios para la tabla de administración (`GET /users`, ADMIN). */

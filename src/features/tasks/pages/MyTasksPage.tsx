@@ -26,6 +26,7 @@ import type { Task, TaskRole } from '../services/tasks.service';
 import { projectDot } from '../lib/palette';
 import { TASK_ROLE_BADGE_CLASS, TASK_ROLE_LABEL, rolesOfUser } from '../lib/roles';
 import { formatDueDate, isDueToday, isOverdue } from '../lib/deadline';
+import { OpenEndedChip } from '../components/open-ended/OpenEndedChip';
 
 /** Valor sentinela para "todos los roles" en el select (los roles reales nunca son vacíos). */
 const ALL_ROLES = '';
@@ -448,6 +449,10 @@ function TaskRow({ task, onOpen, project, emphasize }: TaskRowProps) {
                 />
               )}
             </>
+          ) : task.openEndedStatus ? (
+            // (QL-197) En "Mis tareas" el estado del fin abierto importa especialmente: es la
+            // pantalla donde el Creador descubre que su tarea sigue esperando (o denegada).
+            <OpenEndedChip task={task} />
           ) : (
             <span className="text-sm text-on-surface-variant">Sin fecha</span>
           )}

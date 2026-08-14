@@ -14,6 +14,7 @@ import { AttachmentsPanel } from '@/features/attachments/components/AttachmentsP
 import { useTask } from '../hooks/use-tasks';
 import { userHasRole } from '../lib/roles';
 import { CompletionSection } from '../components/CompletionSection';
+import { OpenEndedSection } from '../components/open-ended/OpenEndedSection';
 import { DeadlineSection } from '../components/DeadlineSection';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
 import { TaskAnalyticsSection } from '../components/TaskAnalyticsSection';
@@ -146,6 +147,11 @@ export function TaskDetailPage() {
         <aside className="space-y-4 lg:sticky lg:top-6">
           {/* (QL-141) Mover la tarea entre columnas contiguas (siguiente/anterior). */}
           <TaskColumnMover task={task} projectId={projectId} />
+
+          {/* (QL-197) Estado de la solicitud de fin abierto y, para Dirección, su resolución.
+              Va ANTES del cierre y del deadline: mientras esté bloqueada, es lo que explica por
+              qué esas dos secciones no dejan avanzar. Se renderiza `null` si no hay solicitud. */}
+          <OpenEndedSection task={task} projectId={projectId} />
 
           <CompletionSection task={task} projectId={projectId} />
 

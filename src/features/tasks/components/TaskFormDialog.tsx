@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, TriangleAlert } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,8 +32,10 @@ import { DatePicker } from '@/components/ui/date-picker';
 
 import { useCreateTask, useUpdateTask } from '../hooks/use-tasks';
 import { TaskParticipantsPicker } from './TaskParticipantsPicker';
-import { taskFormSchema, type TaskFormValues } from '../schemas/task.schema';
+import { OpenEndedRequestFields } from './open-ended/OpenEndedRequestFields';
+import { buildTaskFormSchema, type TaskFormValues } from '../schemas/task.schema';
 import type { Task } from '../services/tasks.service';
+import { taskDateErrorMessage } from '../lib/open-ended';
 import { assigneeOf } from '../lib/roles';
 import {
   dateInputToDate,
@@ -73,16 +75,22 @@ const emptyValues: TaskFormValues = {
   dueDate: '',
   dueTime: '',
   deadlineLocked: false,
+  openEnded: false,
+  openEndedManagerId: '',
+  openEndedReason: '',
   assigneeId: '',
   collaboratorIds: [],
   observerIds: [],
 };
 
 /**
- * Traduce el `error.code` de negocio del alta/edición a un mensaje claro (QL-123, QL-178 §3.58).
- * **Siempre por `error.code`**, nunca por el texto del backend.
+ * Traduce el `error.code` de negocio del alta/edición a un mensaje claro (QL-123, QL-178 §3.58,
+ * QL-197 §3.69). **Siempre por `error.code`**, nunca por el texto del backend.
  */
 function taskFormErrorMessage(err: unknown, fallback: string): string {
+  // (QL-197) Fechas obligatorias y fin abierto: mismo mapa que usan el detalle y el tablero.
+  const dateMessage = taskDateErrorMessage(err);
+  if (dateMessage) return dateMessage;
   if (err instanceof ApiError) {
     switch (err.code) {
       case 'USER_NOT_PROJECT_MEMBER':
@@ -158,6 +166,26 @@ export function TaskFormDialog({
   const updateTask = useUpdateTask(projectId);
   const isPending = createTask.isPending || updateTask.isPending;
 
+  /**
+   * (QL-197, §3.69) Qué fechas exige ESTE uso del formulario. La regla **rige hacia adelante**:
+   * en el alta las dos son obligatorias; en la edición solo se exige lo que la tarea ya tenía,
+   * porque el backend rechaza **borrar** una fecha existente (400 `TASK_START_DATE_REQUIRED` /
+   * `TASK_DUE_DATE_REQUIRED`) pero deja editar con normalidad una tarea antigua que nunca la
+   * tuvo. Marcar esas como inválidas habría congelado casi todo el histórico.
+   *
+   * El check de fin abierto solo se ofrece en el **alta**: `PATCH /tasks/:id` no acepta
+   * `openEndedRequest`, así que en edición la vía es ponerle fecha (y eso cancela la solicitud).
+   */
+  const formRules = useMemo(
+    () => ({
+      requireStartDate: !isEdit || !!task?.startDate,
+      // La edición reducida del CREATOR ni siquiera manda `dueDate`, así que no la exige.
+      requireDueDate: !isEdit || (isFullEdit && !!task?.dueDate),
+      allowOpenEnded: !isEdit,
+    }),
+    [isEdit, isFullEdit, task?.startDate, task?.dueDate],
+  );
+
   const {
     register,
     control,
@@ -167,7 +195,7 @@ export function TaskFormDialog({
     watch,
     formState: { errors },
   } = useForm<TaskFormValues>({
-    resolver: zodResolver(taskFormSchema),
+    resolver: zodResolver(buildTaskFormSchema(formRules)),
     defaultValues: emptyValues,
   });
 
@@ -176,6 +204,10 @@ export function TaskFormDialog({
   const observerIds = watch('observerIds') ?? [];
   // (P1) El toggle de bloqueo solo aplica cuando ya se eligió una fecha límite.
   const dueDateValue = watch('dueDate') ?? '';
+  // (QL-197) Check "Sin fecha de finalización". Solo cuenta en el alta.
+  const openEnded = (watch('openEnded') ?? false) && formRules.allowOpenEnded;
+  const openEndedManagerId = watch('openEndedManagerId') ?? '';
+  const openEndedReason = watch('openEndedReason') ?? '';
 
   useEffect(() => {
     if (!open) return;
@@ -192,6 +224,11 @@ export function TaskFormDialog({
         dueDate: fullEdit ? isoToDateInput(task.dueDate) : '',
         dueTime: fullEdit ? isoToTimeInput(task.dueDate) : '',
         deadlineLocked: fullEdit ? task.deadlineLocked : false,
+        // (QL-197) La solicitud de fin abierto solo existe en el alta: `PATCH /tasks/:id` no la
+        // acepta, así que en edición estos tres campos van vacíos y nunca se envían.
+        openEnded: false,
+        openEndedManagerId: '',
+        openEndedReason: '',
         // (QL-192) En la EDICIÓN no se toca el Responsable: se muestra el que la tarea tenga.
         assigneeId: fullEdit ? (assigneeOf(task)?.userId ?? '') : '',
         collaboratorIds: fullEdit ? userIdsWithRole(task, 'COLLABORATOR') : [],
@@ -286,12 +323,26 @@ export function TaskFormDialog({
       const { assigneeId: nextAssigneeId, collaboratorIds: nextCollaboratorIds, observerIds: nextObserverIds } =
         resolveRoles(values);
 
-      // (P1/§3.6) Fecha límite opcional en el alta. (QL-166) Con hora: fecha + hora → ISO
-      // completo (hora vacía → 18:00). `deadlineLocked` solo tiene sentido con una fecha
-      // (bloquear un deadline nulo no aporta nada), así que se envía solo si la hay.
-      const dueDate =
-        dateTimeInputToIso(values.dueDate ?? '', values.dueTime ?? '') ?? undefined;
+      // (P1/§3.6) Fecha límite en el alta. (QL-166) Con hora: fecha + hora → ISO completo (hora
+      // vacía → 18:00). `deadlineLocked` solo tiene sentido con una fecha (bloquear un deadline
+      // nulo no aporta nada), así que se envía solo si la hay.
+      //
+      // (QL-197) `dueDate` y `openEndedRequest` son **excluyentes**: mandar las dos es un 400
+      // `OPEN_ENDED_REQUEST_NOT_APPLICABLE`. Con el check marcado se manda solo la solicitud, y
+      // la fecha ni se serializa aunque hubiera quedado un valor en el campo.
+      // Se lee de `values` (los datos ya validados que entrega rhf), no del `watch` del render:
+      // es lo que el esquema acaba de comprobar, así que payload y validación no pueden diverger.
+      const requestsOpenEnded = formRules.allowOpenEnded && values.openEnded === true;
+      const dueDate = requestsOpenEnded
+        ? undefined
+        : (dateTimeInputToIso(values.dueDate ?? '', values.dueTime ?? '') ?? undefined);
       const deadlineLocked = dueDate && values.deadlineLocked ? true : undefined;
+      const openEndedRequest = requestsOpenEnded
+        ? {
+            managerId: values.openEndedManagerId ?? '',
+            reason: (values.openEndedReason ?? '').trim(),
+          }
+        : undefined;
 
       createTask.mutate(
         {
@@ -300,9 +351,12 @@ export function TaskFormDialog({
           description,
           columnId: values.columnId || undefined,
           labelIds,
-          startDate,
+          // (QL-197) Obligatoria: el esquema ya la exige, así que aquí nunca es `null`. El `??`
+          // es solo para satisfacer al tipo (`dateInputToIso` puede devolver `null`).
+          startDate: startDate ?? '',
           dueDate,
           deadlineLocked,
+          openEndedRequest,
           assigneeId: nextAssigneeId ?? undefined,
           collaboratorIds: nextCollaboratorIds.length
             ? nextCollaboratorIds
@@ -311,7 +365,11 @@ export function TaskFormDialog({
         },
         {
           onSuccess: () => {
-            toast.success('Tarea creada');
+            toast.success(
+              requestsOpenEnded
+                ? 'Tarea creada. Queda bloqueada hasta que Dirección autorice el fin abierto.'
+                : 'Tarea creada',
+            );
             onOpenChange(false);
           },
           onError: (err) => {
@@ -414,9 +472,13 @@ export function TaskFormDialog({
             />
           </div>
 
+          {/* (QL-197, §3.69) Fecha de inicio OBLIGATORIA: ninguna tarea puede existir sin ella,
+              y el backend tampoco deja borrarla después. En una tarea antigua que nunca la tuvo
+              sigue siendo opcional (la regla rige hacia adelante). */}
           <div className="grid gap-1.5">
             <Label htmlFor="startDate" className="text-on-surface">
-              Fecha de inicio
+              Fecha de inicio{' '}
+              {formRules.requireStartDate && <span className="text-error">*</span>}
             </Label>
             <Controller
               control={control}
@@ -427,10 +489,17 @@ export function TaskFormDialog({
                   className="w-full sm:w-1/2"
                   value={dateInputToDate(field.value ?? '')}
                   onChange={(date) => field.onChange(dateToDateInput(date))}
-                  placeholder="Sin fecha"
+                  placeholder={
+                    formRules.requireStartDate ? 'Elegir fecha' : 'Sin fecha'
+                  }
                 />
               )}
             />
+            {errors.startDate && (
+              <span className="text-xs font-medium text-error">
+                {errors.startDate.message}
+              </span>
+            )}
           </div>
 
           {/* (P1/§3.6) Fecha límite en el ALTA y (QL-178) en la edición completa del ADMIN.
@@ -439,7 +508,8 @@ export function TaskFormDialog({
           {showFullFields && (
             <div className="grid gap-1.5">
               <Label htmlFor="dueDate" className="text-on-surface">
-                Fecha límite
+                Fecha de finalización{' '}
+                {formRules.requireDueDate && <span className="text-error">*</span>}
               </Label>
               <div className="flex flex-wrap items-center gap-2">
                 <Controller
@@ -450,17 +520,25 @@ export function TaskFormDialog({
                       id="dueDate"
                       className="w-full sm:flex-1"
                       value={dateInputToDate(field.value ?? '')}
+                      // (QL-197) Con el fin abierto marcado la fecha no puede existir:
+                      // mandar las dos es 400 `OPEN_ENDED_REQUEST_NOT_APPLICABLE`.
+                      disabled={openEnded}
                       onChange={(date) => field.onChange(dateToDateInput(date))}
-                      placeholder="Sin fecha límite"
+                      placeholder={openEnded ? 'Sin fecha de fin' : 'Elegir fecha'}
                     />
                   )}
                 />
                 {/* (QL-166) Hora del deadline; solo aplica con una fecha elegida. Vacía → 18:00. */}
-                {dueDateValue && (
+                {dueDateValue && !openEnded && (
                   <Input id="dueTime" type="time" className="h-10 w-32" {...register('dueTime')} />
                 )}
               </div>
-              {dueDateValue && (
+              {errors.dueDate && (
+                <span className="text-xs font-medium text-error">
+                  {errors.dueDate.message}
+                </span>
+              )}
+              {dueDateValue && !openEnded && (
                 <Controller
                   control={control}
                   name="deadlineLocked"
@@ -476,6 +554,61 @@ export function TaskFormDialog({
                     </label>
                   )}
                 />
+              )}
+
+              {/* (QL-197, §3.69) La única excepción a la fecha de fin obligatoria: que Dirección
+                  autorice dejarla abierta. Al marcarlo se limpia la fecha (son excluyentes) y se
+                  revelan los DOS campos de la solicitud, que viajan juntos o ninguno. */}
+              {formRules.allowOpenEnded && (
+                <Controller
+                  control={control}
+                  name="openEnded"
+                  render={({ field }) => (
+                    <label className="mt-1 flex items-center gap-2 text-sm text-on-surface">
+                      <Switch
+                        checked={!!field.value}
+                        onCheckedChange={(checked) => {
+                          field.onChange(checked);
+                          if (checked) {
+                            // Excluyentes: al pedir el fin abierto, la fecha se va con su hora
+                            // y con el bloqueo (que sin fecha no significa nada).
+                            setValue('dueDate', '');
+                            setValue('dueTime', '');
+                            setValue('deadlineLocked', false);
+                          }
+                        }}
+                      />
+                      <span className="text-on-surface-variant">
+                        Sin fecha de finalización (requiere autorización de Dirección)
+                      </span>
+                    </label>
+                  )}
+                />
+              )}
+
+              {openEnded && (
+                <>
+                  {/* La consecuencia se dice ANTES de crear, no se descubre después: la tarea
+                      nace bloqueada y no se podrá mover ni completar hasta que Dirección responda. */}
+                  <p className="inline-flex items-start gap-1.5 rounded-md border border-warning/30 bg-warning-container/50 px-3 py-2 text-xs text-on-warning-container">
+                    <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+                    <span>
+                      La tarea se creará <span className="font-medium">bloqueada</span>: no se
+                      podrá mover de columna ni completar hasta que Dirección autorice. Sí se
+                      podrá comentar y editar — ponerle una fecha de fin la desbloquea.
+                    </span>
+                  </p>
+
+                  <OpenEndedRequestFields
+                    managerId={openEndedManagerId}
+                    reason={openEndedReason}
+                    onManagerChange={(id) => setValue('openEndedManagerId', id)}
+                    onReasonChange={(value) => setValue('openEndedReason', value)}
+                    managerError={errors.openEndedManagerId?.message}
+                    reasonError={errors.openEndedReason?.message}
+                    disabled={isPending}
+                  />
+                </>
               )}
             </div>
           )}

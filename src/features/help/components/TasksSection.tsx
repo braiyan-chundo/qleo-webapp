@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   AtSign,
   CalendarClock,
+  CalendarOff,
   CalendarPlus,
   CheckCircle2,
   ListChecks,
@@ -19,8 +20,10 @@ import { Section, FeatureList, type HelpFeature } from './HelpPrimitives';
 /** Ciclo de vida de una tarea (QL-126). Verificado contra el detalle de tarea real. */
 const TASK_STEPS: { title: string; body: ReactNode }[] = [
   {
+    // (QL-197) Las dos fechas pasaron a ser obligatorias en el alta: es lo primero que hay que
+    // saber antes de pulsar "Nueva tarea", así que se dice en el paso 1.
     title: 'Se crea',
-    body: 'Con un título (obligatorio) y una columna. Puedes fijar Responsable, Colaboradores, etiqueta y fecha de inicio desde el primer momento.',
+    body: 'Con un título, una fecha de inicio y una fecha de finalización (las tres obligatorias) y una columna. Puedes fijar Responsable, Colaboradores y etiqueta desde el primer momento.',
   },
   {
     title: 'Se trabaja',
@@ -45,8 +48,15 @@ const TASK_FEATURES: HelpFeature[] = [
   },
   {
     icon: <CalendarClock className="size-4 text-primary" />,
-    term: 'Fecha límite',
-    desc: 'El Creador puede bloquearla; si está bloqueada, el Responsable o los Colaboradores pueden solicitar una prórroga. Si la fecha cae en festivo o fin de semana, Qleo lo avisa (no bloquea).',
+    term: 'Fecha de finalización',
+    desc: 'Obligatoria. El Creador puede bloquearla; si está bloqueada, el Responsable o los Colaboradores pueden solicitar una prórroga. Si la fecha cae en festivo o fin de semana, Qleo lo avisa (no bloquea).',
+  },
+  {
+    // (QL-197) La única excepción a la fecha de fin obligatoria, y su coste: la tarea nace
+    // bloqueada. Se documenta porque quien la marca sin saberlo cree que la tarea está rota.
+    icon: <CalendarOff className="size-4 text-primary" />,
+    term: 'Sin fecha de finalización (excepción)',
+    desc: 'Si una tarea de verdad no puede tener fecha de fin, al crearla marca «Sin fecha de finalización», elige a quién de Dirección se lo pides y explica por qué. La tarea nace BLOQUEADA —no se mueve ni se completa, aunque sí se comenta y se edita— hasta que Dirección responda. Si deniegan, la salida es ponerle una fecha: al hacerlo la solicitud se cancela sola.',
   },
   {
     icon: <ListChecks className="size-4 text-primary" />,
@@ -76,7 +86,7 @@ const TASK_FEATURES: HelpFeature[] = [
   {
     icon: <CalendarPlus className="size-4 text-primary" />,
     term: 'Fecha de inicio',
-    desc: 'Marca cuándo arranca la tarea; junto a la fecha límite alimenta la barra de la vista Gantt.',
+    desc: 'Obligatoria y sin excepciones: marca cuándo arranca la tarea y, junto a la de finalización, alimenta la barra de la vista Gantt. Se puede cambiar, pero no dejar en blanco.',
   },
   {
     icon: <CheckCircle2 className="size-4 text-primary" />,

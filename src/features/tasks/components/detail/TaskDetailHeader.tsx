@@ -1,4 +1,4 @@
-import { Archive, BadgeCheck, CheckCircle2, ThumbsDown } from 'lucide-react';
+import { Archive, BadgeCheck, CalendarOff, CheckCircle2, ThumbsDown } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth.store';
 
 import type { Task } from '../../services/tasks.service';
 import { TASK_ROLE_BADGE_CLASS, formatRoles, rolesOfUser } from '../../lib/roles';
+import { OPEN_ENDED_PRESENTATION } from '../../lib/open-ended';
 import { columnColor } from '../../lib/palette';
 
 interface TaskDetailHeaderProps {
@@ -86,6 +87,15 @@ export function TaskDetailHeader({
             <Badge className="bg-tertiary-container text-on-tertiary-container">
               <BadgeCheck className="size-3.5" />
               Validado por: {task.validatedBy.name}
+            </Badge>
+          )}
+          {/* QL-197: estado de la solicitud de fin abierto. El detalle (motivo, quién y cuándo,
+              y las acciones de Dirección) vive en `OpenEndedSection`. `APPROVED` se pinta con el
+              token neutro: dejarla sin fecha de fin es legítimo, no un problema. */}
+          {task.openEndedStatus && (
+            <Badge className={OPEN_ENDED_PRESENTATION[task.openEndedStatus].badgeClass}>
+              <CalendarOff className="size-3.5" />
+              {OPEN_ENDED_PRESENTATION[task.openEndedStatus].label}
             </Badge>
           )}
           {/* QL-171: la revisión fue rechazada y aún no se ha vuelto a solicitar. El motivo

@@ -24,6 +24,7 @@ import {
   isOverdue,
 } from '../lib/deadline';
 import { formatRoles, participantsAssigneeFirst } from '../lib/roles';
+import { OpenEndedChip } from './open-ended/OpenEndedChip';
 
 interface TaskCardProps {
   task: Task;
@@ -142,6 +143,10 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
               aria-label="Tiene descripción"
             />
           )}
+
+          {/* (QL-197) El estado del fin abierto ocupa el sitio del chip de fecha límite: las dos
+              cosas no pueden coexistir (poner fecha cancela la solicitud). */}
+          <OpenEndedChip task={task} />
 
           {task.dueDate && (
             <span

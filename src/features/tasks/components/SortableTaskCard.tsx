@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 
 import type { Task } from '../services/tasks.service';
 import { canMoveTask } from '../lib/roles';
+import { isOpenEndedBlocked } from '../lib/open-ended';
 import { TaskCard } from './TaskCard';
 
 interface SortableTaskCardProps {
@@ -25,6 +26,11 @@ interface SortableTaskCardProps {
  * pero sigue clickable (abre la tarea). El click no se roba al drag porque el `PointerSensor`
  * del board usa un `activationConstraint` de distancia (6px).
  *
+ * (QL-197) Una tarea **bloqueada** por su solicitud de fin abierto (`openEndedBlocked`) tampoco
+ * se arrastra, sea cual sea el rol: el backend rechazaría el `move` con 409, y dejar arrastrar
+ * para luego revertir la tarjeta es una UX pésima. Sigue clickable a propósito — el detalle es
+ * donde se explica el bloqueo y donde está la vía de escape (ponerle fecha de fin).
+ *
  * (QL-123) Desde que el click **navega** a la vista de tarea (antes abría un modal), un click
  * fantasma tras soltar una tarjeta sería mucho más molesto: sacaría al usuario del tablero.
  * Por eso guardamos con un ref si hubo arrastre y, si lo hubo, tragamos el `click` que algunos
@@ -37,7 +43,7 @@ export function SortableTaskCard({
   dropDisabled,
   onClick,
 }: SortableTaskCardProps) {
-  const draggable = canMoveTask(task.currentUserRole);
+  const draggable = canMoveTask(task.currentUserRole) && !isOpenEndedBlocked(task);
   const draggedRef = useRef(false);
 
   const {

@@ -53,6 +53,23 @@ export interface TaskDiscardedBy {
   name: string;
 }
 
+/** Persona referenciada en la solicitud de fecha de fin abierta (QL-197, §3.69). */
+export interface TaskOpenEndedUser {
+  id: string;
+  name: string;
+}
+
+/**
+ * (QL-197, §3.69) Estado de la solicitud de **fecha de fin abierta**:
+ * `PENDING` esperando a Dirección · `APPROVED` autorizada (la tarea vive legítimamente sin
+ * `dueDate`) · `REJECTED` denegada.
+ *
+ * `null` es el caso **normal** y el de **todas** las tareas anteriores a la HU: la regla rige
+ * hacia adelante. Ojo con el reflejo antiguo: `dueDate: null` ya **no** implica fin abierto
+ * autorizado — en el histórico solo significa que nadie le puso fecha.
+ */
+export type OpenEndedStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
 /**
  * Estado del visto bueno para cerrar una tarea (QL-145, §3.39; `REJECTED` en QL-171):
  * `NONE` nadie pidió · `REQUESTED` el Responsable solicitó revisión · `VALIDATED` ya validada ·
@@ -146,6 +163,40 @@ export interface Task {
   discardedAt: string | null;
   /** (QL-142, §3.41) ADMIN que la descartó, o `null` si no está descartada. */
   discardedBy: TaskDiscardedBy | null;
+  /** (QL-197, §3.69) Estado de la solicitud de fin abierto, o `null` si no hay solicitud. */
+  openEndedStatus: OpenEndedStatus | null;
+  /**
+   * (QL-197, §3.69) ¿La tarea está **bloqueada** por su solicitud de fin abierto? Bloqueada =
+   * no se puede **mover de columna**, **completar** ni arrancar el cronómetro. Comentar y editar
+   * siguen abiertos a propósito: ponerle una fecha de fin es la vía de escape.
+   *
+   * ⚠️ **Usa este campo; no derives el bloqueo de `openEndedStatus`.** El backend lo emite ya
+   * calculado precisamente para que la regla viva en un solo sitio. Recalcularla en cliente es
+   * cómo se desincronizan las dos implementaciones — el mismo fallo de QL-192 con la precedencia
+   * de roles.
+   */
+  openEndedBlocked: boolean;
+  /** (QL-197) Motivo que dio el Creador al pedir el fin abierto, o `null`. */
+  openEndedReason: string | null;
+  /** (QL-197) Quién pidió la autorización (el Creador), o `null`. */
+  openEndedRequestedBy: TaskOpenEndedUser | null;
+  /**
+   * (QL-197) Directivo **al que se le pidió** (el que recibe la notificación), o `null`.
+   * Resolverla puede cualquier miembro de Dirección, no solo él: por eso `openEndedResolvedBy`
+   * es un campo aparte y puede ser otra persona.
+   */
+  openEndedRequestedTo: TaskOpenEndedUser | null;
+  /** (QL-197) ISO8601 de la solicitud, o `null`. */
+  openEndedRequestedAt: string | null;
+  /** (QL-197) Quién resolvió (aprobó o rechazó), o `null` si sigue pendiente. */
+  openEndedResolvedBy: TaskOpenEndedUser | null;
+  /** (QL-197) ISO8601 de la resolución, o `null` si sigue pendiente. */
+  openEndedResolvedAt: string | null;
+  /**
+   * (QL-197) Comentario de la resolución: **opcional** al aprobar, **obligatorio** al rechazar.
+   * `null` si no hay resolución o si se aprobó sin escribir nada.
+   */
+  openEndedResolutionComment: string | null;
   createdAt: string;
 }
 
@@ -211,6 +262,22 @@ export interface RejectReviewPayload {
   newDueDate?: string;
 }
 
+/**
+ * (QL-197, §3.69) Body de `POST /tasks/:id/approve-open-ended`. El comentario es **opcional**
+ * (mismo criterio que el visto bueno de QL-171) y el body entero puede omitirse.
+ */
+export interface ApproveOpenEndedPayload {
+  comment?: string;
+}
+
+/**
+ * (QL-197, §3.69) Body de `POST /tasks/:id/reject-open-ended`. El motivo es **obligatorio**:
+ * denegar sin decir por qué deja la tarea bloqueada y al Creador sin saber qué corregir.
+ */
+export interface RejectOpenEndedPayload {
+  comment: string;
+}
+
 /** Filtros del listado del tablero (§3.7). El endpoint **no pagina**. */
 export interface TaskListParams {
   projectId?: string;
@@ -220,6 +287,25 @@ export interface TaskListParams {
    * sección "Descartadas"). Omitir/`false` → el listado normal, que **excluye** las descartadas.
    */
   discarded?: boolean;
+}
+
+/**
+ * (QL-197, §3.69) Solicitud de **fecha de fin abierta** embebida en el alta.
+ *
+ * Es un objeto y no dos campos sueltos **a propósito**: pedir autorización es UNA decisión, así
+ * que el front no puede mandar media solicitud (un motivo sin directivo, o al revés). Su mera
+ * presencia es lo que permite crear la tarea sin `dueDate`.
+ */
+export interface OpenEndedRequestPayload {
+  /**
+   * Directivo al que se le pide (a quien se **notifica**). Debe ser un usuario **ACTIVO** de
+   * Dirección (`MANAGER` o `ADMIN`) o el alta falla con 400 `OPEN_ENDED_MANAGER_INVALID` y la
+   * tarea **no se crea**. Se valida antes de crear nada: una solicitud dirigida a un MEMBER
+   * dejaría la tarea bloqueada para siempre, porque nadie podría desbloquearla.
+   */
+  managerId: string;
+  /** Por qué la tarea no puede tener fecha de fin. **Obligatorio** (máx. 500). */
+  reason: string;
 }
 
 /** Body para crear una tarea (§3.7). Si falta `columnId` cae en la columna default. */
@@ -233,14 +319,26 @@ export interface CreateTaskPayload {
    * `project.labelIds` (si no → 400 `LABEL_NOT_IN_PROJECT`). `[]` = sin etiqueta.
    */
   labelIds?: string[];
-  /** Fecha de inicio ISO opcional. */
-  startDate?: string | null;
   /**
-   * (P1/§3.6) Fecha límite ISO opcional fijada YA en el alta (QL-09, RF-2.1). Antes solo se
-   * fijaba tras crear con `PATCH /tasks/:id/deadline`; ahora puede ir en el POST. Si se omite,
-   * la tarea nace sin deadline.
+   * (QL-197, §3.69) Fecha de inicio ISO. **OBLIGATORIA, sin excepción posible**: ninguna tarea
+   * puede nacer sin ella (400 `TASK_START_DATE_REQUIRED`).
+   */
+  startDate: string;
+  /**
+   * (P1/§3.6) Fecha límite ISO fijada YA en el alta (QL-09, RF-2.1).
+   *
+   * (QL-197) **Obligatoria salvo** que se mande `openEndedRequest`, y las dos son
+   * **excluyentes**: sin ninguna → 400 `TASK_DUE_DATE_REQUIRED`; con las dos → 400
+   * `OPEN_ENDED_REQUEST_NOT_APPLICABLE`.
    */
   dueDate?: string;
+  /**
+   * (QL-197, §3.69) Pide a Dirección autorización para dejar la fecha de fin abierta. Excluyente
+   * con `dueDate`. La tarea **se crea igualmente, pero BLOQUEADA** (`openEndedStatus: 'PENDING'`,
+   * `openEndedBlocked: true`) hasta que Dirección resuelva: no se mueve de columna, no se
+   * completa y no arranca el cronómetro.
+   */
+  openEndedRequest?: OpenEndedRequestPayload;
   /**
    * (P1/§3.6) Bloquea la edición del deadline por no-Creadores (RF-2.1). Default `false`.
    * Solo tiene sentido junto con `dueDate` (bloquear un deadline nulo no aporta nada).
@@ -305,11 +403,25 @@ export interface UpdateTaskPayload {
    * `[]` la deja sin etiqueta; omitirlo no la toca.
    */
   labelIds?: string[];
-  /** Fecha de inicio ISO; `null` la limpia. */
+  /**
+   * Fecha de inicio ISO; `null` la limpia.
+   *
+   * (QL-197, §3.69) **`null` sobre una tarea que YA tiene fecha de inicio → 400
+   * `TASK_START_DATE_REQUIRED`**, sin excepción. Lo que sí se permite es editar con normalidad
+   * una tarea **anterior** a la HU que nunca la tuvo (la regla rige hacia adelante): ahí `null`
+   * pasa sin error. Es decir, no se puede **borrar** una fecha existente; cambiarla, sí.
+   */
   startDate?: string | null;
   /**
    * (QL-178, §3.58) Fecha límite ISO8601 **con hora** (QL-166); `null` la quita. Un ADMIN puede
    * moverla aunque esté bloqueada (`deadlineLocked`).
+   *
+   * (QL-197, §3.69) Dos reglas nuevas, simétricas:
+   * - **`null` sobre una tarea que YA tiene fecha → 400 `TASK_DUE_DATE_REQUIRED`**, salvo que su
+   *   fin abierto esté `APPROVED`. Sin esto, este PATCH sería el atajo para saltarse la
+   *   autorización entera. Como con `startDate`, una tarea antigua sin fecha se sigue editando.
+   * - **Poner una fecha CANCELA la solicitud**: el backend limpia los ocho campos `openEnded*`.
+   *   Es también cómo se desbloquea una tarea denegada.
    */
   dueDate?: string | null;
   /** (QL-178, §3.58) Bloqueo del deadline por no-Creadores (RF-2.1). */
@@ -491,5 +603,26 @@ export const tasksService = {
    */
   rejectReview: (id: string, data: RejectReviewPayload) => {
     return api.post<Task>(`/tasks/${id}/reject-review`, data);
+  },
+
+  /**
+   * (QL-197, §3.69) Dirección **autoriza** dejar la fecha de fin abierta: la tarea se desbloquea
+   * y su falta de `dueDate` pasa a ser legítima. `comment` opcional (el body puede omitirse).
+   *
+   * Puede resolver **cualquier** miembro de Dirección (ADMIN/MANAGER), no solo el directivo al
+   * que se le pidió: si solo pudiera el elegido, unas vacaciones suyas congelarían la tarea.
+   * 409 `OPEN_ENDED_REQUEST_NOT_PENDING` si ya la resolvió otro (o si el Creador le puso fecha).
+   */
+  approveOpenEnded: (id: string, data?: ApproveOpenEndedPayload) => {
+    return api.post<Task>(`/tasks/${id}/approve-open-ended`, data);
+  },
+
+  /**
+   * (QL-197, §3.69) Dirección **deniega** el fin abierto: la tarea sigue bloqueada y la única
+   * salida es ponerle una fecha de fin. `comment` **obligatorio**. Mismos permisos y mismo 409
+   * `OPEN_ENDED_REQUEST_NOT_PENDING` que {@link approveOpenEnded}.
+   */
+  rejectOpenEnded: (id: string, data: RejectOpenEndedPayload) => {
+    return api.post<Task>(`/tasks/${id}/reject-open-ended`, data);
   },
 };

@@ -49,7 +49,9 @@ const TASK_ROLES: { label: string; badgeClass: string; desc: string }[] = [
     label: 'Observador',
     badgeClass:
       'bg-transparent text-on-surface-variant border border-outline-variant/60',
-    desc: 'Acceso de solo lectura. Sigue el avance sin poder modificar la tarea.',
+    // (QL-196) Ya NO es "solo lectura": supervisa, valida el cierre y comenta. Lo que no hace
+    // es EJECUTAR la tarea.
+    desc: 'Supervisa la tarea: la sigue, comenta en su hilo y da (o niega) el visto bueno para cerrarla. No la ejecuta: no la edita, no marca checklist, no adjunta ni la mueve.',
   },
 ];
 
@@ -61,9 +63,14 @@ const MATRIX_COLS = ['Creador', 'Responsable', 'Colaborador', 'Observador'] as c
 /** Qué puede hacer cada rol (derivado del gating real de la ficha de tarea). */
 const MATRIX_ROWS: { action: string; cells: [Cell, Cell, Cell, Cell] }[] = [
   { action: 'Ver la tarea', cells: [true, true, true, true] },
-  { action: 'Comentar · checklist · adjuntar', cells: [true, true, true, false] },
+  // (QL-196) Comentar se separa del resto: es lo único que el Observador SÍ puede hacer de
+  // este bloque, así que juntarlos en una fila volvía a decir que es de solo lectura.
+  { action: 'Comentar en el hilo', cells: [true, true, true, true] },
+  { action: 'Checklist · adjuntar', cells: [true, true, true, false] },
   { action: 'Cronómetro · mover en el tablero', cells: [true, true, true, false] },
   { action: 'Completar y reabrir', cells: [true, true, false, false] },
+  // (QL-145/QL-171) El visto bueno del cierre: el Creador y el Observador lo dan o lo niegan.
+  { action: 'Validar o rechazar el cierre', cells: [true, false, false, true] },
   { action: 'Editar la fecha límite', cells: [true, 'Si no está bloqueada', 'Si no está bloqueada', false] },
   { action: 'Bloquear la fecha límite', cells: [true, false, false, false] },
   { action: 'Solicitar prórroga', cells: ['—', 'Si está bloqueada', 'Si está bloqueada', false] },
@@ -220,6 +227,15 @@ export function RolesSection() {
         <p className="mt-3 text-xs text-on-surface-variant">
           El Responsable y los Colaboradores editan la fecha límite mientras el Creador no
           la bloquee; si la bloquea, pueden solicitarle una prórroga.
+        </p>
+        {/* (QL-196) La excepción que rompe la tabla: Dirección comenta sin tener rol en la
+            tarea. Se dice aquí para que nadie la busque como un quinto rol por tarea. */}
+        <p className="mt-2 text-xs text-on-surface-variant">
+          Aparte de esta tabla, quien tiene rol de plataforma{' '}
+          <span className="font-medium text-on-surface">Dirección</span> (o Administración)
+          puede comentar <span className="font-medium text-on-surface">cualquier</span> tarea
+          aunque no participe en ella, para hacer seguimiento. Comentar no le da ningún rol en
+          la tarea ni le permite subir adjuntos.
         </p>
       </Section>
     </div>

@@ -34,6 +34,7 @@ import {
   isOverdue,
 } from '../lib/deadline';
 import { effectiveTaskRole } from '../lib/roles';
+import { isOpenEndedBlocked, taskDateErrorMessage } from '../lib/open-ended';
 
 interface DeadlineSectionProps {
   task: Task;
@@ -74,6 +75,10 @@ export function DeadlineSection({ task, projectId }: DeadlineSectionProps) {
 
   const overdue = isOverdue(task.dueDate);
   const editorDisabled = !isCreator && (!canEditRole || task.deadlineLocked);
+  // (QL-197) Bloqueada por su fin abierto. NO deshabilita este editor a propósito: ponerle una
+  // fecha es justamente la vía de escape, y tiene que seguir disponible sobre todo tras un
+  // rechazo. Solo se usa para explicarlo.
+  const openEndedBlocked = isOpenEndedBlocked(task);
   // (QL-166) "Sucio" si cambió el día o —habiendo un día elegido— cambió la hora respecto a
   // la guardada. Con la fecha vacía, la hora sola no cuenta (sin fecha no hay deadline).
   const savedDate = isoToDateInput(task.dueDate);
@@ -96,15 +101,10 @@ export function DeadlineSection({ task, projectId }: DeadlineSectionProps) {
     );
   };
 
-  const handleClear = () => {
-    setDeadline.mutate(
-      { dueDate: null },
-      {
-        onSuccess: () => toast.success('Fecha límite eliminada'),
-        onError: (err) => handleDeadlineError(err),
-      },
-    );
-  };
+  // (QL-197) Ya no existe un `handleClear`: `PATCH /tasks/:id/deadline { dueDate: null }` sobre
+  // una tarea que tiene fecha responde 400 `TASK_DUE_DATE_REQUIRED` salvo con el fin abierto
+  // APPROVED —y esa combinación no puede darse, porque poner fecha cancela la autorización—.
+  // Para dejar una tarea sin fecha de fin hay que pedirle autorización a Dirección en el alta.
 
   const handleToggleLock = (locked: boolean) => {
     setDeadline.mutate(
@@ -144,9 +144,27 @@ export function DeadlineSection({ task, projectId }: DeadlineSectionProps) {
             )}
           </>
         ) : (
-          <span className="text-on-surface-variant">Sin fecha límite.</span>
+          // (QL-197) `dueDate: null` ya no significa una sola cosa: en el histórico es "nadie le
+          // puso fecha", y con una solicitud es un estado con nombre propio. El detalle vive en
+          // `OpenEndedSection`; aquí solo se evita el texto que dice lo que no es.
+          <span className="text-on-surface-variant">
+            {task.openEndedStatus === 'APPROVED'
+              ? 'Sin fecha de fin (autorizado por Dirección).'
+              : task.openEndedStatus
+                ? 'Sin fecha de fin: hay una solicitud de autorización en curso.'
+                : 'Sin fecha límite.'}
+          </span>
         )}
       </p>
+
+      {/* (QL-197) La vía de escape del bloqueo, dicha donde está el editor: ponerle una fecha
+          cancela la solicitud entera en el backend y desbloquea la tarea. */}
+      {openEndedBlocked && (isCreator || canEditRole) && (
+        <p className="mt-2 rounded-md bg-surface-container-high px-3 py-2 text-xs text-on-surface-variant">
+          La tarea está bloqueada por su solicitud de fin abierto. Al guardar una fecha de
+          finalización, la solicitud se cancela y la tarea se desbloquea.
+        </p>
+      )}
 
       {/* Editor: CREATOR siempre; ASSIGNEE/COLLABORATOR solo si no está bloqueada. */}
       {(isCreator || canEditRole) && (
@@ -188,17 +206,11 @@ export function DeadlineSection({ task, projectId }: DeadlineSectionProps) {
             {setDeadline.isPending && <Loader2 className="animate-spin" />}
             Guardar
           </Button>
-          {task.dueDate && !editorDisabled && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleClear}
-              disabled={setDeadline.isPending}
-            >
-              Quitar
-            </Button>
-          )}
+          {/* (QL-197) El botón "Quitar" desapareció, no se deshabilitó: desde esta HU **quitar
+              una fecha de fin existente siempre falla** con 400 `TASK_DUE_DATE_REQUIRED` — la
+              única excepción del backend es que el fin abierto esté `APPROVED`, y una tarea
+              aprobada nunca tiene fecha (ponerle una cancela la autorización). Dejarlo visible
+              era ofrecer una acción que la API rechaza el 100% de las veces. */}
         </div>
       )}
 
@@ -298,6 +310,13 @@ function formatIsoDay(isoDay: string): string {
 
 /** Traduce los `error.code` del endpoint de deadline a toasts claros en español. */
 function handleDeadlineError(err: unknown) {
+  // (QL-197) `TASK_DUE_DATE_REQUIRED` al intentar QUITAR una fecha que la tarea ya tiene: solo
+  // se permite si Dirección autorizó el fin abierto. Mismo mapa que el formulario y el detalle.
+  const dateMessage = taskDateErrorMessage(err);
+  if (dateMessage) {
+    toast.error(dateMessage);
+    return;
+  }
   if (err instanceof ApiError) {
     if (err.code === 'DEADLINE_LOCKED') {
       toast.error('El Creador bloqueó la fecha. Solicita una prórroga.');

@@ -167,9 +167,11 @@ export function AttachmentsPanel({ task }: AttachmentsPanelProps) {
         </div>
       )}
 
+      {/* (QL-196) Adjuntar NO se abrió al Observador: sigue siendo de quien ejecuta la tarea.
+          Lo que cambia es el motivo que se le da — ya no es "solo lectura", porque comenta. */}
       {!canUpload && role === 'OBSERVER' && !isError && (
         <p className="mt-3 text-xs text-on-surface-variant">
-          Tu rol es de solo lectura.
+          Como Observador puedes seguir y comentar la tarea, pero no subir archivos.
         </p>
       )}
     </div>

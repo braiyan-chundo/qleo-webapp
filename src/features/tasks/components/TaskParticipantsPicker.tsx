@@ -296,9 +296,11 @@ export function TaskParticipantsPicker({
             disabled={disabled}
           />
         )}
+        {/* (QL-196) Los Observadores YA comentan: el texto decía lo contrario y era la fuente
+            de la confusión de "solo lectura". Supervisan, no ejecutan. */}
         <span className="text-xs text-on-surface-variant">
-          Los Observadores son solo lectura: pueden ver la tarea, pero no moverla, ni
-          comentarla, ni completarla.
+          Los Observadores supervisan: ven la tarea, comentan en su hilo y validan su cierre,
+          pero no la mueven, ni la editan, ni la completan.
         </span>
       </div>
     </div>

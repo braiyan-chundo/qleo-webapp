@@ -12,6 +12,7 @@ import { canManageProject } from '@/features/projects/utils/permissions';
 import { useMoveTask, useTasks } from '../../hooks/use-tasks';
 import type { Task } from '../../services/tasks.service';
 import { canMoveTask } from '../../lib/roles';
+import { isOpenEndedBlocked } from '../../lib/open-ended';
 import { columnColor } from '../../lib/palette';
 
 interface TaskColumnMoverProps {
@@ -63,6 +64,10 @@ export function TaskColumnMover({ task, projectId }: TaskColumnMoverProps) {
   if (!next && !prev) return null;
 
   const pending = moveTask.isPending;
+  // (QL-197) Bloqueada por su solicitud de fin abierto: el backend rechaza el `move` con 409.
+  // Los botones se **deshabilitan** en vez de ocultarse, con el motivo debajo: la tarea sí se
+  // puede editar, y saber por qué no avanza es lo que lleva a ponerle una fecha de fin.
+  const blocked = isOpenEndedBlocked(task);
 
   function moveTo(target: Column) {
     // Al final de la columna destino, igual que al soltar sobre el carril en el board.
@@ -93,7 +98,7 @@ export function TaskColumnMover({ task, projectId }: TaskColumnMoverProps) {
             size="sm"
             className="justify-start"
             onClick={() => moveTo(next)}
-            disabled={pending}
+            disabled={pending || blocked}
           >
             {pending ? <Loader2 className="animate-spin" /> : <ArrowRight />}
             Mover a: {next.name}
@@ -106,13 +111,21 @@ export function TaskColumnMover({ task, projectId }: TaskColumnMoverProps) {
             size="sm"
             className="justify-start"
             onClick={() => moveTo(prev)}
-            disabled={pending}
+            disabled={pending || blocked}
           >
             {pending ? <Loader2 className="animate-spin" /> : <ArrowLeft />}
             Volver a: {prev.name}
           </Button>
         )}
       </div>
+
+      {blocked && (
+        <p className="mt-2 text-xs text-on-surface-variant">
+          {task.openEndedStatus === 'REJECTED'
+            ? 'No se puede mover: Dirección no autorizó el fin abierto. Ponle una fecha de finalización para desbloquearla.'
+            : 'No se puede mover hasta que Dirección autorice dejar la fecha de fin abierta.'}
+        </p>
+      )}
     </section>
   );
 }

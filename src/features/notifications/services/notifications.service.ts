@@ -10,6 +10,10 @@ import type { Paginated } from '@/shared/types/paginated';
  *   sistema, `actor=null`**).
  * - **(QL-171)** `TASK_REVIEW_REJECTED`: el Creador/Observador **rechazó** la revisión de tu
  *   tarea. Va al **Responsable** y trae el motivo en `reason` (mismo campo que usa la prórroga).
+ * - **(QL-197, §3.69)** Las tres del **fin abierto**, todas con `taskId` y el motivo/comentario
+ *   en `reason`: `TASK_OPEN_ENDED_REQUESTED` (al **directivo elegido**, uno solo — avisar a
+ *   todos les llenaría la bandeja), `TASK_OPEN_ENDED_APPROVED` y `TASK_OPEN_ENDED_REJECTED`
+ *   (ambas al **Creador** que la pidió).
  */
 export type NotificationType =
   | 'MENTION'
@@ -19,7 +23,10 @@ export type NotificationType =
   | 'PROJECT_MEMBER_ADDED'
   | 'TASK_MOVED'
   | 'DEADLINE_APPROACHING'
-  | 'TASK_REVIEW_REJECTED';
+  | 'TASK_REVIEW_REJECTED'
+  | 'TASK_OPEN_ENDED_REQUESTED'
+  | 'TASK_OPEN_ENDED_APPROVED'
+  | 'TASK_OPEN_ENDED_REJECTED';
 
 /**
  * Todos los tipos, en el orden en que se ofrecen en el filtro de la bandeja (QL-137). Es la
@@ -32,6 +39,9 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'TASK_ASSIGNED',
   'TASK_MOVED',
   'TASK_REVIEW_REJECTED',
+  'TASK_OPEN_ENDED_REQUESTED',
+  'TASK_OPEN_ENDED_APPROVED',
+  'TASK_OPEN_ENDED_REJECTED',
   'DEADLINE_APPROACHING',
   'DEADLINE_EXTENSION_REQUEST',
   'PROJECT_MEMBER_ADDED',
@@ -44,6 +54,11 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   TASK_ASSIGNED: 'Asignaciones',
   TASK_MOVED: 'Cambios de estado',
   TASK_REVIEW_REJECTED: 'Revisiones rechazadas',
+  // (QL-197) Las tres se etiquetan por separado: la primera es trabajo pendiente de Dirección
+  // y las otras dos son la respuesta que espera el Creador.
+  TASK_OPEN_ENDED_REQUESTED: 'Autorizaciones pedidas',
+  TASK_OPEN_ENDED_APPROVED: 'Fin abierto autorizado',
+  TASK_OPEN_ENDED_REJECTED: 'Fin abierto denegado',
   DEADLINE_APPROACHING: 'Vencimientos',
   DEADLINE_EXTENSION_REQUEST: 'Prórrogas',
   PROJECT_MEMBER_ADDED: 'Proyectos',
@@ -100,8 +115,11 @@ export interface Notification {
   /** Fecha propuesta en `DEADLINE_EXTENSION_REQUEST` (QL-09); `null` en otros tipos. */
   requestedDate: string | null;
   /**
-   * Motivo: de la solicitud de prórroga (QL-09) y, **(QL-171)**, del rechazo de revisión
-   * (`TASK_REVIEW_REJECTED`, el `rejectionComment` de la tarea). `null` en el resto de tipos.
+   * Motivo: de la solicitud de prórroga (QL-09); **(QL-171)** del rechazo de revisión
+   * (`TASK_REVIEW_REJECTED`, el `rejectionComment` de la tarea); y **(QL-197)** de las tres del
+   * fin abierto — el motivo en `TASK_OPEN_ENDED_REQUESTED` y el comentario de Dirección en
+   * `TASK_OPEN_ENDED_APPROVED`/`_REJECTED` (que al autorizar puede venir vacío: es opcional).
+   * `null` en el resto de tipos.
    */
   reason: string | null;
   /**

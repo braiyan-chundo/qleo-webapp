@@ -4,6 +4,7 @@ import { Loader2, MessageSquare, Trash2 } from 'lucide-react';
 
 import { ApiError } from '@/core/api/fetch-client';
 import type { TaskRole } from '@/features/tasks/services/tasks.service';
+import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 import { CollapsibleText } from '@/shared/components/CollapsibleText';
@@ -44,13 +45,15 @@ function formatDateTime(iso?: string): string {
   });
 }
 
-/** Traduce cualquier fallo de comentarios a un toast según §3.9 (READ_ONLY_ROLE / 403 genérico). */
+/**
+ * Traduce cualquier fallo de comentarios a un toast (§3.9).
+ *
+ * (QL-196, §3.68) **Ya no se trata `READ_ONLY_ROLE`**: desde que el Observador puede comentar,
+ * `POST /tasks/:taskId/comments` no lo emite — el único rechazo posible es el 403 genérico de
+ * Nest ("No participas en esta tarea."), que se pinta tal cual con `err.message`.
+ */
 function notifyError(err: unknown, fallback: string) {
   if (err instanceof ApiError) {
-    if (err.code === 'READ_ONLY_ROLE') {
-      toast.error('Tu rol es de solo lectura.');
-      return;
-    }
     if (err.code === 'COMMENT_ATTACHMENT_INVALID') {
       toast.error('No se pudo adjuntar el archivo al comentario. Vuelve a intentarlo.');
       return;
@@ -69,18 +72,27 @@ function notifyError(err: unknown, fallback: string) {
 
 /**
  * Panel del hilo de comentarios dentro del detalle de tarea (QL-12, §3.9). El hilo se muestra
- * cronológico ascendente (más reciente abajo) con la caja de comentar al final. Deriva `canComment`
- * del rol por tarea (CREATOR/ASSIGNEE/COLLABORATOR).
+ * cronológico ascendente (más reciente abajo) con la caja de comentar al final.
+ *
+ * (QL-196, §3.68) **Quién puede comentar** son dos vías independientes, y basta con una:
+ * participar en la tarea con **cualquiera** de los cuatro roles (el `OBSERVER` incluido, que
+ * antes se excluía a mano) **o** ser Dirección (`hasAtLeastRole(user,'MANAGER')`).
+ *
+ * ⚠️ La segunda vía **no** se puede leer de `currentUserRole`: el contrato dice explícitamente
+ * que ese campo NO cambió, así que un gerente que comenta una tarea ajena sigue recibiendo
+ * `null`. Condicionar solo por `currentUserRole !== null` le escondería la caja aunque la API le
+ * deje escribir. Y comentar tampoco lo mete en `assignments`: seguirá siendo `null` después.
  *
  * (QL-176) **Un comentario no se edita**: solo se puede **eliminar** el propio. (QL-174) Cada
  * comentario puede traer adjuntos, que se abren en el visor compartido. (QL-173) Los cuerpos
  * largos se recortan con "Leer más".
  */
 export function CommentsPanel({ task }: CommentsPanelProps) {
-  const role = task.currentUserRole;
-  const canComment =
-    role === 'CREATOR' || role === 'ASSIGNEE' || role === 'COLLABORATOR';
-  const currentUserId = useAuthStore((s) => s.user?.id);
+  const currentUser = useAuthStore((s) => s.user);
+  const currentUserId = currentUser?.id;
+  /** ¿Participa en la tarea? Con cualquier rol; desde QL-196 el `OBSERVER` también comenta. */
+  const isParticipant = task.currentUserRole !== null;
+  const canComment = isParticipant || hasAtLeastRole(currentUser, 'MANAGER');
 
   const { data: comments, isLoading, isError, error } = useComments(task.id);
 
@@ -130,12 +142,14 @@ export function CommentsPanel({ task }: CommentsPanelProps) {
         </ul>
       )}
 
-      {canComment && !isError && <CommentComposer taskId={task.id} onError={notifyError} />}
-
-      {!canComment && role === 'OBSERVER' && !isError && (
-        <p className="mt-3 text-xs text-on-surface-variant">
-          Tu rol es de solo lectura.
-        </p>
+      {canComment && !isError && (
+        <CommentComposer
+          taskId={task.id}
+          onError={notifyError}
+          // (QL-196, §3.68) Límite conocido de la HU: adjuntar sigue exigiendo participar en la
+          // tarea. Dirección comenta texto, pero el clip se retira para que no se coma un 403.
+          canAttach={isParticipant}
+        />
       )}
     </div>
   );

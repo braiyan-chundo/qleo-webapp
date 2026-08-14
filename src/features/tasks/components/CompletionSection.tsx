@@ -40,6 +40,7 @@ import {
 import { useCompleteTask, useReopenTask, useRequestReview } from '../hooks/use-tasks';
 import type { Task } from '../services/tasks.service';
 import { effectiveTaskRole } from '../lib/roles';
+import { isOpenEndedBlocked, taskDateErrorMessage } from '../lib/open-ended';
 import { formatDateTime } from '../lib/time';
 import { RejectReviewDialog } from './review/RejectReviewDialog';
 import { ValidateReviewDialog } from './review/ValidateReviewDialog';
@@ -196,6 +197,9 @@ export function CompletionSection({ task, projectId }: CompletionSectionProps) {
 
   // ---- Tarea NO completada: acciones según rol + estado de validación (QL-145/QL-171) ----
   const reviewStatus = task.reviewStatus;
+  // (QL-197) Bloqueo por fin abierto: se lee el campo **calculado por el backend**, no se
+  // deriva de `openEndedStatus`. Corta cerrar y solicitar revisión (que solo sirve para cerrar).
+  const openEndedBlocked = isOpenEndedBlocked(task);
   // El Responsable que no es Creador ni ADMIN de plataforma necesita el visto bueno para cerrar.
   const assigneeGated = isAssignee && !isPlatformAdmin;
   // ¿Ve el panel de cierre? CREATOR/ADMIN sin gate; el ASSIGNEE gateado solo si ya está VALIDATED.
@@ -239,10 +243,21 @@ export function CompletionSection({ task, projectId }: CompletionSectionProps) {
               <div>
                 <p className="text-sm font-medium text-on-surface">Cerrar tarea</p>
                 <p className="mt-0.5 text-xs text-on-surface-variant">
-                  Registra un resumen de resultados para marcarla como completada.
+                  {/* (QL-197) Bloqueada por el fin abierto: el backend rechaza el cierre con
+                      409, así que se dice por qué y cuál es la salida en vez de dejar pulsar. */}
+                  {openEndedBlocked
+                    ? task.openEndedStatus === 'REJECTED'
+                      ? 'Dirección no autorizó dejar la fecha de fin abierta: ponle una fecha de finalización para poder cerrarla.'
+                      : 'No se puede cerrar hasta que Dirección autorice dejar la fecha de fin abierta.'
+                    : 'Registra un resumen de resultados para marcarla como completada.'}
                 </p>
               </div>
-              <Button type="button" size="sm" onClick={() => setCompleteOpen(true)}>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setCompleteOpen(true)}
+                disabled={openEndedBlocked}
+              >
                 <CheckCircle2 />
                 Completar tarea
               </Button>
@@ -519,6 +534,14 @@ function CompleteTaskDialog({
           onOpenChange(false);
         },
         onError: (err) => {
+          // (QL-197) Carrera: la tarea pasó a estar bloqueada por su fin abierto mientras el
+          // diálogo estaba abierto (409 `OPEN_ENDED_AUTHORIZATION_PENDING`/`_REJECTED`).
+          const dateMessage = taskDateErrorMessage(err);
+          if (dateMessage) {
+            toast.error(dateMessage);
+            onOpenChange(false);
+            return;
+          }
           if (err instanceof ApiError) {
             if (err.code === 'MANDATORY_SUMMARY_REQUIRED') {
               toast.error(

@@ -30,7 +30,9 @@ const QUICK_STEPS: { title: string; body: ReactNode }[] = [
   },
   {
     title: 'Crea tareas',
-    body: 'Pulsa «Nueva tarea» o el «+» de una columna. El Responsable (único) viene preseleccionado contigo; cámbialo si es otra persona, y añade Colaboradores y, si aplica, una fecha límite.',
+    // (QL-197) La fecha de fin dejó de ser opcional: decir "si aplica" mandaba al usuario a un
+    // formulario que no le deja guardar.
+    body: 'Pulsa «Nueva tarea» o el «+» de una columna. Las fechas de inicio y de finalización son obligatorias. El Responsable (único) viene preseleccionado contigo; cámbialo si es otra persona y añade Colaboradores.',
   },
   {
     title: 'Trabaja en el tablero',

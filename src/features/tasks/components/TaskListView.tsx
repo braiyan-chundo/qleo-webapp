@@ -41,6 +41,7 @@ import {
   downloadCsv,
   type TaskCsvRow,
 } from '../lib/export-csv';
+import { OpenEndedChip } from './open-ended/OpenEndedChip';
 import { TaskDetailDialog } from './TaskDetailDialog';
 
 interface TaskListViewProps {
@@ -339,6 +340,10 @@ export function TaskListView({ projectId, projectCode }: TaskListViewProps) {
                         <Lock className="size-3.5" aria-label="Fecha bloqueada" />
                       )}
                     </span>
+                  ) : task.openEndedStatus ? (
+                    // (QL-197) Sin fecha ya no es siempre "—": puede ser un fin abierto, que sí
+                    // tiene estado propio (y, salvo autorizado, bloquea la tarea).
+                    <OpenEndedChip task={task} />
                   ) : (
                     '—'
                   )}
@@ -516,6 +521,9 @@ function TaskRow({ task, statusName, onOpen }: TaskRowProps) {
               />
             )}
           </span>
+        ) : task.openEndedStatus ? (
+          // (QL-197) Misma distinción que en la tarjeta móvil: el fin abierto no es un hueco.
+          <OpenEndedChip task={task} />
         ) : (
           <span className="text-on-surface-variant">—</span>
         )}

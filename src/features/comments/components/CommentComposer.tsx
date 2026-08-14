@@ -29,6 +29,16 @@ interface CommentComposerProps {
   taskId: string;
   /** Traduce un fallo del alta de comentario a un toast (lo aporta el panel, §3.9). */
   onError: (err: unknown, fallback: string) => void;
+  /**
+   * (QL-196, §3.68) ¿Puede este autor **adjuntar** archivos al comentario?
+   *
+   * Es un permiso **distinto** del de comentar: QL-196 abrió `POST /tasks/:taskId/comments` a
+   * Dirección aunque no participe en la tarea, pero **no tocó**
+   * `POST /tasks/:taskId/attachments`, que sigue exigiendo participar. Con `false` se retiran el
+   * botón del clip, el pegado de ficheros y su texto de ayuda: dejarlos visibles haría que el
+   * usuario eligiera un archivo y se comiera un 403 **antes** siquiera de poder comentar.
+   */
+  canAttach: boolean;
 }
 
 /**
@@ -44,8 +54,11 @@ interface CommentComposerProps {
  * ⚠️ El **texto sigue siendo obligatorio** (decisión del cliente): no existe el comentario
  * solo-adjunto, así que "Comentar" permanece deshabilitado sin texto aunque haya archivos, con
  * un hint que lo explica.
+ *
+ * (QL-196, §3.68) Con `canAttach: false` la caja queda **solo texto**: es el caso de Dirección
+ * comentando una tarea en la que no participa, donde subir el archivo sí daría 403.
  */
-export function CommentComposer({ taskId, onError }: CommentComposerProps) {
+export function CommentComposer({ taskId, onError, canAttach }: CommentComposerProps) {
   const addComment = useAddComment(taskId);
   const uploadAttachment = useUploadAttachment(taskId);
   const removeAttachment = useDeleteAttachment(taskId);
@@ -109,6 +122,9 @@ export function CommentComposer({ taskId, onError }: CommentComposerProps) {
    * defecto; si solo trae texto, no se toca nada (el pegado normal sigue funcionando).
    */
   const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    // (QL-196) Sin permiso de adjuntar, el pegado de ficheros se ignora por completo y el
+    // pegado de texto sigue siendo el del navegador: subirlos acabaría en 403.
+    if (!canAttach) return;
     const files = filesFromClipboard(e.clipboardData);
     if (files.length === 0) return;
     e.preventDefault();
@@ -176,29 +192,37 @@ export function CommentComposer({ taskId, onError }: CommentComposerProps) {
         disabled={addComment.isPending}
       />
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept={ACCEPT_ATTR}
-        className="hidden"
-        onChange={(e) => {
-          handleFiles(e.target.files);
-          e.target.value = '';
-        }}
-      />
+      {canAttach && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={ACCEPT_ATTR}
+          className="hidden"
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = '';
+          }}
+        />
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={addComment.isPending}
-        >
-          <Paperclip />
-          Adjuntar
-        </Button>
+        {canAttach ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={addComment.isPending}
+          >
+            <Paperclip />
+            Adjuntar
+          </Button>
+        ) : (
+          // Sin el botón, el `justify-between` empujaría "Comentar" a la izquierda: el hueco
+          // se conserva con un elemento vacío en vez de reescribir el layout.
+          <span />
+        )}
         <div className="flex items-center gap-2">
           {/* El texto es obligatorio incluso con adjuntos: se dice, no se deja adivinar. */}
           {uploads.length > 0 && body.length === 0 && (
@@ -213,10 +237,19 @@ export function CommentComposer({ taskId, onError }: CommentComposerProps) {
         </div>
       </div>
 
-      <p className="text-[11px] text-on-surface-variant">
-        Adjunta archivos con el clip o pégalos con Ctrl+V (máx {MAX_UPLOAD_LABEL}). Se guardan
-        también en los adjuntos de la tarea.
-      </p>
+      {canAttach ? (
+        <p className="text-[11px] text-on-surface-variant">
+          Adjunta archivos con el clip o pégalos con Ctrl+V (máx {MAX_UPLOAD_LABEL}). Se guardan
+          también en los adjuntos de la tarea.
+        </p>
+      ) : (
+        // (QL-196, §3.68) Comentar desde fuera de la tarea no notifica a nadie: solo se avisa a
+        // los @mencionados. Si Dirección quiere que alguien lo lea, tiene que mencionarlo.
+        <p className="text-[11px] text-on-surface-variant">
+          No participas en esta tarea: puedes comentar, pero no adjuntar archivos. Menciona con
+          @ a quien deba leerte — si no, nadie recibirá aviso.
+        </p>
+      )}
     </div>
   );
 }

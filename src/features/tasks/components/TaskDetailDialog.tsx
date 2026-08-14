@@ -17,6 +17,7 @@ import { useTask } from '../hooks/use-tasks';
 import { formatDueDate, isOverdue } from '../lib/deadline';
 import { assigneeOf, userHasRole } from '../lib/roles';
 import { CompletionSection } from './CompletionSection';
+import { OpenEndedChip } from './open-ended/OpenEndedChip';
 import { TaskDetailHeader } from './detail/TaskDetailHeader';
 import { TaskDescription } from './detail/TaskDescription';
 import { TaskAdminMenu } from './detail/TaskAdminMenu';
@@ -121,6 +122,12 @@ export function TaskDetailDialog({
                         aria-label="Fecha bloqueada"
                       />
                     )}
+                  </p>
+                ) : task.openEndedStatus ? (
+                  // (QL-197) "Sin fecha" a secas escondía el estado del fin abierto —y que la
+                  // tarea puede estar bloqueada por él—. El detalle completo, en la vista larga.
+                  <p className="mt-1">
+                    <OpenEndedChip task={task} />
                   </p>
                 ) : (
                   <p className="mt-1 text-sm text-on-surface-variant">Sin fecha</p>

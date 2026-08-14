@@ -41,6 +41,28 @@ export function notificationText(notification: Notification): string {
       const base = `${actor} rechazó la revisión de ${task ?? 'una tarea'}`;
       return reason ? `${base}: ${reason}` : base;
     }
+    case 'TASK_OPEN_ENDED_REQUESTED': {
+      // (QL-197, §3.69) Va al directivo ELEGIDO: es una acción pendiente suya, así que la frase
+      // pide algo ("necesita tu autorización") en vez de solo informar.
+      const reason = notification.reason?.trim();
+      const base = `${actor} necesita tu autorización para dejar ${task ?? 'una tarea'} sin fecha de fin`;
+      return reason ? `${base}: ${reason}` : base;
+    }
+    case 'TASK_OPEN_ENDED_APPROVED': {
+      // Va al Creador. El comentario es OPCIONAL al autorizar, así que puede no venir.
+      const reason = notification.reason?.trim();
+      const base = `${actor} autorizó dejar ${task ?? 'una tarea'} sin fecha de fin`;
+      return reason ? `${base}: ${reason}` : base;
+    }
+    case 'TASK_OPEN_ENDED_REJECTED': {
+      // Va al Creador. Aquí el motivo es obligatorio en el backend, pero se compone igual con
+      // fallback: la tarea sigue bloqueada y lo que hay que decirle es la salida.
+      const reason = notification.reason?.trim();
+      const base = `${actor} no autorizó dejar ${task ?? 'una tarea'} sin fecha de fin`;
+      return reason
+        ? `${base}: ${reason}`
+        : `${base}. Ponle una fecha de finalización para desbloquearla`;
+    }
     case 'DEADLINE_APPROACHING':
       // Noti del sistema (sin actor): se compone sin nombre.
       return task ? `${task} está por vencer` : 'Una de tus tareas está por vencer';

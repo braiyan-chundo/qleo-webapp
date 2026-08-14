@@ -1,10 +1,17 @@
 import * as z from 'zod';
 
+/** Tope de caracteres del motivo/comentario del fin abierto (mismo que el backend, QL-197). */
+export const OPEN_ENDED_REASON_MAX = 500;
+
 /**
  * Esquema del formulario de tarea (crear/editar). `title` es obligatorio; `columnId` es
  * opcional (si se omite el backend usa la columna default del proyecto, el Backlog).
+ *
+ * ⚠️ Las **fechas** no se validan aquí: su obligatoriedad depende del modo (alta vs. edición) y
+ * de lo que la tarea ya tenía, así que vive en {@link buildTaskFormSchema}. Este objeto es la
+ * forma base, y {@link taskFormSchema} su variante permisiva para quien solo necesite el tipo.
  */
-export const taskFormSchema = z.object({
+const taskFormShape = z.object({
   title: z.string().trim().min(1, 'El título es obligatorio'),
   description: z.string().trim().optional(),
   columnId: z.string().optional(),
@@ -13,12 +20,20 @@ export const taskFormSchema = z.object({
    * Una sola por ahora; se envía como `labelIds` (`[]` o `[id]`).
    */
   labelId: z.string().optional(),
-  /** Fecha de inicio opcional (valor de `<input type="date">`, `YYYY-MM-DD`). */
+  /**
+   * Fecha de inicio (valor de `<input type="date">`, `YYYY-MM-DD`).
+   *
+   * (QL-197) **Obligatoria en el alta**, sin excepción posible. En la edición solo lo es si la
+   * tarea ya la tenía: la regla rige hacia adelante y una tarea antigua sin fecha se sigue
+   * editando con normalidad. Lo decide {@link buildTaskFormSchema}.
+   */
   startDate: z.string().optional(),
   /**
-   * (P1) Fecha límite opcional elegida en el **alta** (valor `<input type="date">`,
-   * `YYYY-MM-DD`). Solo se usa al crear: en edición el deadline se gestiona con la
-   * `DeadlineSection` del detalle (incl. bloqueo, prórroga y calendario laboral).
+   * (P1) Fecha límite elegida en el **alta** (valor `<input type="date">`, `YYYY-MM-DD`) y en la
+   * edición completa del ADMIN. En la edición reducida del CREATOR el deadline se gestiona con
+   * la `DeadlineSection` del detalle (incl. bloqueo, prórroga y calendario laboral).
+   *
+   * (QL-197) **Obligatoria salvo** que se marque {@link openEnded}. Las dos son excluyentes.
    */
   dueDate: z.string().optional(),
   /**
@@ -28,6 +43,22 @@ export const taskFormSchema = z.object({
   dueTime: z.string().optional(),
   /** (P1) Bloquear la edición del deadline por no-Creadores desde el alta. */
   deadlineLocked: z.boolean().optional(),
+  /**
+   * (QL-197, §3.69) Check **"Sin fecha de finalización"**: pide a Dirección autorización para
+   * dejar la tarea sin `dueDate`. Solo existe en el **alta** (`PATCH /tasks/:id` no acepta
+   * `openEndedRequest`), y marcarlo **excluye** poner fecha límite: mandar las dos cosas es un
+   * 400 `OPEN_ENDED_REQUEST_NOT_APPLICABLE`.
+   */
+  openEnded: z.boolean().optional(),
+  /**
+   * (QL-197) Directivo al que se le pide la autorización. Va **junto** al motivo: el backend
+   * recibe un objeto `openEndedRequest: { managerId, reason }`, así que no se puede mandar media
+   * solicitud. Debe ser un usuario ACTIVO de Dirección o el alta falla con 400
+   * `OPEN_ENDED_MANAGER_INVALID` y la tarea **no se crea**.
+   */
+  openEndedManagerId: z.string().optional(),
+  /** (QL-197) Motivo de la solicitud. Obligatorio si se marca {@link openEnded}. */
+  openEndedReason: z.string().optional(),
   /**
    * (QL-123) Responsable (ASSIGNEE) elegido en el **alta**.
    *
@@ -48,7 +79,106 @@ export const taskFormSchema = z.object({
   observerIds: z.array(z.string()).optional(),
 });
 
-export type TaskFormValues = z.infer<typeof taskFormSchema>;
+export type TaskFormValues = z.infer<typeof taskFormShape>;
+
+/**
+ * (QL-197, §3.69) Qué exige el formulario en **este** uso concreto. La obligatoriedad de las
+ * fechas no es una constante del esquema porque **rige hacia adelante**: al crear siempre se
+ * piden, pero al editar solo se exige lo que la tarea ya tenía — de las 64 tareas del clon de
+ * producción, 60 no tienen `dueDate` y 17 no tienen `startDate`, y bloquearles la edición por
+ * una fecha que nadie les puso habría congelado casi todo el histórico.
+ */
+export interface TaskFormRules {
+  /** La fecha de inicio no puede quedar vacía (alta siempre; edición si ya la tenía). */
+  requireStartDate: boolean;
+  /** La fecha de fin no puede quedar vacía (alta siempre; edición si ya la tenía). */
+  requireDueDate: boolean;
+  /**
+   * ¿Se ofrece el check "Sin fecha de finalización"? **Solo en el alta**: `PATCH /tasks/:id` no
+   * acepta `openEndedRequest`, así que en edición la única salida de una tarea bloqueada es
+   * ponerle fecha (lo que además cancela la solicitud en el backend).
+   */
+  allowOpenEnded: boolean;
+}
+
+/**
+ * Construye el esquema del formulario con las reglas de fecha de {@link TaskFormRules}.
+ *
+ * Las tres validaciones que añade sobre la forma base espejan **exactamente** los 400 del
+ * backend, para que el usuario los vea antes de enviar y no como un toast tras el fallo:
+ * `TASK_START_DATE_REQUIRED`, `TASK_DUE_DATE_REQUIRED` y `OPEN_ENDED_REQUEST_NOT_APPLICABLE`
+ * (más los dos campos de la solicitud, que van **juntos o ninguno**).
+ */
+export function buildTaskFormSchema(rules: TaskFormRules) {
+  return taskFormShape.superRefine((values, ctx) => {
+    const startDate = values.startDate?.trim() ?? '';
+    const dueDate = values.dueDate?.trim() ?? '';
+    // El check solo cuenta donde se ofrece: si un valor viejo quedara en el estado del
+    // formulario en modo edición, se ignora en vez de habilitar una vía que la API no acepta.
+    const openEnded = rules.allowOpenEnded && values.openEnded === true;
+
+    if (rules.requireStartDate && !startDate) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['startDate'],
+        message: 'La fecha de inicio es obligatoria',
+      });
+    }
+
+    if (openEnded && dueDate) {
+      // La UI ya limpia y deshabilita la fecha al marcar el check; esto es la red de abajo.
+      ctx.addIssue({
+        code: 'custom',
+        path: ['dueDate'],
+        message: 'Quita la fecha de fin o desmarca «Sin fecha de finalización»',
+      });
+    }
+
+    if (rules.requireDueDate && !dueDate && !openEnded) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['dueDate'],
+        message: rules.allowOpenEnded
+          ? 'Pon una fecha de fin o marca «Sin fecha de finalización»'
+          : 'La fecha de fin es obligatoria',
+      });
+    }
+
+    if (openEnded) {
+      if (!values.openEndedManagerId?.trim()) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['openEndedManagerId'],
+          message: 'Elige a quién de Dirección le pides la autorización',
+        });
+      }
+      const reason = values.openEndedReason?.trim() ?? '';
+      if (!reason) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['openEndedReason'],
+          message: 'Explica por qué la tarea no puede tener fecha de fin',
+        });
+      } else if (reason.length > OPEN_ENDED_REASON_MAX) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['openEndedReason'],
+          message: `Máximo ${OPEN_ENDED_REASON_MAX} caracteres`,
+        });
+      }
+    }
+  });
+}
+
+/**
+ * Variante permisiva (sin ninguna fecha obligatoria). Es la que usa cualquier consumidor que
+ * solo necesite la forma; el formulario real construye la suya con {@link buildTaskFormSchema}.
+ */
+export const taskFormSchema = buildTaskFormSchema({
+  requireStartDate: false,
+  requireDueDate: false,
+  allowOpenEnded: false,
+});
 
 /**
  * Esquema del formulario de "Solicitar prórroga" (QL-09, §3.7). Un no-Creador propone una
@@ -103,3 +233,32 @@ export const validateReviewSchema = z.object({
 });
 
 export type ValidateReviewValues = z.infer<typeof validateReviewSchema>;
+
+/**
+ * (QL-197, §3.69) Diálogo con el que Dirección **autoriza** el fin abierto: comentario
+ * **opcional** (mismo criterio que el visto bueno de QL-171), solo acotado en longitud.
+ */
+export const approveOpenEndedSchema = z.object({
+  comment: z
+    .string()
+    .trim()
+    .max(OPEN_ENDED_REASON_MAX, `Máximo ${OPEN_ENDED_REASON_MAX} caracteres`)
+    .optional(),
+});
+
+export type ApproveOpenEndedValues = z.infer<typeof approveOpenEndedSchema>;
+
+/**
+ * (QL-197, §3.69) Diálogo con el que Dirección **deniega** el fin abierto: el motivo es
+ * **obligatorio** (el backend también lo exige). Denegar sin decir por qué deja la tarea
+ * bloqueada y al Creador sin saber qué corregir.
+ */
+export const rejectOpenEndedSchema = z.object({
+  comment: z
+    .string()
+    .trim()
+    .min(1, 'Explica por qué no autorizas dejar la fecha de fin abierta')
+    .max(OPEN_ENDED_REASON_MAX, `Máximo ${OPEN_ENDED_REASON_MAX} caracteres`),
+});
+
+export type RejectOpenEndedValues = z.infer<typeof rejectOpenEndedSchema>;

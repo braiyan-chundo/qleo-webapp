@@ -7,10 +7,12 @@ import { notificationKeys } from '@/features/notifications/hooks/use-notificatio
 
 import {
   tasksService,
+  type ApproveOpenEndedPayload,
   type AssignRolePayload,
   type CompleteTaskPayload,
   type CreateTaskPayload,
   type MoveTaskPayload,
+  type RejectOpenEndedPayload,
   type RejectReviewPayload,
   type RequestDeadlineExtensionPayload,
   type SetDeadlinePayload,
@@ -469,5 +471,60 @@ export function useRejectReview(projectId: string, taskId: string) {
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
     },
+  });
+}
+
+/**
+ * (QL-197, §3.69) Invalidación común de las dos resoluciones del fin abierto. Ambas cambian
+ * `openEndedStatus` **y** `openEndedBlocked`, que gobiernan el arrastre de la card en el tablero
+ * y las acciones del detalle, así que hay que refrescar los tres sitios donde vive una tarea
+ * (detalle, tablero del proyecto y "Mis tareas") además de la bandeja: el backend notifica al
+ * Creador (`TASK_OPEN_ENDED_APPROVED` / `TASK_OPEN_ENDED_REJECTED`).
+ *
+ * Se invalida **también en el fallo**, por eso vive en `onSettled` y no en `onSuccess`: el 409
+ * `OPEN_ENDED_REQUEST_NOT_PENDING` significa que otro gerente ya la resolvió, y justamente ahí
+ * es cuando la vista está mintiendo y hay que traer el estado real.
+ */
+function invalidateOpenEnded(
+  queryClient: ReturnType<typeof useQueryClient>,
+  projectId: string,
+  taskId: string,
+) {
+  queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+  queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+  queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
+  queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+}
+
+/**
+ * (QL-197, §3.69) Dirección **autoriza** el fin abierto (`comment` opcional). Solo ADMIN/MANAGER
+ * (`@Roles(MANAGER)` en el backend). La tarea queda `APPROVED` y **desbloqueada**.
+ *
+ * Puede rechazar con `ApiError` **409 `OPEN_ENDED_REQUEST_NOT_PENDING`**: otro gerente se
+ * adelantó. Con tres personas en Dirección es el caso corriente, no un borde — el componente
+ * decide el mensaje ("ya está resuelta") y el `onSettled` de aquí trae el estado real.
+ */
+export function useApproveOpenEnded(projectId: string, taskId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data?: ApproveOpenEndedPayload) =>
+      tasksService.approveOpenEnded(taskId, data),
+    onSettled: () => invalidateOpenEnded(queryClient, projectId, taskId),
+  });
+}
+
+/**
+ * (QL-197, §3.69) Dirección **deniega** el fin abierto con un motivo **obligatorio**. La tarea
+ * queda `REJECTED` y **sigue bloqueada**: la única salida es ponerle una fecha de fin. Mismos
+ * permisos y mismo 409 que {@link useApproveOpenEnded}.
+ */
+export function useRejectOpenEnded(projectId: string, taskId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: RejectOpenEndedPayload) =>
+      tasksService.rejectOpenEnded(taskId, data),
+    onSettled: () => invalidateOpenEnded(queryClient, projectId, taskId),
   });
 }
