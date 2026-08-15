@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Loader2, MessageSquare, Trash2 } from 'lucide-react';
+import { ArrowUpRight, Import, Loader2, MessageSquare, Trash2 } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { ApiError } from '@/core/api/fetch-client';
 import type { TaskRole } from '@/features/tasks/services/tasks.service';
 import { hasAtLeastRole } from '@/shared/lib/permissions';
@@ -165,6 +167,13 @@ interface CommentItemProps {
  * Un comentario del hilo: avatar + autor + fecha (+ "editado") + cuerpo + adjuntos. Si es propio,
  * ofrece **eliminar** (QL-176: la edición ya no existe; la etiqueta "editado" se conserva porque
  * es un dato real de comentarios antiguos).
+ *
+ * (QL-201, §3.73 §3) Un comentario **importado** (llegó al duplicar la tarea a este proyecto) se
+ * marca de forma **visible**, no con un icono discreto: conserva autor y fecha originales, así que
+ * sin la marca aparenta haberse escrito aquí — firmado por alguien que quizá ni es miembro del
+ * proyecto y fechado antes de que el proyecto existiera. Se distingue con banda lateral + chip, y
+ * la fecha dice **las dos cosas**: la original ordena el hilo, y junto a ella se puede ver cuándo
+ * llegó de verdad y quién lo trajo.
  */
 function CommentItem({ comment, taskId, isOwn }: CommentItemProps) {
   const deleteComment = useDeleteComment(taskId);
@@ -172,6 +181,19 @@ function CommentItem({ comment, taskId, isOwn }: CommentItemProps) {
 
   const authorName = comment.author?.name ?? 'Usuario';
   const attachments = comment.attachments ?? [];
+  const isImported = comment.isImported === true;
+  /**
+   * "Importado el {fecha} por {quien}". Se pinta como texto **y** como `title` de la fecha
+   * original: quien pase el ratón por una fecha antigua tiene que poder saber por qué está ahí.
+   */
+  const importedNote = isImported
+    ? [
+        comment.importedAt ? `Importado el ${formatDateTime(comment.importedAt)}` : 'Importado',
+        comment.importedBy?.name ? `por ${comment.importedBy.name}` : null,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : null;
 
   const handleDelete = () => {
     deleteComment.mutate(comment.id, {
@@ -187,7 +209,15 @@ function CommentItem({ comment, taskId, isOwn }: CommentItemProps) {
   };
 
   return (
-    <li className="group/comment flex gap-3">
+    <li
+      className={cn(
+        'group/comment flex gap-3',
+        // La banda lateral es lo que hace que un importado no se lea como uno de aquí de un
+        // vistazo, sin tener que leer el chip.
+        isImported &&
+          'rounded-r-md border-l-2 border-outline-variant bg-surface-container-low/60 py-2 pr-2 pl-3',
+      )}
+    >
       <AuthedAvatar
         size="sm"
         className="mt-0.5 shrink-0"
@@ -197,13 +227,22 @@ function CommentItem({ comment, taskId, isOwn }: CommentItemProps) {
       />
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-medium text-on-surface">
             {authorName}
           </span>
-          <span className="shrink-0 text-xs text-on-surface-variant">
+          <span
+            className="shrink-0 text-xs text-on-surface-variant"
+            title={importedNote ?? undefined}
+          >
             {formatDateTime(comment.createdAt)}
           </span>
+          {isImported && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface-container-high px-1.5 py-0.5 text-xs font-medium text-on-surface-variant">
+              <Import className="size-3 shrink-0" aria-hidden />
+              Importado
+            </span>
+          )}
           {comment.editedAt && (
             <span className="shrink-0 text-xs text-on-surface-variant">· editado</span>
           )}
@@ -231,6 +270,26 @@ function CommentItem({ comment, taskId, isOwn }: CommentItemProps) {
             <MentionText body={comment.body} mentions={comment.mentions} />
           </p>
         </CollapsibleText>
+
+        {/* (QL-201, §3.73 §3) La procedencia, en texto y no solo en un tooltip: la fecha del
+            comentario es la ORIGINAL, así que hay que poder ver también la honesta —cuándo llegó
+            aquí y quién lo trajo— y saltar a su hilo real. El enlace usa la ruta plana
+            `/tasks/:id`, que resuelve el proyecto y degrada a un 404 de marca si la tarea original
+            ya se eliminó (QL-143), en vez de reventar. */}
+        {isImported && (
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-on-surface-variant">
+            {importedNote && <span>{importedNote}</span>}
+            {comment.importedFrom && (
+              <Link
+                to={`/tasks/${comment.importedFrom.taskId}`}
+                className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline"
+              >
+                Ver en la tarea original
+                <ArrowUpRight className="size-3" aria-hidden />
+              </Link>
+            )}
+          </p>
+        )}
 
         {/* (QL-174) Adjuntos del comentario → visor compartido al hacer click. */}
         <CommentAttachments attachments={attachments} />

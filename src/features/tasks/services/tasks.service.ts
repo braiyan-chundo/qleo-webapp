@@ -60,6 +60,25 @@ export interface TaskOpenEndedUser {
 }
 
 /**
+ * (QL-201, §3.73) **Procedencia** de una tarea que nació como copia.
+ *
+ * Los **nombres** son una instantánea del momento de copiar: si después renombran la original o
+ * su proyecto, este texto conserva el de entonces —describe el acto de copiar, no el estado de
+ * hoy— y sobrevive incluso a que borren la original (QL-143). Los **ids** son el enlace vivo:
+ * llevan al historial de verdad, que es lo que la copia no tiene.
+ */
+export interface TaskDuplicatedFrom {
+  /** Tarea original. Enlázalo: ahí está el historial real (`GET /audit/TASK/:taskId`). */
+  taskId: string;
+  /** Título que tenía la original al copiarla. */
+  taskTitle: string;
+  /** Proyecto del que salió la copia. */
+  projectId: string;
+  /** Nombre de ese proyecto al copiar. */
+  projectName: string;
+}
+
+/**
  * (QL-197, §3.69) Estado de la solicitud de **fecha de fin abierta**:
  * `PENDING` esperando a Dirección · `APPROVED` autorizada (la tarea vive legítimamente sin
  * `dueDate`) · `REJECTED` denegada.
@@ -197,6 +216,20 @@ export interface Task {
    * `null` si no hay resolución o si se aprobó sin escribir nada.
    */
   openEndedResolutionComment: string | null;
+  /**
+   * (QL-201, §3.73) `true` si la tarea **nació como copia** de otra. Es el interruptor del cartel
+   * de procedencia: sin pintarlo, la copia aparece en el tablero destino como una tarea
+   * cualquiera y nadie puede saber de dónde salió ni dónde está su historial real.
+   *
+   * `false` en las 64 tareas anteriores a la HU (campo aditivo, sin migración).
+   */
+  isDuplicate: boolean;
+  /** (QL-201) De dónde salió la copia; `null` en cualquier tarea normal. */
+  duplicatedFrom: TaskDuplicatedFrom | null;
+  /** (QL-201) Miembro de Dirección que ejecutó la duplicación, o `null`. */
+  duplicatedBy: TaskCompletedBy | null;
+  /** (QL-201) ISO8601 del momento en que se duplicó, o `null`. */
+  duplicatedAt: string | null;
   createdAt: string;
 }
 
@@ -441,6 +474,106 @@ export interface UpdateTaskPayload {
   observerIds?: string[];
 }
 
+/**
+ * (QL-201, §3.73 §1) Body de `POST /tasks/:id/duplicate`. Solo `projectId` es obligatorio; el
+ * resto son **sustituciones** sobre lo que se copia de la original.
+ *
+ * ⚠️ Las fechas son opcionales pero **no siempre prescindibles**: la copia es una tarea NUEVA y
+ * tiene que cumplir QL-197 por sí misma. Si la original no tiene `startDate` (17 tareas antiguas
+ * en producción) o no tiene `dueDate` (60 de 64) hay que aportarlas aquí, o la petición se
+ * rechaza con `TASK_START_DATE_REQUIRED` / `TASK_DUE_DATE_REQUIRED`. Y **la autorización de fin
+ * abierto no se hereda**: una tarea con fin abierto APROBADO también exige `dueDate` en la copia.
+ */
+export interface DuplicateTaskPayload {
+  /** Proyecto **destino**. Puede ser el mismo de la original (queda una copia hermana). */
+  projectId: string;
+  /** Columna destino; si se omite, la **columna default** del proyecto destino. */
+  columnId?: string;
+  /** Título de la copia; si se omite se conserva el de la original **sin prefijos**. */
+  title?: string;
+  /** ISO8601. Si se omite se hereda la de la original (y es obligatoria si no la tiene). */
+  startDate?: string;
+  /** ISO8601. Igual que `startDate`, y sin herencia de la autorización de fin abierto. */
+  dueDate?: string;
+}
+
+/** (QL-201) Por qué un participante de la original no viajó a la copia. */
+export type SkippedParticipantReason = 'NOT_MEMBER_OF_TARGET_PROJECT';
+
+/** (QL-201) Por qué una etiqueta no viajó a la copia. */
+export type SkippedLabelReason = 'NOT_ADOPTED_BY_TARGET_PROJECT';
+
+/**
+ * (QL-201, §3.73 §6) Participante que **se quedó fuera** de la copia, con nombre y rol para
+ * poder nombrarlo en el resumen sin otra petición.
+ *
+ * No es un detalle de implementación: QL-51 gobierna la visibilidad del **proyecto entero**, así
+ * que añadir a esta gente al destino le daría acceso a todo el tablero, a sus documentos y a sus
+ * demás tareas — una decisión de acceso no puede colarse como efecto secundario de un botón
+ * "Duplicar". Se descartan; descartarlos **en silencio** dejaría una copia mutilada que parece
+ * completa, y por eso hay que enseñar esta lista.
+ */
+export interface SkippedParticipant {
+  userId: string;
+  name: string;
+  /** Rol que tenía en la ORIGINAL y que se ha quedado sin cubrir en la copia. */
+  role: TaskRole;
+  reason: SkippedParticipantReason;
+}
+
+/** (QL-201) Etiqueta que el proyecto destino no tiene adoptada (QL-146) y no viajó. */
+export interface SkippedLabel {
+  labelId: string;
+  name: string;
+  reason: SkippedLabelReason;
+}
+
+/** (QL-201) Censo de lo que SÍ se copió, para el resumen del final. */
+export interface DuplicateCopiedCounts {
+  comments: number;
+  checklistItems: number;
+  attachments: number;
+  /**
+   * Adjuntos cuyo binario **no se pudo leer** del almacén. La duplicación **no se aborta** por
+   * esto (la tarea ya existe), así que es un aviso que hay que enseñar: los archivos que faltan
+   * hay que volver a subirlos a mano.
+   */
+  attachmentsFailed: number;
+  /** Participantes que sí viajaron, sin contar al Creador de la copia. */
+  participants: number;
+}
+
+/**
+ * (QL-201, §3.73 §1) Respuesta de `POST /tasks/:id/duplicate`.
+ *
+ * ⚠️ `id` y `projectId` de primer nivel **repiten a propósito** los de `task`: son metadatos que
+ * el bus de tiempo real usa para ubicar el evento en el tablero **destino**. Para **pintar** se
+ * usa `task`.
+ */
+export interface DuplicateTaskResult {
+  /** = `task.id`. Metadato del evento de tiempo real. */
+  id: string;
+  /** = `task.projectId`. Metadato del evento de tiempo real. */
+  projectId: string;
+  /** La copia ya creada: **esto** es lo que se pinta. */
+  task: Task;
+  copied: DuplicateCopiedCounts;
+  /** Vacío si viajaron todos. Si no, **hay que enseñarlo con nombres**. */
+  skippedParticipants: SkippedParticipant[];
+  skippedLabels: SkippedLabel[];
+  /**
+   * (QL-192) `true` si el Responsable de la original no pudo viajar y el puesto **recayó en quien
+   * duplica**: ninguna copia nace sin Responsable. El descartado aparece en `skippedParticipants`
+   * con `role: 'ASSIGNEE'`.
+   */
+  assigneeFellBackToDuplicator: boolean;
+  /**
+   * **Siempre `false`**: duplicar no notifica a nadie. Viene explícito para que la UI pueda
+   * decirlo en voz alta en vez de dejar que Dirección suponga que su equipo ya se enteró.
+   */
+  notified: boolean;
+}
+
 /** Body para asignar/cambiar el rol por tarea de un usuario (§3.7). Solo el CREATOR. */
 export interface AssignRolePayload {
   userId: string;
@@ -539,6 +672,19 @@ export const tasksService = {
    */
   restore: (id: string) => {
     return api.post<Task>(`/tasks/${id}/restore`);
+  },
+
+  /**
+   * (QL-201, §3.73) **Duplica** la tarea a otro proyecto (o al mismo). **Solo Dirección**
+   * (`MANAGER`+): un MEMBER recibe 403 aunque sea el Creador de la tarea. `id` es la tarea
+   * **ORIGINAL**, que no se toca en absoluto.
+   *
+   * Puede rechazar con 400 `TASK_START_DATE_REQUIRED` / `TASK_DUE_DATE_REQUIRED` si la original
+   * no tiene esas fechas y el body no las aporta; el diálogo ya lo anticipa (ver
+   * {@link DuplicateTaskPayload}).
+   */
+  duplicate: (id: string, data: DuplicateTaskPayload) => {
+    return api.post<DuplicateTaskResult>(`/tasks/${id}/duplicate`, data);
   },
 
   assignRole: (id: string, data: AssignRolePayload) => {

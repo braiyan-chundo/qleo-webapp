@@ -66,9 +66,47 @@ export function notificationText(notification: Notification): string {
     case 'DEADLINE_APPROACHING':
       // Noti del sistema (sin actor): se compone sin nombre.
       return task ? `${task} está por vencer` : 'Una de tus tareas está por vencer';
+
+    // ───────────────── (QL-200, §3.72 §6) Alertas de gestión ─────────────────
+    // Las cuatro son del **sistema** (`actor: null`) y hablan de un tercero (`subject`). El
+    // backend manda el detalle **ya redactado** en `reason` —el mismo texto que va en el push—
+    // así que aquí NO se vuelve a componer la frase: reescribirla en cliente es cómo la campana
+    // y el push acaban diciendo cosas distintas del mismo aviso. El fallback solo cubre el caso
+    // raro de que `reason` no llegue, y se cuida de no atribuirle a nadie una acción.
+    case 'MGMT_TASK_OVERDUE': {
+      const reason = notification.reason?.trim();
+      if (reason) return reason;
+      return task ? `${task} sigue vencida sin cerrar` : 'Hay una tarea vencida sin cerrar';
+    }
+    case 'MGMT_PENDING_BUILDUP': {
+      const reason = notification.reason?.trim();
+      return reason ?? `${subjectName(notification)} acumula tareas pendientes por encima del umbral`;
+    }
+    case 'MGMT_LOW_COMPLIANCE': {
+      const reason = notification.reason?.trim();
+      return (
+        reason ??
+        `${subjectName(notification)} está por debajo del umbral de cumplimiento de plazos`
+      );
+    }
+    case 'MGMT_REPEATED_BREACH': {
+      const reason = notification.reason?.trim();
+      return (
+        reason ?? `${subjectName(notification)} acumula varios incumplimientos de plazo`
+      );
+    }
+
     default:
       return `${actor} generó una notificación`;
   }
+}
+
+/**
+ * (QL-200) Nombre del **sujeto** de una alerta de gestión, con fallback neutro. Nunca "Alguien":
+ * el sujeto no es un actor anónimo que hizo algo, es la persona de la que trata el aviso.
+ */
+function subjectName(notification: Notification): string {
+  return notification.subject?.name?.trim() || 'Un miembro del equipo';
 }
 
 /**

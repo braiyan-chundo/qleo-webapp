@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import {
   Archive,
   ArchiveRestore,
+  Copy,
   Loader2,
   MoreVertical,
   Pencil,
@@ -39,6 +40,7 @@ import {
 import { useCanDiscardTask } from '../../hooks/use-task-permissions';
 import type { Task } from '../../services/tasks.service';
 import { TaskFormDialog } from '../TaskFormDialog';
+import { DuplicateTaskDialog } from '../DuplicateTaskDialog';
 
 interface TaskAdminMenuProps {
   task: Task;
@@ -76,6 +78,8 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
   const deleteTask = useDeleteTask(projectId);
 
   const [editOpen, setEditOpen] = useState(false);
+  /** (QL-201) Diálogo de duplicar. Solo Dirección; el backend responde 403 al resto. */
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   /**
@@ -174,6 +178,19 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
             </>
           )}
 
+          {/* (QL-201, §3.73) Duplicar a otro proyecto. Exige rol `MANAGER`+ y NO se abre a
+              `canFullEdit`: no edita la tarea original —no la toca en absoluto—, así que ser
+              OBSERVER de ella no impide sacarle una copia. */}
+          {isAdmin && (
+            <>
+              <DropdownMenuItem onSelect={() => setDuplicateOpen(true)}>
+                <Copy className="size-4" />
+                Duplicar tarea
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+
           {/* (QL-198b) Delegable con `TASK_DISCARD`, acotado a los proyectos propios. */}
           {showDiscard &&
             (task.isDiscarded ? (
@@ -217,6 +234,16 @@ export function TaskAdminMenu({ task, projectId, onDeleted }: TaskAdminMenuProps
           projectId={projectId}
           task={task}
           fullEdit
+        />
+      )}
+
+      {/* (QL-201) Duplicar: el diálogo gatea sus propias queries por `open` (proyectos y columnas
+          del destino), así que montarlo cerrado no cuesta peticiones. */}
+      {isAdmin && (
+        <DuplicateTaskDialog
+          open={duplicateOpen}
+          onOpenChange={setDuplicateOpen}
+          task={task}
         />
       )}
 

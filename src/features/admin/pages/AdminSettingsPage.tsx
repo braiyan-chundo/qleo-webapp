@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { ShieldCheck, Sparkles, Tags, UsersRound } from 'lucide-react';
+import { BellRing, ShieldCheck, Sparkles, Tags, UsersRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,6 +11,7 @@ import { LabelCatalogManager } from '@/features/labels/components/LabelCatalogMa
 import { AvatarCatalogManager } from '@/features/avatars/components/AvatarCatalogManager';
 import { AiConnectionManager } from '@/features/ai/components/AiConnectionManager';
 import { PermissionProfilesManager } from '@/features/permission-profiles/components/PermissionProfilesManager';
+import { ManagementAlertsForm } from '@/features/settings/components/ManagementAlertsForm';
 
 /**
  * Descriptor de un tab de Configuración. El catálogo de tabs es **extensible** (QL-149): añadir
@@ -49,6 +50,15 @@ const SETTINGS_TABS: readonly SettingsTab[] = [
     label: 'Avatares',
     icon: UsersRound,
     Component: AvatarCatalogManager,
+    adminOnly: true,
+  },
+  // (QL-200, §3.72 §4) Umbrales de las alertas de gestión + su interruptor general. Materia de
+  // Dirección por definición (habla del desempeño de terceros): nunca delegable.
+  {
+    value: 'alertas',
+    label: 'Alertas de gestión',
+    icon: BellRing,
+    Component: ManagementAlertsForm,
     adminOnly: true,
   },
   // (QL-185, §3.62) Conexión IA de la plataforma (device login con ChatGPT).

@@ -25,6 +25,7 @@ import { TaskDescription } from '../components/detail/TaskDescription';
 import { TaskCreatorActions } from '../components/detail/TaskCreatorActions';
 import { TaskAdminMenu } from '../components/detail/TaskAdminMenu';
 import { TaskAuditLogSection } from '../components/detail/TaskAuditLogSection';
+import { TaskOriginCard } from '../components/detail/TaskOriginCard';
 
 /**
  * Vista dedicada y deep-linkable de una tarea (QL-25): `/projects/:id/tasks/:taskId`. Layout
@@ -128,6 +129,14 @@ export function TaskDetailPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         {/* Columna principal: contenido de trabajo. */}
         <div className="space-y-4">
+          {/* (QL-201, §3.73 §7) La procedencia de una copia se pinta UNA sola vez, y dónde
+              depende de quién mira: para Administración y Dirección abre el bloque de historial
+              (ahí abajo), que es donde se busca "de dónde salió esto" y donde está el enlace al
+              historial real. Quien no ve ese bloque la necesita igual —es lo único que explica
+              por qué el hilo tiene comentarios de gente ajena al proyecto—, así que para el
+              resto sube aquí arriba. Se renderiza `null` si la tarea no es una copia. */}
+          {!isAdmin && <TaskOriginCard task={task} />}
+
           <TaskDescription description={task.description} />
 
           <ChecklistPanel
@@ -175,7 +184,10 @@ export function TaskDetailPage() {
           menú kebab de la cabecera (`TaskAdminMenu`). */}
       {isAdmin && (
         <div className="mt-8 space-y-8">
-          <TaskAuditLogSection taskId={task.id} />
+          <TaskAuditLogSection
+            taskId={task.id}
+            leading={<TaskOriginCard task={task} />}
+          />
           <TaskAnalyticsSection taskId={task.id} />
         </div>
       )}

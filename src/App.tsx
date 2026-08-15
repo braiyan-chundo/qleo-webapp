@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
@@ -71,6 +71,15 @@ function App() {
                     administración —ADMIN o Dirección (QL-195)— y el por-proyecto además del
                     creador (el backend autoriza). El acceso del menú es adminOnly. */}
                 <Route path="/analytics" element={<AnalyticsPage />} />
+                {/* (QL-200, §3.72 §6) El push de las alertas de gestión de PERSONA abre
+                    `/analytics/users` — la ruta de la API, no la del front. El click in-app ya se
+                    traduce en `notification-nav`, pero el push lo abre el service worker
+                    directamente contra el origen: sin este alias, tocar la notificación desde el
+                    móvil aterriza en el 404. */}
+                <Route
+                  path="/analytics/users"
+                  element={<Navigate to="/analytics" replace />}
+                />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 {/* Calendario (QL-162): **ruta única** autenticada. La página se ramifica por rol —el
                     MEMBER ve su calendario de solo lectura; administración/Dirección, la gestión con sus

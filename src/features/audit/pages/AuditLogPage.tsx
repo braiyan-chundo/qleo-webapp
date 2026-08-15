@@ -80,6 +80,8 @@ const ACTION_META: Record<AuditAction, { label: string; variant: BadgeVariant }>
   ASSIGN: { label: 'Asignación', variant: 'outline' },
   COMPLETE: { label: 'Completada', variant: 'outline' },
   REOPEN: { label: 'Reapertura', variant: 'outline' },
+  // (QL-201) Se registra sobre la tarea ORIGINAL: "de aquí salió una copia".
+  DUPLICATE: { label: 'Duplicada', variant: 'outline' },
 };
 
 function formatDateTime(iso: string): string {

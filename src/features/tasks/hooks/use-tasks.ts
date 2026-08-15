@@ -11,6 +11,7 @@ import {
   type AssignRolePayload,
   type CompleteTaskPayload,
   type CreateTaskPayload,
+  type DuplicateTaskPayload,
   type MoveTaskPayload,
   type RejectOpenEndedPayload,
   type RejectReviewPayload,
@@ -175,6 +176,37 @@ export function useUpdateTask(projectId: string) {
     onSuccess: (_task, { id }) => {
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
+    },
+  });
+}
+
+/**
+ * (QL-201, §3.73) **Duplica** una tarea a un proyecto destino. **Solo Dirección** (`MANAGER`+).
+ *
+ * Qué se invalida y por qué:
+ * - el **tablero destino**, donde acaba de aparecer una tarjeta nueva (`data.projectId`, que sale
+ *   de la respuesta: el destino lo elige el usuario en el diálogo, no lo sabe este hook de
+ *   antemano);
+ * - **"Mis tareas"**, porque quien duplica siempre queda como `CREATOR` de la copia — y a veces
+ *   también como Responsable, si el de la original no pudo viajar (QL-192);
+ * - la lista de **descartadas** del destino, no por capricho: se puede duplicar una tarea que
+ *   está en la papelera, y la copia nace **viva**, así que el conteo de esa sección cambia.
+ *
+ * Lo que **no** se toca es la tarea original ni su tablero: la HU garantiza que no se modifica,
+ * no se mueve y no queda marcada. Invalidar su proyecto sería sugerir que sí pasó algo allí.
+ *
+ * Tampoco se invalidan las **notificaciones**: duplicar no genera ninguna (`notified: false`).
+ */
+export function useDuplicateTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: DuplicateTaskPayload }) =>
+      tasksService.duplicate(id, data),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.list(result.projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.discardedList(result.projectId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.mine() });
     },
   });

@@ -262,3 +262,39 @@ export const rejectOpenEndedSchema = z.object({
 });
 
 export type RejectOpenEndedValues = z.infer<typeof rejectOpenEndedSchema>;
+
+/**
+ * (QL-201, §3.73 §5) Esquema del diálogo **Duplicar tarea**.
+ *
+ * Las dos fechas son **obligatorias en el formulario** aunque el endpoint las acepte opcionales, y
+ * es una decisión deliberada. La copia es una tarea NUEVA y tiene que cumplir QL-197 por sí misma:
+ * si la original no tiene `startDate` (17 tareas antiguas en producción) o no tiene `dueDate` (60
+ * de 64, y también las que tienen el fin abierto **autorizado**, porque la autorización no se
+ * hereda), el backend responde 400. El diálogo ya tiene la tarea original cargada, así que **sabe
+ * de antemano** qué le falta: se pre-rellenan con las de la original cuando existen y se piden
+ * cuando no, en vez de dejar que el usuario descubra la regla con un error al enviar.
+ *
+ * Exigirlas siempre —en vez de solo cuando falten— evita además la trampa del campo vacío: en el
+ * endpoint, omitir una fecha significa "hereda la de la original", no "sin fecha", así que un
+ * usuario que borrase el campo esperando dejarla en blanco obtendría justo lo contrario.
+ */
+export const duplicateTaskSchema = z.object({
+  /** Proyecto DESTINO. Único campo que el endpoint exige de verdad. */
+  projectId: z.string().trim().min(1, 'Elige el proyecto de destino'),
+  /** Columna del destino; vacío = la columna por defecto de ese tablero. */
+  columnId: z.string().optional(),
+  /** Título de la copia. Se pre-rellena con el de la original, **sin prefijos** (§3.73 §1). */
+  title: z
+    .string()
+    .trim()
+    .min(1, 'El título es obligatorio')
+    .max(200, 'Máximo 200 caracteres'),
+  /** Valor de `<input type="date">` (`YYYY-MM-DD`). */
+  startDate: z.string().trim().min(1, 'La fecha de inicio es obligatoria'),
+  /** Valor de `<input type="date">` (`YYYY-MM-DD`). */
+  dueDate: z.string().trim().min(1, 'La fecha de fin es obligatoria'),
+  /** (QL-166) Hora del deadline (`HH:mm`); vacía → 18:00 al serializar. */
+  dueTime: z.string().optional(),
+});
+
+export type DuplicateTaskValues = z.infer<typeof duplicateTaskSchema>;

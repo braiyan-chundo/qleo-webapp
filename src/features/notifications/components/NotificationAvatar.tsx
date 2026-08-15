@@ -1,4 +1,14 @@
-import { BadgeCheck, Bell, Hourglass, ThumbsDown, type LucideIcon } from 'lucide-react';
+import {
+  BadgeCheck,
+  Bell,
+  CalendarX,
+  GaugeCircle,
+  Hourglass,
+  Layers,
+  Repeat,
+  ThumbsDown,
+  type LucideIcon,
+} from 'lucide-react';
 
 import { AuthedAvatar } from '@/shared/components/AuthedAvatar';
 import { cn } from '@/lib/utils';
@@ -39,25 +49,61 @@ const NOTIFICATION_TYPE_BADGE: Partial<Record<NotificationType, NotificationType
     icon: ThumbsDown,
     className: 'bg-error-container text-on-error-container',
   },
+  // (QL-200) Las cuatro de gestión llevan insignia propia: sin actor humano, el icono es lo
+  // único que las distingue de un vistazo en la campana. Solo la de tarea vencida va en rojo —
+  // es la única que señala un hecho consumado sobre un compromiso concreto; las tres de persona
+  // van en ámbar porque describen una situación a revisar, no un fallo probado.
+  MGMT_TASK_OVERDUE: {
+    icon: CalendarX,
+    className: 'bg-error-container text-on-error-container',
+  },
+  MGMT_PENDING_BUILDUP: {
+    icon: Layers,
+    className: 'bg-warning-container text-on-warning-container',
+  },
+  MGMT_LOW_COMPLIANCE: {
+    icon: GaugeCircle,
+    className: 'bg-warning-container text-on-warning-container',
+  },
+  MGMT_REPEATED_BREACH: {
+    icon: Repeat,
+    className: 'bg-warning-container text-on-warning-container',
+  },
 };
 
 interface NotificationAvatarProps {
   /** Actor humano poblado, o `null` en las notis del sistema (§3.10, `DEADLINE_APPROACHING`). */
   actor: NotificationActor | null;
+  /**
+   * (QL-200, §3.72 §6) **Sujeto** de una alerta de gestión: de quién habla el aviso. Se usa solo
+   * cuando **no hay actor**, que es siempre en las `MGMT_*`.
+   *
+   * ⚠️ No es un "actor de repuesto": el sujeto **no ha hecho nada**. Se pinta su cara porque el
+   * aviso trata de él y reconocerlo de un vistazo es justo lo que Dirección necesita, pero el
+   * texto de la fila nunca le atribuye una acción (ver `notification-text`).
+   */
+  subject?: NotificationActor | null;
   /** Tipo de la notificación; decide la insignia de icono (si la hay). */
   type?: NotificationType;
   className?: string;
 }
 
 /**
- * Avatar de una fila de notificación. Muestra el avatar del actor humano, o un icono de
- * sistema (campana) cuando la noti **no tiene actor** (notis automáticas del sistema, §3.10).
+ * Avatar de una fila de notificación. Muestra el avatar del actor humano, el del **sujeto** si la
+ * noti es del sistema pero trata de alguien (QL-200), o un icono de sistema (campana) cuando no
+ * hay ni lo uno ni lo otro (§3.10, `DEADLINE_APPROACHING`).
  * Iguala el tamaño del `AuthedAvatar size="sm"` (size-6) para no descuadrar la fila.
  */
-export function NotificationAvatar({ actor, type, className }: NotificationAvatarProps) {
+export function NotificationAvatar({
+  actor,
+  subject,
+  type,
+  className,
+}: NotificationAvatarProps) {
   const badge = type ? NOTIFICATION_TYPE_BADGE[type] : undefined;
+  const person = actor ?? subject ?? null;
 
-  const avatar = !actor ? (
+  const avatar = !person ? (
     <span
       aria-hidden
       className={cn(
@@ -71,9 +117,9 @@ export function NotificationAvatar({ actor, type, className }: NotificationAvata
     <AuthedAvatar
       size="sm"
       className={badge ? undefined : className}
-      avatarDownloadUrl={actor.avatarDownloadUrl}
-      avatarUrl={actor.avatarUrl}
-      name={actor.name}
+      avatarDownloadUrl={person.avatarDownloadUrl}
+      avatarUrl={person.avatarUrl}
+      name={person.name}
     />
   );
 

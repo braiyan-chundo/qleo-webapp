@@ -1,13 +1,22 @@
 import type { UserRole } from '@/store/auth.store';
 
-/** Acciones registradas por la auditoría (§3.3). */
+/**
+ * Acciones registradas por la auditoría (§3.3).
+ *
+ * (QL-201, §3.73 §7) `DUPLICATE` se registra sobre la tarea **ORIGINAL** —es la entidad sobre la
+ * que se actuó, "de aquí salió una copia"— y trae en `newValues` el id de la copia y el censo de
+ * lo copiado. La copia recibe además su propio `CREATE`: su existencia empieza de verdad en ese
+ * instante, y ese es el primer renglón legítimo de su historial. Lo que **no** se hace es clonar
+ * los logs de la original a nombre de la copia.
+ */
 export type AuditAction =
   | 'CREATE'
   | 'UPDATE'
   | 'DELETE'
   | 'ASSIGN'
   | 'COMPLETE'
-  | 'REOPEN';
+  | 'REOPEN'
+  | 'DUPLICATE';
 
 /** Actor poblado en cada log de auditoría. */
 export interface AuditActor {

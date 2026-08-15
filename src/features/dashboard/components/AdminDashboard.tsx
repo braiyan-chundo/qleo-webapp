@@ -41,6 +41,9 @@ const ACTION_META: Record<AuditAction, { label: string; variant: BadgeVariant }>
   ASSIGN: { label: 'Asignación', variant: 'outline' },
   COMPLETE: { label: 'Completada', variant: 'outline' },
   REOPEN: { label: 'Reapertura', variant: 'outline' },
+  // (QL-201) Tercer mapa que hay que tocar al añadir una acción — el `Record<AuditAction, …>` es
+  // lo que lo delata en compilación en vez de dejar salir el código crudo en pantalla.
+  DUPLICATE: { label: 'Duplicada', variant: 'outline' },
 };
 
 function actionMeta(action: string): { label: string; variant: BadgeVariant } {

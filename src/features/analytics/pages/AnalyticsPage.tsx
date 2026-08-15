@@ -6,6 +6,7 @@ import { BackButton } from '@/shared/components/BackButton';
 import { hasAtLeastRole } from '@/shared/lib/permissions';
 import { useAuthStore } from '@/store/auth.store';
 import { useProjects } from '@/features/projects/hooks/use-projects';
+import { useManagementAlertSettings } from '@/features/settings/hooks/use-settings';
 
 import {
   useAnalyticsOverview,
@@ -41,6 +42,13 @@ export function AnalyticsPage() {
 
   const overview = useAnalyticsOverview();
   const usersPerformance = useUsersPerformance();
+  /**
+   * (QL-200, §3.72 §4) Los umbrales solo para leer `complianceMinSample`: es lo que permite que
+   * la tabla diga *"2 de 5 compromisos necesarios"* en vez de un "sin datos" sin más. El hook ya
+   * se auto-gatea por rol, así que un MEMBER no dispara la petición; si falla o aún no llegó, la
+   * tabla se calla el denominador y **no** pinta el porcentaje por su cuenta.
+   */
+  const managementAlerts = useManagementAlertSettings();
 
   // Proyectos para el selector: administración ve todos; un creador ve solo los suyos (evita 403).
   // `limit: 50` es el máximo que admite el DTO de paginación del backend (@Max(50)); pedir
@@ -124,6 +132,7 @@ export function AnalyticsPage() {
             users={usersPerformance.data}
             isLoading={usersPerformance.isLoading}
             isError={usersPerformance.isError}
+            complianceMinSample={managementAlerts.data?.complianceMinSample}
           />
         </section>
       )}

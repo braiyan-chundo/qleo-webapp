@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { History, Sparkles } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,16 @@ import type { AuditAction } from '@/features/audit/types/audit';
 
 interface TaskAuditLogSectionProps {
   taskId: string;
+  /**
+   * (QL-201, §3.73 §7) Contenido que **abre** el bloque de historial, antes de los registros.
+   *
+   * Hoy es la tarjeta de procedencia de una copia, y va aquí a propósito: los `auditLogs` de la
+   * original no se clonan (no se fabrican entradas sobre una entidad que aún no existía), así que
+   * el historial de una copia recién creada tiene un solo renglón. Quien lo abre buscando "de
+   * dónde salió esto" necesita encontrar el enlace al historial de verdad **en este bloque**, no
+   * en otra parte de la página.
+   */
+  leading?: ReactNode;
 }
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
@@ -21,6 +32,8 @@ const ACTION_META: Record<AuditAction, { label: string; variant: BadgeVariant }>
   ASSIGN: { label: 'Asignación', variant: 'outline' },
   COMPLETE: { label: 'Completada', variant: 'outline' },
   REOPEN: { label: 'Reapertura', variant: 'outline' },
+  // (QL-201) Aparece en el historial de la tarea ORIGINAL, no en el de la copia.
+  DUPLICATE: { label: 'Duplicada', variant: 'outline' },
 };
 
 function actionMeta(action: string): { label: string; variant: BadgeVariant } {
@@ -109,7 +122,7 @@ function diffKeys(
  * mutaciones (mover, cerrar, validar, descartar…) sigue con la auditoría genérica y
  * `oldValues: {}`: esas entradas se pintan como siempre, sin diff.
  */
-export function TaskAuditLogSection({ taskId }: TaskAuditLogSectionProps) {
+export function TaskAuditLogSection({ taskId, leading }: TaskAuditLogSectionProps) {
   const { data: logs, isLoading, isError, error } = useTaskAuditLog(taskId);
 
   return (
@@ -123,6 +136,10 @@ export function TaskAuditLogSection({ taskId }: TaskAuditLogSectionProps) {
           Administración y Dirección
         </span>
       </div>
+
+      {/* (QL-201) Va FUERA de los estados de carga/error de la lista: la procedencia es un dato
+          que ya está en la tarea, así que no puede depender de que `GET /audit/TASK/:id` responda. */}
+      {leading}
 
       <div className="rounded-xl border border-outline-variant/50 bg-surface-container-low p-4">
         {isLoading ? (

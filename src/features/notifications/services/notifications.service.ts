@@ -14,6 +14,10 @@ import type { Paginated } from '@/shared/types/paginated';
  *   en `reason`: `TASK_OPEN_ENDED_REQUESTED` (al **directivo elegido**, uno solo — avisar a
  *   todos les llenaría la bandeja), `TASK_OPEN_ENDED_APPROVED` y `TASK_OPEN_ENDED_REJECTED`
  *   (ambas al **Creador** que la pidió).
+ * - **(QL-200, §3.72 §6)** Las cuatro **alertas de gestión** `MGMT_*`, que van **solo a
+ *   Dirección** y son notificaciones **del sistema**: `actor` viene siempre `null` (no las genera
+ *   una persona, las dispara el paso del tiempo). Traen `subjectUserId`/`subject` —de quién
+ *   hablan— y `reason` con el detalle ya redactado por el backend.
  */
 export type NotificationType =
   | 'MENTION'
@@ -26,7 +30,28 @@ export type NotificationType =
   | 'TASK_REVIEW_REJECTED'
   | 'TASK_OPEN_ENDED_REQUESTED'
   | 'TASK_OPEN_ENDED_APPROVED'
-  | 'TASK_OPEN_ENDED_REJECTED';
+  | 'TASK_OPEN_ENDED_REJECTED'
+  | 'MGMT_TASK_OVERDUE'
+  | 'MGMT_PENDING_BUILDUP'
+  | 'MGMT_LOW_COMPLIANCE'
+  | 'MGMT_REPEATED_BREACH';
+
+/**
+ * (QL-200, §3.72 §6) Las cuatro alertas de gestión. Se agrupan aparte porque comparten todo lo
+ * que las hace distintas del resto: solo las recibe Dirección, no tienen actor y su protagonista
+ * es el `subject`, que **no ha hecho nada**.
+ */
+export const MANAGEMENT_NOTIFICATION_TYPES: readonly NotificationType[] = [
+  'MGMT_TASK_OVERDUE',
+  'MGMT_PENDING_BUILDUP',
+  'MGMT_LOW_COMPLIANCE',
+  'MGMT_REPEATED_BREACH',
+];
+
+/** ¿Es una alerta de gestión (QL-200)? Decide el icono, el avatar y el destino al navegar. */
+export function isManagementNotification(type: NotificationType): boolean {
+  return MANAGEMENT_NOTIFICATION_TYPES.includes(type);
+}
 
 /**
  * Todos los tipos, en el orden en que se ofrecen en el filtro de la bandeja (QL-137). Es la
@@ -45,6 +70,12 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'DEADLINE_APPROACHING',
   'DEADLINE_EXTENSION_REQUEST',
   'PROJECT_MEMBER_ADDED',
+  // (QL-200) Al final del filtro: solo las ve Dirección, y para el resto de la plantilla un chip
+  // con 0 sería ruido (los chips con 0 ni se pintan, ver `NotificationFilters`).
+  'MGMT_TASK_OVERDUE',
+  'MGMT_PENDING_BUILDUP',
+  'MGMT_LOW_COMPLIANCE',
+  'MGMT_REPEATED_BREACH',
 ];
 
 /** Etiqueta legible de cada tipo, para los chips del filtro (QL-137). */
@@ -62,6 +93,12 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   DEADLINE_APPROACHING: 'Vencimientos',
   DEADLINE_EXTENSION_REQUEST: 'Prórrogas',
   PROJECT_MEMBER_ADDED: 'Proyectos',
+  // (QL-200) Las cuatro de gestión van etiquetadas por separado: son cuatro situaciones
+  // distintas y agruparlas en un "Gestión" genérico impediría filtrar la que interesa.
+  MGMT_TASK_OVERDUE: 'Tareas vencidas (gestión)',
+  MGMT_PENDING_BUILDUP: 'Acumulación de pendientes',
+  MGMT_LOW_COMPLIANCE: 'Bajo cumplimiento',
+  MGMT_REPEATED_BREACH: 'Incumplimientos repetidos',
 };
 
 /** ¿Es `value` un `NotificationType` válido? Narrowing para lo que llega de la URL (QL-137). */
@@ -135,6 +172,18 @@ export interface Notification {
   project: NotificationProjectRef | null;
   /** **(QL-137)** Tarea ya poblada, o `null` si no cuelga de una tarea o si la tarea se borró. */
   task: NotificationTaskRef | null;
+  /**
+   * **(QL-200, §3.72 §6)** De **quién habla** la alerta de gestión. `null` en todos los tipos
+   * anteriores.
+   *
+   * ⚠️ Es un campo **aparte de `actor` a propósito**: el sujeto **no ha hecho nada**, la alerta
+   * la dispara el paso del tiempo. Renderizarlo como si fuera el actor haría que la bandeja
+   * dijera "Fulano hizo X" cuando nadie hizo nada — y en una alerta sobre su desempeño, eso no es
+   * un matiz de redacción.
+   */
+  subjectUserId?: string | null;
+  /** **(QL-200)** El mismo funcionario, ya poblado. `null` si no es `MGMT_*` o si ya no existe. */
+  subject?: NotificationActor | null;
   createdAt: string;
 }
 

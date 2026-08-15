@@ -213,6 +213,10 @@ function NotificationPopoverRow({
       >
         <NotificationAvatar
           actor={notification.actor}
+          // (QL-200) Las alertas de gestión no tienen actor: sin pasar el sujeto, la campana las
+          // pintaría todas con el icono genérico de sistema y no se distinguiría de quién habla
+          // cada una.
+          subject={notification.subject}
           type={notification.type}
           className="mt-0.5 shrink-0"
         />

@@ -105,6 +105,42 @@ export function useReorderChecklist(taskId: string) {
   });
 }
 
+/**
+ * (QL-201, §3.73 §10) **Desmarca todo** el checklist de una tarea.
+ *
+ * Existe por un detalle de la duplicación: el checklist se copia **con su estado `done`**, porque
+ * el cliente pidió conservar la información. Si el uso real resulta ser "duplicar para rehacer",
+ * lo que falta es un gesto de UI **después** de copiar — no desmarcar por defecto, que sería
+ * perder el dato que se pidió guardar. De ahí que sea una acción explícita y no un flag del alta.
+ *
+ * No hay endpoint de lote, así que recorre los ítems marcados y manda un toggle **explícito**
+ * (`done: false`) por cada uno: sin el `done` el backend invierte el valor actual y una carrera
+ * con otro usuario podría acabar marcando lo que se quería desmarcar. Un checklist típico son
+ * unos pocos ítems; las llamadas van en serie para no disparar una ráfaga contra la API.
+ *
+ * Permitido a CREATOR/ASSIGNEE/COLLABORATOR (los mismos que el toggle normal).
+ */
+export function useUncheckAllChecklist() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (taskId: string): Promise<number> => {
+      const items = await checklistsService.list(taskId);
+      const done = items.filter((item) => item.done);
+      for (const item of done) {
+        await checklistsService.toggle(item.id, { done: false });
+      }
+      return done.length;
+    },
+    onSuccess: (_count, taskId) => {
+      queryClient.invalidateQueries({ queryKey: checklistKeys.list(taskId) });
+      // El progreso del checklist viaja en la propia tarea (`checklistDone`), que se pinta en la
+      // tarjeta del tablero y en el detalle: sin esto, la copia seguiría anunciando "5/5".
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
 /** Elimina un ítem e invalida el checklist. Solo CREATOR/ASSIGNEE. */
 export function useDeleteItem(taskId: string) {
   const queryClient = useQueryClient();

@@ -18,6 +18,9 @@ const ACTION_VERB: Record<string, string> = {
   ASSIGN: 'asignó',
   COMPLETE: 'completó',
   REOPEN: 'reabrió',
+  // (QL-201) El log cuelga de la tarea ORIGINAL, así que la frase sale como "María duplicó la
+  // tarea «X»" — que es literalmente lo que pasó, aunque la copia viva en otro proyecto.
+  DUPLICATE: 'duplicó',
 };
 
 /**

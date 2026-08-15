@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { FolderOpen, Loader2, ListFilter, Mail, MailOpen, MoreVertical, Trash2 } from 'lucide-react';
+import {
+  FolderOpen,
+  Loader2,
+  ListFilter,
+  Mail,
+  MailOpen,
+  MoreVertical,
+  ShieldAlert,
+  Trash2,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -22,7 +31,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-import type { Notification } from '../services/notifications.service';
+import {
+  isManagementNotification,
+  type Notification,
+} from '../services/notifications.service';
 import { notificationText, timeAgo } from '../lib/notification-text';
 import { resolveNotificationHref } from '../lib/notification-nav';
 import { NotificationAvatar } from './NotificationAvatar';
@@ -94,6 +106,7 @@ export function NotificationRow({
       >
         <NotificationAvatar
           actor={notification.actor}
+          subject={notification.subject}
           type={notification.type}
           className="mt-0.5 shrink-0"
         />
@@ -101,6 +114,18 @@ export function NotificationRow({
         <div className="min-w-0 flex-1">
           <p className="text-sm text-on-surface">{notificationText(notification)}</p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-on-surface-variant">
+            {/* (QL-200) La marca "Gestión" va delante del resto de metadatos: deja claro de
+                entrada que es un aviso interno de Dirección sobre otra persona, y no algo que
+                el destinatario tenga que atender él. */}
+            {isManagementNotification(notification.type) && (
+              <>
+                <span className="inline-flex items-center gap-1 rounded-full bg-surface-container-high px-1.5 py-0.5 font-medium text-on-surface-variant">
+                  <ShieldAlert className="size-3 shrink-0" aria-hidden />
+                  Gestión
+                </span>
+                <span aria-hidden>·</span>
+              </>
+            )}
             <span>{timeAgo(notification.createdAt)}</span>
             {/* El proyecto es el "dónde"; el "qué" (la tarea) ya va en el texto. Un proyecto
                 borrado llega con `name: ''` (§3.36) → no se pinta el chip. */}

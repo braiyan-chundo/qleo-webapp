@@ -116,9 +116,63 @@ export interface TaskAnalytics {
 }
 
 /**
+ * (QL-200, §3.72 §3) Hacia dónde se mueve el cumplimiento de una persona. Lo resuelve el
+ * **backend** con una banda muerta de ±5 puntos; el front **no lo recalcula**.
+ *
+ * `INSUFFICIENT_DATA` (alguna de las dos ventanas sin muestra) **no es «estable»**: se pinta
+ * como ausencia de dato, sin flecha y sin cero.
+ */
+export type ComplianceTrendDirection =
+  | 'IMPROVING'
+  | 'WORSENING'
+  | 'STABLE'
+  | 'INSUFFICIENT_DATA';
+
+/**
+ * (QL-200, §3.72 §3) Recuento de una ventana de compromisos **ya juzgables**.
+ *
+ * `rate` es **`null` cuando `sample` es 0** — ni 0 ni 100. Es la misma disciplina que
+ * `complianceRate`: sin muestra no hay porcentaje.
+ */
+export interface ComplianceWindow {
+  /** Compromisos juzgables de la ventana (el denominador). */
+  sample: number;
+  /** De esos, entregados dentro de plazo. */
+  onTime: number;
+  /** De esos, incumplidos (tarde, o vencidos y aún abiertos). */
+  breached: number;
+  /** `round(onTime / sample × 100)`, o **`null`** si `sample === 0`. */
+  rate: number | null;
+}
+
+/**
+ * (QL-200, §3.72 §3) Tendencia del cumplimiento: los últimos `windowDays` días contra los
+ * `windowDays` anteriores, anclando cada compromiso en su **`dueDate`** (el periodo en que
+ * *vencía*, no en el que se cerró).
+ */
+export interface ComplianceTrend {
+  /** Tamaño de cada ventana en días (hoy 30). */
+  windowDays: number;
+  /** Ventana reciente. */
+  current: ComplianceWindow;
+  /** Ventana anterior, del mismo tamaño: la referencia de la comparación. */
+  previous: ComplianceWindow;
+  /** `current.rate − previous.rate` en **puntos**; `null` si alguna ventana está vacía. */
+  deltaPoints: number | null;
+  /** Ya resuelto por el backend (banda muerta ±5 pts). **No lo recalcules.** */
+  direction: ComplianceTrendDirection;
+}
+
+/**
  * P6 (§3.24) — perfil de rendimiento por usuario. Todos los tiempos en **ms**. `avgDurationMs`
  * es tiempo **hábil**; `avgDelayMs` es **reloj de pared**. `efficiency` 0–100 (puntualidad ×
  * avance), la calcula el backend y el front la muestra tal cual.
+ *
+ * ⚠️ (QL-200, §3.72 §1) **Asimetría heredada.** Los campos anteriores a QL-200 (`assignedTasks`,
+ * `completedTasks`, `onTime`, `late`, `efficiency`) **incluyen las tareas descartadas**; los
+ * nuevos (`pending*`, `overdueTasks`, `compliance*`) **no**. Consecuencia práctica:
+ * `pendingTasks + completedTasks` **no** tiene por qué sumar `assignedTasks`, así que estos
+ * números no se pueden presentar como el desglose de un total.
  */
 export interface UserPerformance {
   user: AnalyticsUser;
@@ -138,8 +192,51 @@ export interface UserPerformance {
   avgDurationMs: number;
   /** Media de `max(0, completedAt − dueDate)` sobre ASSIGNEE finalizadas con `dueDate`; `0` si ninguna. */
   avgDelayMs: number;
-  /** 0–100 (a-tiempo × avance). */
+  /**
+   * 0–100 (a-tiempo × **avance**). **NO es el «% de cumplimiento»** (QL-200): mezcla puntualidad
+   * con volumen entregado, ignora la tarea vencida y aún abierta, y vale **0 cuando no hay
+   * datos**. Para el listón que pidió el cliente, {@link UserPerformance.complianceRate}.
+   */
   efficiency: number;
+
+  // ───────────────────────── QL-200 (§3.72) — aditivo ─────────────────────────
+
+  /** Tareas donde es Responsable, **sin completar y sin descartar**: lo que tiene encima hoy. */
+  pendingTasks: number;
+  /** De las pendientes, las que ya pasaron su `dueDate`. */
+  overdueTasks: number;
+  /**
+   * De las pendientes, las que **no tienen fecha de fin** y por tanto no son juzgables. Es la
+   * **explicación** de un cumplimiento nulo o no fiable: sin esto, el hueco parece un fallo o,
+   * peor, una acusación.
+   */
+  pendingWithoutDueDate: number;
+  /**
+   * **% de cumplimiento** (§3.72 §0): de los compromisos con fecha ya juzgables, cuántos se
+   * entregaron en plazo.
+   *
+   * ⚠️ **`null` no es 0.** `null` significa que no hay ni un compromiso que juzgar. Convertirlo
+   * con `?? 0` —o dejar que ordene como un cero— convierte «no se puede medir» en «lo hace fatal»
+   * en una pantalla que lee su jefe.
+   */
+  complianceRate: number | null;
+  /** Denominador de `complianceRate`: compromisos juzgables. Se enseña **junto** al porcentaje. */
+  complianceSample: number;
+  /** De la muestra, los entregados en plazo (numerador). */
+  complianceOnTime: number;
+  /** De la muestra, los incumplidos. Siempre `complianceOnTime + complianceBreached === complianceSample`. */
+  complianceBreached: number;
+  /**
+   * `complianceSample >= complianceMinSample` (el mismo listón que usa el cron de alertas y que
+   * Dirección edita en `GET|PATCH /settings/management-alerts`).
+   *
+   * ⚠️ **En `false` no se pinta el porcentaje.** Hoy sale `false` para *todos* los usuarios del
+   * clon de producción (solo 4 de 64 tareas tienen fecha de fin), así que este es el caso normal,
+   * no el borde.
+   */
+  complianceReliable: boolean;
+  /** Tendencia 30 d vs. los 30 anteriores, ya resuelta por el backend. */
+  complianceTrend: ComplianceTrend;
 }
 
 export const analyticsService = {
@@ -151,6 +248,9 @@ export const analyticsService = {
   /** Análisis de una tarea (`GET /analytics/tasks/:id`, **solo ADMIN**; §3.24, P5). */
   getTaskAnalytics: (taskId: string) =>
     api.get<TaskAnalytics>(`/analytics/tasks/${taskId}`),
-  /** Rendimiento por usuario (`GET /analytics/users`, **solo ADMIN**; §3.24, P6). */
+  /**
+   * Rendimiento por usuario (`GET /analytics/users`, **Dirección**; §3.24 P6 + §3.72 QL-200).
+   * Array plano ordenado por `efficiency` desc; QL-200 solo **añadió** campos.
+   */
   getUsersPerformance: () => api.get<UserPerformance[]>('/analytics/users'),
 };

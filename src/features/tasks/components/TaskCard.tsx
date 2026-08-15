@@ -3,6 +3,7 @@ import {
   CalendarClock,
   CheckCircle2,
   CheckSquare,
+  CopyCheck,
   Lock,
   TriangleAlert,
 } from 'lucide-react';
@@ -80,6 +81,23 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
             className="mt-0.5 size-4 shrink-0 text-tertiary"
             aria-label="Completada"
           />
+        )}
+        {/* (QL-201, §3.73 §0) Marca de copia en la propia tarjeta. Sin ella, una tarea duplicada
+            aparece en el tablero destino como una cualquiera y su procedencia solo se descubre
+            entrando al detalle — que es justo lo que la HU quería evitar. Va como icono a secas:
+            el "de dónde salió" completo vive en el detalle, aquí basta con que se note. */}
+        {task.isDuplicate && (
+          <span
+            className="mt-0.5 shrink-0 text-on-surface-variant"
+            aria-label="Tarea duplicada"
+            title={
+              task.duplicatedFrom
+                ? `Copia de «${task.duplicatedFrom.taskTitle}» · proyecto «${task.duplicatedFrom.projectName}»`
+                : 'Tarea duplicada'
+            }
+          >
+            <CopyCheck className="size-4" aria-hidden />
+          </span>
         )}
         <p
           className={cn(
