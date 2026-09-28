@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useSerialQueue } from '@/shared/hooks/use-serial-queue';
 import type { CommentMention } from '@/features/comments/services/comments.service';
 import {
   MentionTextarea,
@@ -186,6 +187,9 @@ export function WallComposer({
 
   const uploadAttachment = useUploadWallAttachment();
   const removeAttachment = useRemoveWallAttachment();
+  // Todas las subidas (ficheros y nota de voz) van de una en una: en paralelo, Nextcloud
+  // responde `423 Locked` al escribir a la vez en la misma carpeta (ver hook).
+  const uploadQueue = useSerialQueue();
 
   const trimmed = value.trim();
   const doneAttachments = uploads.filter((u) => u.status === 'done' && u.attachment);
@@ -207,11 +211,19 @@ export function WallComposer({
       if (slot.previewUrl) URL.revokeObjectURL(slot.previewUrl);
       // Si ya se subió (adjunto huérfano), lo borramos en el backend (best-effort).
       if (slot.attachment) removeAttachment.mutate(slot.attachment.id);
+      // Si aún espera turno en la cola, ya no se sube; si está subiendo, su job lo borra al acabar.
+      if (slot.status === 'uploading') uploadQueue.cancel(slot.key);
       setUploads((prev) => prev.filter((u) => u.key !== slot.key));
     },
-    [removeAttachment],
+    [removeAttachment, uploadQueue],
   );
 
+  /**
+   * Todos los slots aparecen **ya** en `uploading`, pero las peticiones salen **en serie** por
+   * `uploadQueue`: si el usuario suelta más ficheros mientras otra tanda sube, se encadenan a
+   * la misma cola. Un fallo no la corta. Se usa `mutateAsync` (no `mutate` con callbacks)
+   * porque TanStack Query solo dispara los callbacks por-llamada de la **última** `mutate`.
+   */
   const handleFiles = (fileList: FileList | File[] | null) => {
     if (!fileList || fileList.length === 0) return;
     for (const file of Array.from(fileList)) {
@@ -229,16 +241,23 @@ export function WallComposer({
         ...prev,
         { key, name: file.name, isImage, previewUrl, status: 'uploading' },
       ]);
-      uploadAttachment.mutate(
-        { file },
-        {
-          onSuccess: (attachment) => patchSlot(key, { status: 'done', attachment }),
-          onError: (err) => {
-            patchSlot(key, { status: 'error' });
-            notifyWallError(err, 'No se pudo subir el archivo');
-          },
-        },
-      );
+      uploadQueue.enqueue(key, async () => {
+        try {
+          const attachment = await uploadAttachment.mutateAsync({ file });
+          // Desmontado: no se toca estado (el huérfano queda, como antes del cambio).
+          if (!uploadQueue.isMounted()) return;
+          // Quitado mientras subía: ya no lo enviará nadie, se borra (best-effort).
+          if (uploadQueue.isCancelled(key)) {
+            removeAttachment.mutate(attachment.id);
+            return;
+          }
+          patchSlot(key, { status: 'done', attachment });
+        } catch (err) {
+          if (!uploadQueue.isMounted() || uploadQueue.isCancelled(key)) return;
+          patchSlot(key, { status: 'error' });
+          notifyWallError(err, 'No se pudo subir el archivo');
+        }
+      });
     }
   };
 
@@ -346,25 +365,31 @@ export function WallComposer({
       type: recording.mimeType,
     });
     setSendingVoice(true);
-    uploadAttachment.mutate(
-      { file, durationSec: recording.durationSec },
-      {
-        onSuccess: (attachment) => {
-          setSendingVoice(false);
-          onSend({
-            body: '',
-            mentions: [],
-            attachments: [attachment],
-            replyTo: replyTo?.id,
-            replyPreview: replyTo,
-          });
-        },
-        onError: (err) => {
-          setSendingVoice(false);
-          notifyWallError(err, 'No se pudo enviar la nota de voz');
-        },
-      },
-    );
+    // La nota de voz va por la **misma** cola que los ficheros: comparte carpeta en Nextcloud y,
+    // con `mutate` + callbacks, una subida de fichero lanzada a la vez le robaría el `onSuccess`.
+    // Se captura la cita **ahora** (lo que el usuario veía al soltar), no al llegarle el turno.
+    const quoted = replyTo;
+    uploadQueue.enqueue(nextPendingKey('wall-voice'), async () => {
+      try {
+        const attachment = await uploadAttachment.mutateAsync({
+          file,
+          durationSec: recording.durationSec,
+        });
+        if (!uploadQueue.isMounted()) return;
+        setSendingVoice(false);
+        onSend({
+          body: '',
+          mentions: [],
+          attachments: [attachment],
+          replyTo: quoted?.id,
+          replyPreview: quoted,
+        });
+      } catch (err) {
+        if (!uploadQueue.isMounted()) return;
+        setSendingVoice(false);
+        notifyWallError(err, 'No se pudo enviar la nota de voz');
+      }
+    });
   };
 
   return (
