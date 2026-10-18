@@ -31,8 +31,10 @@ type FormTarget = { mode: 'create' } | { mode: 'edit'; id: string; snapshot: Rem
  */
 export function RemindersTaskSection({ task }: RemindersTaskSectionProps) {
   const { data, isLoading, isError, refetch } = useReminders(task.id);
-  // El tope (100) cuenta todos los míos, no solo los de esta tarea.
-  const { data: all } = useReminders();
+  // El tope (100) cuenta todos los míos, no solo los de esta tarea. No se piden solo para esto:
+  // se lee lo que ya haya en caché (si se visitó /recordatorios) sin disparar la petición; si no
+  // hay, el aviso llega al guardar como 409 `REMINDER_LIMIT_REACHED`, que el formulario ya trata.
+  const { data: all } = useReminders(undefined, { enabled: false });
   const [formOpen, setFormOpen] = useState(false);
   const [target, setTarget] = useState<FormTarget>({ mode: 'create' });
 

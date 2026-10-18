@@ -141,6 +141,8 @@ export function ReminderTaskPicker({
               <CommandInput
                 value={search}
                 onValueChange={setSearch}
+                // La API admite hasta 100 (`search` > 100 → 400): más allá diría «Ninguna tarea…» en falso.
+                maxLength={100}
                 placeholder="Buscar tarea por título…"
                 className="max-md:text-base"
               />
