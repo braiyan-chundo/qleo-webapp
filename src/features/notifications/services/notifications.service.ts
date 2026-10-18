@@ -18,6 +18,9 @@ import type { Paginated } from '@/shared/types/paginated';
  *   Dirección** y son notificaciones **del sistema**: `actor` viene siempre `null` (no las genera
  *   una persona, las dispara el paso del tiempo). Traen `subjectUserId`/`subject` —de quién
  *   hablan— y `reason` con el detalle ya redactado por el backend.
+ * - **(HU-0202, §3.74 §6)** `REMINDER`: un recordatorio personal sonó. Notificación **del
+ *   sistema** (`actor: null`) que solo recibe su dueña, con el mensaje en `reason`; `taskId` y
+ *   `projectId` si el recordatorio tiene tarea, `null` si no.
  */
 export type NotificationType =
   | 'MENTION'
@@ -34,7 +37,8 @@ export type NotificationType =
   | 'MGMT_TASK_OVERDUE'
   | 'MGMT_PENDING_BUILDUP'
   | 'MGMT_LOW_COMPLIANCE'
-  | 'MGMT_REPEATED_BREACH';
+  | 'MGMT_REPEATED_BREACH'
+  | 'REMINDER';
 
 /**
  * (QL-200, §3.72 §6) Las cuatro alertas de gestión. Se agrupan aparte porque comparten todo lo
@@ -70,6 +74,8 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'DEADLINE_APPROACHING',
   'DEADLINE_EXTENSION_REQUEST',
   'PROJECT_MEMBER_ADDED',
+  // (HU-0202) Recordatorios personales: los recibe cualquiera, así que va antes de los de gestión.
+  'REMINDER',
   // (QL-200) Al final del filtro: solo las ve Dirección, y para el resto de la plantilla un chip
   // con 0 sería ruido (los chips con 0 ni se pintan, ver `NotificationFilters`).
   'MGMT_TASK_OVERDUE',
@@ -93,6 +99,8 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   DEADLINE_APPROACHING: 'Vencimientos',
   DEADLINE_EXTENSION_REQUEST: 'Prórrogas',
   PROJECT_MEMBER_ADDED: 'Proyectos',
+  // (HU-0202) Como lo nombra la maqueta del centro de notificaciones.
+  REMINDER: 'Recordatorio',
   // (QL-200) Las cuatro de gestión van etiquetadas por separado: son cuatro situaciones
   // distintas y agruparlas en un "Gestión" genérico impediría filtrar la que interesa.
   MGMT_TASK_OVERDUE: 'Tareas vencidas (gestión)',

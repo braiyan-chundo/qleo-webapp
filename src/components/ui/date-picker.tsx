@@ -45,6 +45,13 @@ export interface DatePickerProps {
   className?: string;
   /** Texto para lectores de pantalla si no hay `<Label>` asociado. */
   'aria-label'?: string;
+  /** Marca el campo con error (borde `destructive`). */
+  'aria-invalid'?: boolean;
+  /**
+   * (HU-0202, ficha `date-picker`) Modo táctil: en el teléfono (< 768 px) la celda del calendario
+   * pasa a 44 px y el disparador a `h-11` con texto de 16 px. En escritorio no cambia nada.
+   */
+  touch?: boolean;
 }
 
 /** Fecha legible en español, ej. "10 jul 2026". */
@@ -68,6 +75,8 @@ export function DatePicker({
   endMonth,
   className,
   'aria-label': ariaLabel,
+  'aria-invalid': ariaInvalid,
+  touch = false,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -86,8 +95,10 @@ export function DatePicker({
           variant="outline"
           disabled={disabled}
           aria-label={ariaLabel}
+          aria-invalid={ariaInvalid || undefined}
           className={cn(
             'h-10 justify-start gap-2 px-3 font-normal',
+            touch && 'max-md:h-11 max-md:text-base',
             !value && 'text-on-surface-variant',
             className,
           )}
@@ -108,6 +119,7 @@ export function DatePicker({
           locale={es}
           weekStartsOn={1}
           autoFocus
+          className={touch ? 'max-md:[--cell-size:--spacing(11)]' : undefined}
         />
       </PopoverContent>
     </Popover>

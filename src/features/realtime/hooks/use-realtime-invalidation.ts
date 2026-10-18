@@ -8,6 +8,7 @@ import { commentKeys } from '@/features/comments/hooks/use-comments';
 import { dashboardKeys } from '@/features/dashboard/hooks/use-my-dashboard';
 import { notificationKeys } from '@/features/notifications/hooks/use-notifications';
 import { projectKeys } from '@/features/projects/hooks/use-projects';
+import { reminderKeys } from '@/features/reminders/hooks/use-reminders';
 import { scheduleKeys } from '@/features/schedules/hooks/use-schedules';
 import { shiftKeys } from '@/features/shifts/hooks/use-shifts';
 import { taskKeys } from '@/features/tasks/hooks/use-tasks';
@@ -68,6 +69,10 @@ function keysForEvent(event: RealtimeEvent, queryClient: QueryClient): QueryKey[
       // `/tasks/:taskId/complete`), que es donde `id` podría no ser el de la tarea.
       const tid = taskId ?? id;
       if (tid) keys.push(taskKeys.detail(tid));
+      // (HU-0202, §3.74 §8) Cerrar, reabrir o perder el acceso a una tarea cambia el
+      // `blockedReason` de mis recordatorios, que el servidor deriva al leer: no hay evento
+      // `reminder` para eso, así que se releen con cualquier cambio de tarea.
+      keys.push(reminderKeys.all);
       return keys;
     }
 
@@ -166,6 +171,12 @@ function keysForEvent(event: RealtimeEvent, queryClient: QueryClient): QueryKey[
       // así que no hay filtro fino por usuario aquí: se invalida el feature entero
       // (`scheduleKeys.all`) y cada malla mostrada (la del MEMBER, la que mire el ADMIN) refetch.
       return [scheduleKeys.all];
+    }
+
+    case 'reminder': {
+      // HU-0202 (§3.74 §7): crear, editar, pausar, reanudar, borrar y cada pasada del barrido.
+      // El bus no lleva contenido: se relee todo el feature (≤ 100 por persona).
+      return [reminderKeys.all];
     }
 
     default: {

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+  AlarmClock,
   Bell,
   HelpCircle,
   Info,
@@ -24,6 +25,7 @@ import { WallSection } from '../components/WallSection';
 import { RolesSection } from '../components/RolesSection';
 import { AdminSection } from '../components/AdminSection';
 import { NotificationsSection } from '../components/NotificationsSection';
+import { RemindersSection } from '../components/RemindersSection';
 import { ConceptsSection } from '../components/ConceptsSection';
 import { ShortcutsSection } from '../components/ShortcutsSection';
 import { FaqSection } from '../components/FaqSection';
@@ -53,6 +55,8 @@ const HELP_TABS: HelpTab[] = [
     adminOnly: true,
   },
   { value: 'notificaciones', label: 'Notificaciones', icon: <Bell />, content: <NotificationsSection /> },
+  // (HU-0202, AC-28) Igual para todos los roles.
+  { value: 'recordatorios', label: 'Recordatorios', icon: <AlarmClock />, content: <RemindersSection /> },
   { value: 'conceptos', label: 'Conceptos', icon: <Info />, content: <ConceptsSection /> },
   { value: 'atajos', label: 'Atajos', icon: <Keyboard />, content: <ShortcutsSection /> },
   { value: 'faq', label: 'FAQ', icon: <HelpCircle />, content: <FaqSection /> },

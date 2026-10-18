@@ -10,6 +10,7 @@ import { useColumns } from '@/features/columns/hooks/use-columns';
 import { ChecklistPanel } from '@/features/checklists/components/ChecklistPanel';
 import { CommentsPanel } from '@/features/comments/components/CommentsPanel';
 import { AttachmentsPanel } from '@/features/attachments/components/AttachmentsPanel';
+import { RemindersTaskSection } from '@/features/reminders/components/RemindersTaskSection';
 
 import { useTask } from '../hooks/use-tasks';
 import { userHasRole } from '../lib/roles';
@@ -165,6 +166,12 @@ export function TaskDetailPage() {
           <CompletionSection task={task} projectId={projectId} />
 
           <DeadlineSection task={task} projectId={projectId} />
+
+          {/* (HU-0202, DS-7) Mis recordatorios de esta tarea, tras la fecha límite. Cualquier rol
+              en la tarea, también el Observador: un recordatorio propio no toca la tarea. */}
+          <RemindersTaskSection
+            task={{ id: task.id, title: task.title, projectId: task.projectId }}
+          />
 
           <TimeTrackerSection task={task} />
 

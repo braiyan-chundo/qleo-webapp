@@ -67,6 +67,12 @@ export function notificationText(notification: Notification): string {
       // Noti del sistema (sin actor): se compone sin nombre.
       return task ? `${task} está por vencer` : 'Una de tus tareas está por vencer';
 
+    case 'REMINDER': {
+      // (HU-0202, §3.74 §6) Del sistema y solo para su dueña: el mensaje viaja en `reason`.
+      const reason = notification.reason?.trim();
+      return reason ? `Recordatorio: ${reason}` : 'Recordatorio';
+    }
+
     // ───────────────── (QL-200, §3.72 §6) Alertas de gestión ─────────────────
     // Las cuatro son del **sistema** (`actor: null`) y hablan de un tercero (`subject`). El
     // backend manda el detalle **ya redactado** en `reason` —el mismo texto que va en el push—

@@ -1,4 +1,5 @@
 import {
+  AlarmClock,
   LayoutDashboard,
   Folder,
   ClipboardList,
@@ -75,6 +76,9 @@ export const primaryNavItems: NavItem[] = [
   { title: 'Muro', url: '/muro', icon: Megaphone, badge: 'wall' },
   { title: 'Proyectos', url: '/projects', icon: Folder },
   { title: 'Mis tareas', url: '/tasks', icon: ClipboardList },
+  // (HU-0202, DS-11) Recordatorios personales, junto a «Mis tareas». Para todos. En el teléfono
+  // sale en «Más» (vía `allNavItems`); la barra inferior no cambia (DS-6).
+  { title: 'Recordatorios', url: '/recordatorios', icon: AlarmClock },
   // (QL-190) Asistente de IA. Gateado por `canUseAi()` en los consumidores del nav.
   { title: 'Asistente IA', url: '/ia', icon: Sparkles, requiresAi: true },
   { title: 'Notificaciones', url: '/notifications', icon: Bell },

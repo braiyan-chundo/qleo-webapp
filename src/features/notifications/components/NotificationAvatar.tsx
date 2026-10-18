@@ -1,4 +1,5 @@
 import {
+  AlarmClock,
   BadgeCheck,
   Bell,
   CalendarX,
@@ -68,6 +69,11 @@ const NOTIFICATION_TYPE_BADGE: Partial<Record<NotificationType, NotificationType
   MGMT_REPEATED_BREACH: {
     icon: Repeat,
     className: 'bg-warning-container text-on-warning-container',
+  },
+  // (HU-0202, DS-8) Recordatorio personal: del sistema, reloj sobre el círculo de la campana.
+  REMINDER: {
+    icon: AlarmClock,
+    className: 'bg-primary-container text-on-primary-container',
   },
 };
 

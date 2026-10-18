@@ -25,6 +25,8 @@ export const REALTIME_ENTITIES = [
   'shift', // QL-158 — cambió el catálogo global de turnos.
   'holiday', // QL-159 — cambió un festivo del calendario laboral.
   'schedule', // QL-160 — cambió una malla horaria de un usuario.
+  // HU-0202 (§3.74 §7) — cambió un recordatorio personal. Solo a la sala `user:<dueña>`.
+  'reminder',
 ] as const;
 
 export type RealtimeEntity = (typeof REALTIME_ENTITIES)[number];

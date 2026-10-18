@@ -12,6 +12,9 @@ import {
  */
 export const PERFORMANCE_ROUTE = '/analytics';
 
+/** (HU-0202, §3.74 §6) Destino de un recordatorio que no tiene tarea: la misma `url` del push. */
+export const REMINDERS_ROUTE = '/recordatorios';
+
 /**
  * Resuelve la ruta in-app destino de una notificación (§3.10, §3.36). Reglas, **en este orden**:
  * - Con `taskId` → la tarea. Si además viene `projectId` (QL-137: ahora llega en TODAS las notis
@@ -20,6 +23,8 @@ export const PERFORMANCE_ROUTE = '/analytics';
  * - **(QL-200)** Alerta de gestión **de persona** (sin `taskId`) → el panel de rendimiento, que es
  *   donde está el estado real y completo. La bandeja es un canal de avisos, no un registro de
  *   incidencias: el aviso coalesce por cooldown, la tabla no.
+ * - **(HU-0202)** Recordatorio **sin tarea** → `/recordatorios`, igual que su push. Con tarea ya
+ *   salió por la primera regla.
  * - Sin `taskId` pero con `projectId` (p. ej. `PROJECT_MEMBER_ADDED`) → el proyecto.
  * - Sin ninguno (p. ej. `WALL_MENTION`) → `null`: no hay tarea/proyecto que abrir desde aquí.
  *
@@ -47,6 +52,10 @@ export async function resolveNotificationHref(
   // pero si alguna lo trajera algún día, su sitio seguiría siendo el panel de rendimiento.
   if (isManagementNotification(notification.type)) {
     return PERFORMANCE_ROUTE;
+  }
+  // (HU-0202) Antes del `projectId`: un recordatorio sin tarea abre la vista de recordatorios.
+  if (notification.type === 'REMINDER') {
+    return REMINDERS_ROUTE;
   }
   if (notification.projectId) {
     return `/projects/${notification.projectId}`;

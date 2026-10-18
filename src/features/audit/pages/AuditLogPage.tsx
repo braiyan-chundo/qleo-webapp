@@ -63,6 +63,8 @@ const ENTITY_TYPES = [
   'PERMISSION-PROFILE',
   // (QL-199) Altas, ediciones y borrados de ausencias.
   'ABSENCE',
+  // (HU-0202, §3.74 §9) Recordatorios personales: acción e id, sin el mensaje.
+  'REMINDER',
 ] as const;
 
 type BadgeVariant =

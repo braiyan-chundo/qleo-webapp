@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
@@ -27,6 +28,13 @@ import { NotFoundPage } from '@/shared/components/NotFoundPage';
 import { useThemeColorMeta } from '@/shared/hooks/use-theme-color-meta';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
+import { QleoLoader } from '@/shared/components/QleoLoader';
+
+// (HU-0202) Recordatorios en su propio chunk: el bundle principal ya roza el límite de 2 MiB del
+// precache del service worker (`injectManifest`). El chunk se precachea igual: funciona sin red.
+const RemindersPage = lazy(() =>
+  import('@/features/reminders/pages/RemindersPage').then((m) => ({ default: m.RemindersPage })),
+);
 
 function App() {
   // Sincroniza la barra del SO con el tema activo (QL-47).
@@ -58,6 +66,22 @@ function App() {
                   element={<TaskDetailPage />}
                 />
                 <Route path="/tasks" element={<MyTasksPage />} />
+                {/* Recordatorios personales (HU-0202): toda cuenta autenticada, sin gate de rol
+                    (D-15). La push de un recordatorio sin tarea abre esta ruta (§3.74 §6). */}
+                <Route
+                  path="/recordatorios"
+                  element={
+                    <Suspense
+                      fallback={
+                        <div className="flex justify-center p-8">
+                          <QleoLoader />
+                        </div>
+                      }
+                    >
+                      <RemindersPage />
+                    </Suspense>
+                  }
+                />
                 {/* Panel de IA (QL-190): autenticado; el acceso lo gatea `GET /ai/status`
                     (canal `canUseAi`; ADMIN y Dirección siempre pasan, QL-195). El nav se oculta
                     con `canUseAi()`, pero la seguridad real la impone el `AiAccessGuard`. */}
