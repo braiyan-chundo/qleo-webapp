@@ -6,6 +6,7 @@ import { columnKeys } from '@/features/columns/hooks/use-columns';
 import { commentKeys } from '@/features/comments/hooks/use-comments';
 import { checklistKeys } from '@/features/checklists/hooks/use-checklist';
 import { auditKeys } from '@/features/audit/hooks/use-audit';
+import { reminderKeys } from '@/features/reminders/hooks/use-reminders';
 
 import { aiActionsService } from '../services/ai-actions.service';
 
@@ -24,6 +25,7 @@ function invalidateDomainRoots(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: commentKeys.all });
   queryClient.invalidateQueries({ queryKey: checklistKeys.all });
   queryClient.invalidateQueries({ queryKey: auditKeys.all });
+  queryClient.invalidateQueries({ queryKey: reminderKeys.all });
 }
 
 /** Confirma (ejecuta) una acción propuesta. Idempotente. Invalida el dominio afectado al éxito. */

@@ -1,4 +1,4 @@
-import { AlarmClock, BellRing, CalendarDays, ClipboardList, EyeOff, Globe, Repeat } from 'lucide-react';
+import { AlarmClock, BellRing, CalendarDays, ClipboardList, EyeOff, Globe, Repeat, Wand2 } from 'lucide-react';
 
 import { Section, FeatureList, type HelpFeature } from './HelpPrimitives';
 
@@ -28,6 +28,11 @@ const REMINDER_FEATURES: HelpFeature[] = [
     icon: <ClipboardList className="size-4 text-primary" />,
     term: 'Desde una tarea',
     desc: 'En la tarea, la sección «Recordatorios» te deja añadir uno ya asociado. Si la tarea se completa o se descarta, deja de sonar hasta que se reabra.',
+  },
+  {
+    icon: <Wand2 className="size-4 text-primary" />,
+    term: 'Pídeselo al asistente',
+    desc: 'En el asistente de IA, escribe o dicta qué quieres recordar y cuándo. Solo para ti: te pregunta la hora si falta y no crea nada hasta que confirmas la tarjeta. Editar, pausar o borrar se hace aquí.',
   },
   {
     icon: <BellRing className="size-4 text-primary" />,

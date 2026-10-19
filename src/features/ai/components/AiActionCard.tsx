@@ -27,6 +27,7 @@ const CONFIRM_LABELS: Record<string, string> = {
   add_checklist_item: 'Añadir ítem',
   toggle_checklist_item: 'Actualizar ítem',
   create_project: 'Crear proyecto',
+  create_reminder: 'Crear recordatorio',
 };
 
 /**
