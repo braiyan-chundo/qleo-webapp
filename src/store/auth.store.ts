@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { queryClient } from '@/core/query/query-client';
 import { clearImageCache } from '@/shared/lib/image-cache';
 
 /**
@@ -147,6 +148,12 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user }),
       logout: () => {
         set({ accessToken: null, user: null });
+        // Privacidad en equipo compartido (O-4 de HU-0202): sin esto, quien entre después en la
+        // misma pestaña ve, mientras dure la caché, los datos del usuario que sale (sus
+        // recordatorios privados, sus notificaciones). `clear()` también cancela las peticiones en
+        // vuelo, para que una respuesta tardía no repueble la caché del siguiente. Va tras el
+        // `set`: las queries que siguen montadas al salir dependen de `!!token` y no re-piden.
+        queryClient.clear();
         // (QL-182, §3.60) Privacidad en equipo compartido: la caché del SW se indexa por URL,
         // así que hay que vaciar las imágenes cacheadas del usuario que sale. Best-effort,
         // fire-and-forget: no debe bloquear el cierre de sesión. Cubre todas las vías de logout
